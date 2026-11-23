@@ -1,9 +1,72 @@
-<!-- BEGIN:nextjs-agent-rules -->
+## EVERME 프론트엔드 스타일 컨벤션
 
-## This is NOT the Next.js you know
+이하 기준은 사용자가 확정한 UI 요구와 현재 화면에 따른다. 이후 사용자의 명시적인 요청이 우선한다. 기능과 무관한 디자인 변경이나 라이브러리 도입은 하지 않는다.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+### 디자인 방향과 색상
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+- 밝은 테마를 기본으로 한다. 흰색 콘텐츠 영역과 옅은 파스텔 녹색 사이드바, 녹색 포인트를 유지한다. 시스템 테마에 따른 다크 모드는 추가하지 않는다.
+- 공통 색상은 globals.css의 변수를 재사용한다.
 
-<!-- END:nextjs-agent-rules -->
+| 용도 | 값 |
+| --- | --- |
+| 포인트 | --green: #16803C |
+| 선택·호버 배경 | --green-light: #EAF7EF |
+| 본문 | --ink: #17212B |
+| 보조 문구·기본 메뉴 | --muted: #64748B |
+| 기본 테두리 | --line: #E0E7E4 |
+| 보조 표면 | --surface: #F7F9F8 |
+| 사이드바 배경 | #F0F8F3 |
+
+- 사이드바 안의 테두리·구분선·팝업 테두리는 로컬 --line 값을 사용한다: color-mix(in srgb, var(--green) 18%, #f0f8f3).
+- 사이드바의 모드 버튼, 메뉴, 하위 항목, 계정 팝업의 호버 배경은 모두 var(--green-light)로 통일한다. 흰색이나 var(--surface)를 호버 배경으로 섞지 않는다.
+- 기본 글꼴은 Arial, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif, 본문 크기는 15px, 줄 높이는 1.6이다.
+
+### 파일·컴포넌트·스타일 구성
+
+- Next.js App Router를 사용한다. 독립된 화면은 경로 폴더의 page.js로 정의한다.
+- 페이지는 폴더형, UI 컴포넌트는 단일 JS 파일형으로 만든다. 여러 화면에서 공유하는 UI만 src/components에 두고, 화면 전용 컴포넌트는 사용하는 페이지 근처에 둔다.
+- 인증 화면은 app/(auth), 서비스 화면은 app/(service)의 layout.js에서 공통 틀을 적용한다. 괄호 그룹명은 URL에 포함하지 않는다.
+- 모달·드롭다운·로딩·토스트·음성 전환 같은 화면 내부 상태를 위해 새 page.js나 라우트를 추가하지 않는다. 새 작업에서는 필요한 로컬 상태를 사용한다. 기존 변형 경로의 일괄 정리는 별도 요청 없이 진행하지 않는다.
+- 스타일은 컴포넌트 옆의 .module.css에서 관리한다. 예: AppSidebar.js / AppSidebar.module.css, ChatInput.js / ChatInput.module.css.
+- globals.css에는 초기화, 색상 변수, 폰트, 공통 기본 태그 스타일만 둔다. 화면별 선택자나 반응형 규칙을 추가하지 않는다.
+- 여러 화면에 쓰이는 공통 표현은 components/Common.module.css와 Page.module.css를 재사용한다. 같은 스타일을 페이지마다 복제하지 않는다.
+- 반응형 규칙은 해당 컴포넌트 모듈에 둔다. 기존 1100px·760px 분기와 모바일 탐색 동작을 유지한다.
+- 기존 모듈 클래스 연결은 src/lib/classNames.js를 따른다. :global은 부모가 공용 UI 배치를 조정하는 제한된 경우에만 사용하고, 새로운 광범위 전역 선택자는 만들지 않는다.
+- CSS Modules는 Next.js 기본 처리에 맡긴다. 현재 Tailwind Turbopack 로더는 globals.css에만 적용하므로 *.css 전체에 다시 적용하지 않는다.
+
+### 사이드바
+
+- 브랜드는 public/everme_logo.svg를 텍스트 EVERME 왼쪽에 배치한다. 로고 36×36px, 간격 10px, 세로 중앙 정렬을 유지한다.
+- 데스크톱 사이드바의 현재 너비는 300px이다. 너비를 변경할 때는 서비스 콘텐츠의 좌측 여백도 함께 확인해 겹치지 않게 한다.
+- 모드 버튼은 현재 모드를 표시하고 클릭하면 반대 모드로 바로 이동한다. 드롭다운으로 바꾸지 않는다.
+- 모드 버튼은 다른 메뉴와 같은 기본 글자 크기·var(--muted) 색상을 사용하되, 항상 font-weight: 700으로 표시한다.
+- AI 대화와 AI 클론은 클릭하면 하위 목록을 펼치거나 접는 버튼이다. 한 번에 하나의 하위 목록만 열고, 다른 상위 메뉴를 선택하면 기존 목록을 닫는다.
+- AI 대화 오른쪽에 + 버튼을 둔다. 클릭하면 빈 새 대화를 연다.
+- 최근 대화는 최대 5개 행 높이까지 표시하고 초과 항목은 세로 스크롤로 확인한다. 항목의 ··· 메뉴는 hover 또는 키보드 포커스 시 표시하며, 터치 환경에서도 접근 가능해야 한다.
+- AI 클론 하위는 클론 대시보드(/clone), 접근 이력(/clone/history) 두 항목으로 구성한다. 최근 대화 항목과 같은 스타일을 사용한다.
+- 선택 항목은 연녹색 배경으로 구분한다. 기본 메뉴 높이 48px, 모서리 8px, 하위 항목 높이 44px를 기준으로 한다.
+- 계정 설정을 주 메뉴에 넣지 않는다. 하단 이름·이메일 영역을 누르면 위쪽으로 계정 팝업을 열고 계정 설정·로그아웃을 제공한다.
+- 계정 팝업은 바깥 클릭과 Escape로 닫을 수 있어야 한다.
+
+### 채팅 화면과 입력창
+
+- /chat의 기본 화면은 새 대화 화면이다. 사용자 AI 대화 상단에 제목·안내 문구를 위한 별도 헤더를 추가하지 않는다. 정보이용자 AI 대변인의 클론 식별·안내 영역은 별개로 유지한다.
+- 새 대화 안내와 추천 주제는 사이드바를 제외한 채팅 뷰포트의 대화 영역 중앙에 가로·세로 정렬한다. 입력창은 하단에 유지한다.
+- 추천 주제 버튼은 border-radius: 999px의 캡슐 스타일을 사용한다.
+- 채팅 입력 컨테이너는 div.composer이다. form이나 textarea로 바꾸지 않고 input type="text"를 사용한다.
+- 60% 너비는 input이 아닌 div.composer에 적용한다. 채팅 뷰포트 안의 부모 콘텐츠 영역 기준 width와 max-width를 60%로 두고 margin-inline: auto로 중앙 정렬한다.
+- 입력 컨테이너는 높이 76px, 네 모서리 radius 38px로 양 끝이 반원이 되도록 한다.
+- input과 버튼은 한 줄에 배치한다. input은 flex: 1, min-width: 0으로 남은 너비를 채운다.
+- 오른쪽 버튼 순서는 마이크 → 전송이다. 버튼은 44×44px, radius 50%를 사용한다.
+- "음성으로도 이야기할 수 있어요" 문구는 표시하지 않는다.
+- "AI가 잘못 이해할 수 있어요. 나의 발언은 언제든 정정할 수 있어요."는 입력창 아래에서 채팅 뷰포트 기준 가로 중앙 정렬한다. 사이드바 너비를 보정해 전체 브라우저 화면 중앙으로 옮기지 않는다.
+- 전송 버튼과 Enter로 전송한다. 공백 메시지는 무시하고, 한글 IME 조합 중 Enter가 전송되지 않도록 한다.
+- +로 연 빈 대화는 최근 대화에 넣지 않는다. 첫 메시지를 보내고 대화가 시작되는 시점에 한 번만 추가한다. 현재는 목업 응답을 사용하며, 목록은 새로고침 시 초기화되는 메모리 상태이다.
+
+### 접근성과 검증
+
+- 이동은 Link, 펼치기·접기·전송 같은 동작은 button type="button"을 사용한다.
+- 아이콘 버튼에는 aria-label을 제공한다. 하위 메뉴에는 aria-expanded와 aria-controls를 적용하고, 키보드 포커스 표시를 제거하지 않는다.
+- 스타일 리팩터링은 기존 레이아웃·색상·간격·동작을 유지하는 것이 기본이다. 관련 없는 화면까지 재설계하지 않는다.
+- 변경 범위에 맞게 린트·빌드와 브라우저 확인을 수행한다. 모듈 분리나 레이아웃 변경 시 데스크톱·모바일 및 팝업·메뉴·채팅 입력을 확인한다.
+- 변경이 화면에 보이지 않으면 실제 적용 CSS와 실행 중인 서버를 확인한다. 확인 없이 더 강한 선택자나 !important를 반복해서 추가하지 않는다.

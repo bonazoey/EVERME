@@ -1,0 +1,78 @@
+.settings-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 24px;
+}
+.settings-grid > :global(.card) {
+  margin: 0;
+}
+.settings-grid :global(.field) {
+  margin: 24px 0;
+}
+.privacy-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 0 28px;
+  margin-bottom: 28px;
+}
+.privacy-row h3 {
+  margin-top: 0;
+}
+.privacy-row p {
+  font-size: 13px;
+  margin: 0;
+}
+.privacy-row > div:last-child {
+  text-align: right;
+  flex-shrink: 0;
+}
+.privacy-row a {
+  display: block;
+  font-size: 13px;
+  margin-top: 10px;
+}
+.toast {
+  position: fixed;
+  bottom: 32px;
+  left: calc(50% + 118px);
+  transform: translateX(-50%);
+  background: var(--green);
+  color: white;
+  border-radius: 10px;
+  padding: 16px 24px;
+  box-shadow: 0 8px 24px #17212b25;
+  z-index: 50;
+}
+.toast a {
+  margin-left: 24px;
+}
+@media (max-width: 1100px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 1100px) {
+  .settings-grid :global(.card) {
+    margin: 0;
+  }
+}
+@media (max-width: 760px) {
+  .privacy-row {
+    gap: 12px;
+  }
+}
+@media (max-width: 760px) {
+  .privacy-row h3 {
+    font-size: 14px;
+  }
+}
+@media (max-width: 760px) {
+  .toast {
+    left: 50%;
+    width: max-content;
+    max-width: 90%;
+    font-size: 13px;
+  }
+}

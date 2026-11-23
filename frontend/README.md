@@ -1,57 +1,94 @@
 # EVERME 프론트엔드 목업
 
-Penpot의 `02. PC` 페이지를 바탕으로 만든 Next.js App Router 목업입니다.
-인증, 대화, AI 클론, 정보이용자 관리, AI 대변인, 계정 설정 화면을 연결합니다.
+Penpot 디자인을 바탕으로 만든 Next.js App Router 목업입니다.
 
 ## 실행
 
 ```powershell
-cd front-end
+cd frontend
 npm install
 npm run dev
 ```
 
-- 서비스 시작: http://localhost:3000
-- 전체 화면 목록: http://localhost:3000/screens
-- 사용자 대화: http://localhost:3000/chat
-- 정보이용자 모드: http://localhost:3000/viewer/clones
+시작 화면: http://localhost:3000
+사용자 대화: /chat
+정보이용자 모드: /viewer/clones
 
-## 디렉터리
+## 구조
 
 ```text
 src/
-  app/                      # Next.js 라우트, 루트 레이아웃, 공통 CSS
-    [...slug]/page.js        # 화면 대응표에서 페이지 컴포넌트 선택
-    screens/page.js          # 전체 목업 화면 목록
-  components/
-    layout/                 # AuthLayout, AppLayout (사이드바·헤더)
-    pages/                  # 폴더형 페이지 컴포넌트
-      AuthPage/index.js
-      ChatPage/index.js
-      ClonePage/index.js
-      MembersPage/index.js
-      AccessHistoryPage/index.js
-      ClonesPage/index.js
-      InvitationsPage/index.js
-      SettingsPage/index.js
-      ScreenIndexPage/index.js
-    ui/                     # Button.js, Field.js 등 단일 파일 UI 컴포넌트
-  lib/screens.js            # Penpot 화면 ID ↔ URL ↔ 페이지 컴포넌트
-design/penpot-screens.json   # MCP로 읽은 원본 화면명·치수·문구·텍스트 배치
+  app/
+    layout.js                    # HTML·메타데이터·공통 스타일
+    globals.css
+    (auth)/                      # 인증 화면 그룹 (URL에는 포함되지 않음)
+      layout.js                  # 서비스 소개와 인증 폼 공통 틀
+      page.js                    # /
+      AuthForm.js                # 인증 화면이 공유하는 폼
+      signup/page.js
+      consent/page.js
+      reset-password/
+        page.js
+        new/page.js
+        sent/page.js
+    (service)/                   # 서비스 화면 그룹
+      layout.js                  # 공통 사이드바·헤더 및 현재 메뉴 표시
+      AppSidebar.js
+      AppHeader.js
+      chat/
+        page.js                  # /chat
+        ChatContent.js           # 대화·음성·모달 화면이 공유하는 내용
+        voice/page.js
+        edit/page.js
+        ...
+      clone/
+        page.js
+        history/page.js
+      members/
+        page.js
+        MembersContent.js
+        invite/page.js
+        ...
+      settings/
+        page.js
+        SettingsContent.js
+        voice/page.js
+        ...
+      viewer/
+        chat/page.js
+        clones/page.js
+        invitations/page.js
+        settings/page.js
+        ...
+  components/                    # 여러 기능에서 공유하는 단일 파일 UI
+    Button.js
+    Field.js
+    Modal.js
+    ...
 ```
 
-페이지별 폴더에 전용 컴포넌트나 CSS 모듈을 추가할 수 있습니다.
-공용 UI는 `components/ui` 아래 단일 파일로 유지합니다.
+- 페이지는 경로별 폴더의 page.js로 정의합니다.
+- 화면 전용 컴포넌트는 해당 화면 폴더 근처에 둡니다.
+- 여러 화면이 공유하는 UI만 components 아래에 둡니다.
+- 레이아웃은 Next.js의 layout.js에서 한 번 적용합니다.
+- 사용자·정보이용자 대화와 설정은 같은 내용 컴포넌트를 재사용합니다.
+- 변형 화면은 기존 URL을 유지합니다. 예: /members/invite, /viewer/chat/evidence.
+- 전체 화면 목록과 catch-all 라우트, 화면 대응표는 사용하지 않습니다.
 
-## 목업 동작
+## 스타일 관리
 
-- 화면 전환은 Next.js Link와 URL 기반으로 처리합니다.
-- 모달, 드로어, 음성 화면, 저장 알림도 별도 URL로 재현합니다.
-- 모드 선택과 대화 메뉴는 HTML details 요소를 사용합니다.
-- 실제 로그인, 소셜 인증, 이메일 발송, AI 응답, 녹음·재생, 저장·삭제는 구현하지 않습니다.
-- 입력값·선택값은 서버나 전역 상태에 저장하지 않습니다. 동작 버튼은 샘플 결과 화면으로 이동합니다.
-- Penpot의 PC 화면 45개에 더해 새 대화 등 이동에 필요한 보조 경로를 제공합니다.
-- PC 레이아웃을 기준으로 좁은 화면에서도 탐색할 수 있도록 반응형 스타일을 적용했습니다.
+- globals.css에는 색상 변수, 폰트, 기본 태그 스타일만 둡니다.
+- 컴포넌트 스타일과 반응형 규칙은 같은 폴더의 .module.css에서 관리합니다.
+- 예: ChatInput.js → ChatInput.module.css, AppSidebar.js → AppSidebar.module.css.
+- 여러 화면이 공유하는 표현은 components/Common.module.css와 Page.module.css에 둡니다.
+- 부모가 공용 UI의 배치를 조정하는 일부 규칙은 :global 선택자로 한정합니다.
+- classNames 유틸리티는 동적 클래스와 모듈 클래스를 연결합니다.
+- Tailwind 로더는 globals.css에만 적용하며, CSS Modules는 Next.js 기본 처리를 사용합니다.
+
+## 목업 범위
+
+Link로 화면을 전환하고, 모달·드로어·음성 화면·저장 알림도 URL로 재현합니다.
+입력값은 저장하지 않으며 실제 인증, 이메일 발송, AI 응답, 녹음·재생, 저장·삭제는 구현하지 않습니다.
 
 ## 확인
 
@@ -59,5 +96,3 @@ design/penpot-screens.json   # MCP로 읽은 원본 화면명·치수·문구·�
 npm run lint
 npm run build
 ```
-
-[Penpot 원본](https://design.penpot.app/?screen=workspace&team-id=7b7d55f9-965b-8000-8008-fd2808e132b4&file-id=42288968-6e5e-808d-8008-fccfdd4cbaeb&page-id=5c4bd28d-3951-8018-8008-fd03c6143459&layout=layers)
