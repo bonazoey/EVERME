@@ -1,4 +1,13 @@
 const paths = {
+  "arrow-right": "M5 12h14m-6-6 6 6-6 6",
+  "refresh-single": "M20 4v5h-5M20 9a8 8 0 1 0 0 7",
+  copy: "M9 8h10v13H9V8ZM15 8V3H4v13h5",
+  refresh: "M20 3v5h-5M4 21v-5h5M19.5 8A8 8 0 0 0 5 6M4.5 16A8 8 0 0 0 19 18",
+  edit: "m15 4 5 5M4 20l4-1L20 7a2.1 2.1 0 0 0-3-3L5 16l-1 4Z",
+  trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
+  robot:
+    "M12 3v3M8 6h8a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-6a4 4 0 0 1 4-4ZM9 12v2M15 12v2",
+  "chevron-up": "m6 15 6-6 6 6",
   home: "m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8",
   logout: "M9 4H4v16h5M13 8l4 4-4 4M8 12h13",
   chat: "M4 4h16v12H9l-5 4V4Z",

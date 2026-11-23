@@ -1,11 +1,6 @@
-import fieldStyles from "./Field.module.css";
-import classNames from "../lib/classNames.js";
-const styles = {
-  ...fieldStyles,
-};
 export default function Field({ label, ...props }) {
   return (
-    <label className={classNames("field", styles)}>
+    <label className="ui-field flex flex-col gap-3 m-[22px_0] text-[14px] [&_input]:w-full [&_input]:h-12.5 [&_input]:[border:1px_solid_var(--line)] [&_input]:rounded-lg [&_input]:bg-white [&_input]:p-[0_16px] [&_input]:text-ink [&_select]:w-full [&_select]:h-12.5 [&_select]:[border:1px_solid_var(--line)] [&_select]:rounded-lg [&_select]:bg-white [&_select]:p-[0_16px] [&_select]:text-ink">
       <span>{label}</span>
       <input {...props} />
     </label>

@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="640" viewBox="0 0 1600 640">
+ <defs><symbol id="candidate-0" viewBox="0 0 240 240">
+ <path d="M69 169 Q45 170 44 153 M171 169 Q195 170 196 153" fill="none" stroke="#467056" stroke-width="9" stroke-linecap="round"/>
+ <path d="M67 139 C66 109 84 91 120 91 C156 91 174 109 173 139 L180 169 C185 194 158 209 120 209 C82 209 55 194 60 169Z" fill="#CFDFD6" stroke="#467056" stroke-width="5"/>
+ <path d="M120 92 C121 74 116 65 110 56" fill="none" stroke="#467056" stroke-width="6" stroke-linecap="round"/>
+ <path d="M118 76 C87 78 75 60 77 40 C104 36 120 51 118 76Z" fill="#467056"/>
+ <path d="M120 78 C121 50 142 37 164 43 C163 67 147 82 120 78Z" fill="#88AB94"/>
+ <path d="M89 209 L87 217 M151 209 L153 217" stroke="#467056" stroke-width="9" stroke-linecap="round"/>
+ <g fill="#294B38"><ellipse cx="101" cy="148" rx="4" ry="5.5"/><ellipse cx="139" cy="148" rx="4" ry="5.5"/></g><path d="M111 163 Q120 171 129 163" fill="none" stroke="#294B38" stroke-width="3.5" stroke-linecap="round"/></symbol><symbol id="candidate-1" viewBox="0 0 240 240">
+ <path d="M87 186 L81 203 M153 186 L159 203" stroke="#467056" stroke-width="9" stroke-linecap="round"/>
+ <path d="M120 100 C91 65 49 73 37 107 C22 150 48 188 83 185 C100 184 112 174 120 163 C128 174 140 184 157 185 C192 188 218 150 203 107 C191 73 149 65 120 100Z" fill="#467056"/>
+ <path d="M120 115 C99 86 64 92 56 117 C45 150 67 170 86 164 C101 160 109 143 120 129 C131 143 139 160 154 164 C173 170 195 150 184 117 C176 92 141 86 120 115Z" fill="#CFDFD6"/>
+ <path d="M106 113 C111 119 116 125 120 129 C124 124 129 118 134 113" fill="none" stroke="#467056" stroke-width="8" stroke-linecap="round"/>
+ <ellipse cx="77" cy="129" rx="4" ry="5" fill="#294B38"/><ellipse cx="163" cy="129" rx="4" ry="5" fill="#294B38"/>
+ <path d="M110 153 Q120 163 130 153" fill="none" stroke="#294B38" stroke-width="3.5" stroke-linecap="round"/>
+ <circle cx="191" cy="62" r="6" fill="#88AB94"/>
+ </symbol><symbol id="candidate-2" viewBox="0 0 240 240">
+ <path d="M68 174 C36 175 27 142 43 122 C46 97 66 88 86 94 C88 69 117 58 137 77 C164 60 191 81 187 106 C217 111 224 146 204 164 C197 178 179 183 159 178 C142 193 120 188 108 179 C91 190 75 185 68 174Z" fill="#CFDFD6" stroke="#467056" stroke-width="5" stroke-linejoin="round"/>
+ <path d="M73 172 Q66 186 56 180 M174 174 Q183 189 192 180" fill="none" stroke="#467056" stroke-width="6" stroke-linecap="round"/>
+ <path d="M175 63 Q187 43 203 52" fill="none" stroke="#88AB94" stroke-width="3" stroke-linecap="round"/>
+ <circle cx="207" cy="53" r="7" fill="#467056"/>
+ <circle cx="175" cy="40" r="3.5" fill="#88AB94"/>
+ <ellipse cx="96" cy="135" rx="4" ry="5.5" fill="#294B38"/><ellipse cx="139" cy="135" rx="4" ry="5.5" fill="#294B38"/>
+ <path d="M110 151 Q119 160 128 151" fill="none" stroke="#294B38" stroke-width="3.5" stroke-linecap="round"/>
+ </symbol><symbol id="candidate-3" viewBox="0 0 240 240">
+ <path d="M168 166 C185 174 200 164 202 145 C185 142 173 150 168 166Z" fill="#88AB94" stroke="#467056" stroke-width="4"/>
+ <path d="M70 131 C68 90 92 62 122 64 C160 62 179 94 177 133 L174 162 C172 191 151 208 122 208 C91 208 69 189 69 163Z" fill="#CFDFD6" stroke="#467056" stroke-width="5"/>
+ <path d="M106 66 C98 48 109 34 122 34 C130 47 127 57 119 65 M124 65 C134 47 147 44 157 50 C154 65 140 70 124 65Z" fill="#467056"/>
+ <path d="M85 143 C69 147 72 173 95 180 C115 165 108 145 85 143Z" fill="#88AB94"/>
+ <ellipse cx="117" cy="116" rx="4" ry="5" fill="#294B38"/><ellipse cx="149" cy="116" rx="4" ry="5" fill="#294B38"/>
+ <path d="M127 132 L138 132 L132.5 140Z" fill="#467056" stroke="#467056" stroke-width="3" stroke-linejoin="round"/>
+ <path d="M103 210 L98 217 M144 209 L149 216" stroke="#467056" stroke-width="7" stroke-linecap="round"/>
+ </symbol><symbol id="candidate-4" viewBox="0 0 240 240">
+ <path d="M78 164 Q55 166 51 153 M162 164 Q185 166 189 153" fill="none" stroke="#467056" stroke-width="8" stroke-linecap="round"/>
+ <path d="M87 82 L87 96 C68 108 65 120 65 144 L65 178 C65 198 84 208 120 208 C156 208 175 198 175 178 L175 144 C175 120 172 108 153 96 L153 82Z" fill="#EAF2ED" stroke="#467056" stroke-width="5"/>
+ <rect x="80" y="63" width="80" height="25" rx="9" fill="#467056"/>
+ <path d="M120 63 C104 59 101 46 103 36 C119 36 128 46 120 63Z M122 62 C123 47 135 39 147 43 C145 57 136 64 122 62Z" fill="#88AB94"/>
+ <path d="M67 169 Q92 158 120 169 Q147 180 173 165 L173 180 Q173 205 120 205 Q67 205 67 180Z" fill="#CFDFD6"/>
+ <path d="M97 121 C87 110 75 124 97 139 C119 124 107 110 97 121Z" fill="#88AB94"/>
+ <path d="m144 108 3 7 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1Z" fill="#467056"/>
+ <path d="M92 210 L88 216 M148 210 L152 216" stroke="#467056" stroke-width="7" stroke-linecap="round"/>
+ <g fill="#294B38"><ellipse cx="101" cy="148" rx="4" ry="5.5"/><ellipse cx="139" cy="148" rx="4" ry="5.5"/></g><path d="M111 163 Q120 171 129 163" fill="none" stroke="#294B38" stroke-width="3.5" stroke-linecap="round"/></symbol></defs>
+ <rect width="1600" height="640" fill="#F7F9F8"/>
+ <g font-family="Malgun Gothic, Arial, sans-serif">
+ <text x="48" y="54" fill="#467056" font-size="13" font-weight="700" letter-spacing="3">EVERME / MASCOT STUDIES</text>
+ <text x="48" y="99" fill="#17212B" font-size="30" font-weight="700">나의 이야기를 함께할 다섯 친구</text>
+ <text x="1544" y="93" text-anchor="end" fill="#64748B" font-size="13">SVG · 5 CONCEPTS · #467056</text>
+ <g>
+ <rect x="48" y="140" width="280" height="416" rx="24" fill="white" stroke="#E0E7E4"/>
+ <use href="#candidate-0" x="68" y="162" width="240" height="240"/>
+ <text x="72" y="444" font-size="19" font-weight="700" fill="#17212B">01 · 새싹 친구</text>
+ <text x="72" y="475" font-size="13" fill="#64748B">대화와 함께 자라는 기억</text>
+ <use href="#candidate-0" x="71" y="494" width="40" height="40"/>
+ <rect x="120" y="492" width="44" height="44" rx="12" fill="#467056"/>
+ <use href="#candidate-0" x="122" y="494" width="40" height="40"/>
+ <text x="180" y="521" font-size="11" fill="#64748B">SMALL SIZE</text>
+ </g><g>
+ <rect x="352" y="140" width="280" height="416" rx="24" fill="white" stroke="#E0E7E4"/>
+ <use href="#candidate-1" x="372" y="162" width="240" height="240"/>
+ <text x="376" y="444" font-size="19" font-weight="700" fill="#17212B">02 · 무한 동반자</text>
+ <text x="376" y="475" font-size="13" fill="#64748B">EVERME의 연결을 닮은 친구</text>
+ <use href="#candidate-1" x="375" y="494" width="40" height="40"/>
+ <rect x="424" y="492" width="44" height="44" rx="12" fill="#467056"/>
+ <use href="#candidate-1" x="426" y="494" width="40" height="40"/>
+ <text x="484" y="521" font-size="11" fill="#64748B">SMALL SIZE</text>
+ </g><g>
+ <rect x="656" y="140" width="280" height="416" rx="24" fill="white" stroke="#E0E7E4"/>
+ <use href="#candidate-2" x="676" y="162" width="240" height="240"/>
+ <text x="680" y="444" font-size="19" font-weight="700" fill="#17212B">03 · 기억 구름</text>
+ <text x="680" y="475" font-size="13" fill="#64748B">이야기를 포근하게 품는 구름</text>
+ <use href="#candidate-2" x="679" y="494" width="40" height="40"/>
+ <rect x="728" y="492" width="44" height="44" rx="12" fill="#467056"/>
+ <use href="#candidate-2" x="730" y="494" width="40" height="40"/>
+ <text x="788" y="521" font-size="11" fill="#64748B">SMALL SIZE</text>
+ </g><g>
+ <rect x="960" y="140" width="280" height="416" rx="24" fill="white" stroke="#E0E7E4"/>
+ <use href="#candidate-3" x="980" y="162" width="240" height="240"/>
+ <text x="984" y="444" font-size="19" font-weight="700" fill="#17212B">04 · 이야기 새</text>
+ <text x="984" y="475" font-size="13" fill="#64748B">곁에서 이야기를 들어주는 새</text>
+ <use href="#candidate-3" x="983" y="494" width="40" height="40"/>
+ <rect x="1032" y="492" width="44" height="44" rx="12" fill="#467056"/>
+ <use href="#candidate-3" x="1034" y="494" width="40" height="40"/>
+ <text x="1092" y="521" font-size="11" fill="#64748B">SMALL SIZE</text>
+ </g><g>
+ <rect x="1264" y="140" width="280" height="416" rx="24" fill="white" stroke="#E0E7E4"/>
+ <use href="#candidate-4" x="1284" y="162" width="240" height="240"/>
+ <text x="1288" y="444" font-size="19" font-weight="700" fill="#17212B">05 · 기억 보관자</text>
+ <text x="1288" y="475" font-size="13" fill="#64748B">소중한 순간을 차곡차곡 담아요</text>
+ <use href="#candidate-4" x="1287" y="494" width="40" height="40"/>
+ <rect x="1336" y="492" width="44" height="44" rx="12" fill="#467056"/>
+ <use href="#candidate-4" x="1338" y="494" width="40" height="40"/>
+ <text x="1396" y="521" font-size="11" fill="#64748B">SMALL SIZE</text>
+ </g>
+ <text x="48" y="602" fill="#64748B" font-size="13">기억 · 연결 · 성장     /     투명 배경 SVG + 작은 크기 미리보기</text>
+ </g>
+</svg>
