@@ -1,0 +1,20 @@
+.notice {
+  display: flex;
+  gap: 16px;
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.notice > span {
+  color: var(--green);
+  font-size: 20px;
+}
+.notice strong {
+  font-weight: 600;
+}
+.notice p {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 6px 0 0;
+}

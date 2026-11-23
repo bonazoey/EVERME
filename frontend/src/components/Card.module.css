@@ -1,0 +1,15 @@
+.card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  background: #fff;
+  margin: 24px 0;
+}
+.card :where(h2) {
+  margin-bottom: 24px;
+}
+@media (max-width: 760px) {
+  .card {
+    padding: 20px;
+  }
+}

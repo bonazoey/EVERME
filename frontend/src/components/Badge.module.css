@@ -1,0 +1,19 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--green-light);
+  color: var(--green);
+  font-size: 13px;
+  border-radius: 7px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+.badge.amber {
+  background: #fff6e7;
+  color: #a16b17;
+}
+.badge.blue {
+  background: #edf2ff;
+  color: #496aa8;
+}

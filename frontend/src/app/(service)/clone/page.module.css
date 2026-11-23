@@ -1,0 +1,60 @@
+.clone-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.clone-grid > :global(.card) {
+  margin: 0;
+}
+.completion {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.completion > strong {
+  font-size: 42px;
+  color: var(--green);
+  line-height: 1.4;
+}
+.completion > strong span {
+  font-size: 22px;
+}
+.completion > div {
+  flex: 1;
+}
+.completion p {
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+.progress-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 42px;
+  align-items: center;
+  gap: 18px;
+  margin: 30px 0;
+  font-size: 14px;
+}
+.progress-row strong {
+  font-size: 13px;
+  color: var(--green);
+}
+.profile-summary {
+  line-height: 1.9;
+  margin: 28px 0 20px;
+}
+.tag-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 28px 0;
+}
+@media (max-width: 1100px) {
+  .clone-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 1100px) {
+  .progress-row {
+    grid-template-columns: 110px 1fr 42px;
+  }
+}
