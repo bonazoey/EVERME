@@ -1,11 +1,18 @@
 import ChatContent from "../../../chat/ChatContent";
-export default function Page() {
+export default async function Page({ searchParams }) {
+  const params = await searchParams;
+  const conversationId =
+    typeof params.conversation === "string" ? params.conversation : undefined;
+  const hasTitle =
+    typeof params.title === "string" && params.title.trim().length > 0;
   return (
     <ChatContent
+      key={conversationId ?? (hasTitle ? params.title : "new")}
+      conversationId={conversationId}
+      initialEmpty={!hasTitle}
       viewer={true}
-      variant={"empty"}
-      owner={"박정호"}
-      level={"L1 일반"}
+      owner="박정호"
+      level="L1 일반"
     />
   );
 }

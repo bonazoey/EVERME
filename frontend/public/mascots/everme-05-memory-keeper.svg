@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="05-memory-keeper-title 05-memory-keeper-desc">
+  <title id="05-memory-keeper-title">EVERME · 기억 보관자</title>
+  <desc id="05-memory-keeper-desc">소중한 순간을 차곡차곡 담아요. 녹색과 연녹색으로 구성된 마스코트 후보.</desc>
+  
+ <path d="M78 164 Q55 166 51 153 M162 164 Q185 166 189 153" fill="none" stroke="#467056" stroke-width="8" stroke-linecap="round"/>
+ <path d="M87 82 L87 96 C68 108 65 120 65 144 L65 178 C65 198 84 208 120 208 C156 208 175 198 175 178 L175 144 C175 120 172 108 153 96 L153 82Z" fill="#EAF2ED" stroke="#467056" stroke-width="5"/>
+ <rect x="80" y="63" width="80" height="25" rx="9" fill="#467056"/>
+ <path d="M120 63 C104 59 101 46 103 36 C119 36 128 46 120 63Z M122 62 C123 47 135 39 147 43 C145 57 136 64 122 62Z" fill="#88AB94"/>
+ <path d="M67 169 Q92 158 120 169 Q147 180 173 165 L173 180 Q173 205 120 205 Q67 205 67 180Z" fill="#CFDFD6"/>
+ <path d="M97 121 C87 110 75 124 97 139 C119 124 107 110 97 121Z" fill="#88AB94"/>
+ <path d="m144 108 3 7 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1Z" fill="#467056"/>
+ <path d="M92 210 L88 216 M148 210 L152 216" stroke="#467056" stroke-width="7" stroke-linecap="round"/>
+ <g fill="#294B38"><ellipse cx="101" cy="148" rx="4" ry="5.5"/><ellipse cx="139" cy="148" rx="4" ry="5.5"/></g><path d="M111 163 Q120 171 129 163" fill="none" stroke="#294B38" stroke-width="3.5" stroke-linecap="round"/>
+</svg>

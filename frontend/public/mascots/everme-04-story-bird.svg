@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="04-story-bird-title 04-story-bird-desc">
+  <title id="04-story-bird-title">EVERME · 이야기 새</title>
+  <desc id="04-story-bird-desc">곁에서 이야기를 들어주는 새. 녹색과 연녹색으로 구성된 마스코트 후보.</desc>
+  
+ <path d="M168 166 C185 174 200 164 202 145 C185 142 173 150 168 166Z" fill="#88AB94" stroke="#467056" stroke-width="4"/>
+ <path d="M70 131 C68 90 92 62 122 64 C160 62 179 94 177 133 L174 162 C172 191 151 208 122 208 C91 208 69 189 69 163Z" fill="#CFDFD6" stroke="#467056" stroke-width="5"/>
+ <path d="M106 66 C98 48 109 34 122 34 C130 47 127 57 119 65 M124 65 C134 47 147 44 157 50 C154 65 140 70 124 65Z" fill="#467056"/>
+ <path d="M85 143 C69 147 72 173 95 180 C115 165 108 145 85 143Z" fill="#88AB94"/>
+ <ellipse cx="117" cy="116" rx="4" ry="5" fill="#294B38"/><ellipse cx="149" cy="116" rx="4" ry="5" fill="#294B38"/>
+ <path d="M127 132 L138 132 L132.5 140Z" fill="#467056" stroke="#467056" stroke-width="3" stroke-linejoin="round"/>
+ <path d="M103 210 L98 217 M144 209 L149 216" stroke="#467056" stroke-width="7" stroke-linecap="round"/>
+ 
+</svg>

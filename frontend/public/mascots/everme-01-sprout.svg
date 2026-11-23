@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="01-sprout-title 01-sprout-desc">
+  <title id="01-sprout-title">EVERME · 새싹 친구</title>
+  <desc id="01-sprout-desc">대화와 함께 자라는 기억. 녹색과 연녹색으로 구성된 마스코트 후보.</desc>
+  
+ <path d="M69 169 Q45 170 44 153 M171 169 Q195 170 196 153" fill="none" stroke="#467056" stroke-width="9" stroke-linecap="round"/>
+ <path d="M67 139 C66 109 84 91 120 91 C156 91 174 109 173 139 L180 169 C185 194 158 209 120 209 C82 209 55 194 60 169Z" fill="#CFDFD6" stroke="#467056" stroke-width="5"/>
+ <path d="M120 92 C121 74 116 65 110 56" fill="none" stroke="#467056" stroke-width="6" stroke-linecap="round"/>
+ <path d="M118 76 C87 78 75 60 77 40 C104 36 120 51 118 76Z" fill="#467056"/>
+ <path d="M120 78 C121 50 142 37 164 43 C163 67 147 82 120 78Z" fill="#88AB94"/>
+ <path d="M89 209 L87 217 M151 209 L153 217" stroke="#467056" stroke-width="9" stroke-linecap="round"/>
+ <g fill="#294B38"><ellipse cx="101" cy="148" rx="4" ry="5.5"/><ellipse cx="139" cy="148" rx="4" ry="5.5"/></g><path d="M111 163 Q120 171 129 163" fill="none" stroke="#294B38" stroke-width="3.5" stroke-linecap="round"/>
+</svg>

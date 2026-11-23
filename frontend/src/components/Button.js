@@ -1,9 +1,10 @@
-import buttonStyles from "./Button.module.css";
-import classNames from "../lib/classNames.js";
-import Link from "next/link";
-const styles = {
-  ...buttonStyles,
+const buttonVariants = {
+  danger: "border-transparent bg-[#dc4040] text-white",
+  primary:
+    "border-transparent bg-green text-white hover:bg-[color-mix(in_srgb,var(--green)_85%,black)]",
+  secondary: "border-line bg-white text-green hover:bg-green-light",
 };
+import Link from "next/link";
 export default function Button({
   href,
   children,
@@ -11,14 +12,17 @@ export default function Button({
   className = "",
   ...props
 }) {
-  const buttonClasses = `button button--${variant} ${className}`;
   return href ? (
-    <Link className={classNames(buttonClasses, styles)} href={href} {...props}>
+    <Link
+      className={`ui-button inline-flex items-center justify-center min-h-11.5 p-[10px_20px] border rounded-lg text-[15px] font-semibold cursor-pointer gap-2 [transition:background_0.15s] whitespace-nowrap ${buttonVariants[variant]} ${className}`}
+      href={href}
+      {...props}
+    >
       {children}
     </Link>
   ) : (
     <button
-      className={classNames(buttonClasses, styles)}
+      className={`ui-button inline-flex items-center justify-center min-h-11.5 p-[10px_20px] border rounded-lg text-[15px] font-semibold cursor-pointer gap-2 [transition:background_0.15s] whitespace-nowrap ${buttonVariants[variant]} ${className}`}
       type="button"
       {...props}
     >

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-label="EVERME 지속되는 연결 로고">
  <title>EVERME — Everlasting Connection</title>
  <rect width="320" height="320" rx="72" fill="#F2F9F4"/>
- <path d="M160 160 C125 110 91 108 71 131 C49 155 62 205 105 205 C130 205 149 181 160 160 C178 132 197 115 220 115 C263 115 275 164 252 189 C230 215 196 209 160 160Z" fill="none" stroke="#16803C" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M160 160 C125 110 91 108 71 131 C49 155 62 205 105 205 C130 205 149 181 160 160 C178 132 197 115 220 115 C263 115 275 164 252 189 C230 215 196 209 160 160Z" fill="none" stroke="#467056" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
  <circle cx="160" cy="160" r="13" fill="#78C692"/>
 </svg>

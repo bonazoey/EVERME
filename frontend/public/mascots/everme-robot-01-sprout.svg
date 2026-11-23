@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="robot-01-sprout-title robot-01-sprout-desc">
+  <title id="robot-01-sprout-title">EVERME · 새싹봇</title>
+  <desc id="robot-01-sprout-desc">자라나는 기억을 담은 클론. 녹색과 연녹색으로 구성된 마스코트 후보.</desc>
+  <rect x="88" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="129" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="53" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/><rect x="168" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/><rect x="78" y="124" width="84" height="72" rx="23" fill="#467056"/>
+ <path d="M120 55V40" stroke="#467056" stroke-width="5" stroke-linecap="round"/>
+ <path d="M119 42 C99 44 91 32 94 20 C112 20 122 29 119 42Z" fill="#467056"/>
+ <path d="M121 42 C122 24 137 18 151 23 C149 38 137 46 121 42Z" fill="#88AB94"/>
+ <rect x="65" y="53" width="110" height="70" rx="28" fill="#CFDFD6" stroke="#467056" stroke-width="4"/>
+ <rect x="77" y="66" width="86" height="45" rx="19" fill="#467056"/>
+ <circle cx="57" cy="88" r="7" fill="#467056"/><circle cx="183" cy="88" r="7" fill="#467056"/>
+ <rect x="92" y="83" width="8" height="15" rx="4" fill="#CFDFD6"/><rect x="140" y="83" width="8" height="15" rx="4" fill="#CFDFD6"/><path d="M111 104 Q120 111 129 104" fill="none" stroke="#CFDFD6" stroke-width="3" stroke-linecap="round"/><circle cx="120" cy="157" r="16" fill="#CFDFD6"/><circle cx="120" cy="157" r="6" fill="#467056"/>
+</svg>

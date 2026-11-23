@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="robot-03-link-title robot-03-link-desc">
+  <title id="robot-03-link-title">EVERME · 링크봇</title>
+  <desc id="robot-03-link-desc">무한대 로고와 연결된 동반자. 녹색과 연녹색으로 구성된 마스코트 후보.</desc>
+  <rect x="88" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="129" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="53" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/><rect x="168" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/><rect x="78" y="124" width="84" height="72" rx="23" fill="#467056"/>
+ <path d="M120 51V33" stroke="#467056" stroke-width="5" stroke-linecap="round"/>
+ <circle cx="120" cy="26" r="9" fill="#CFDFD6" stroke="#467056" stroke-width="4"/>
+ <rect x="59" y="51" width="122" height="73" rx="25" fill="#CFDFD6" stroke="#467056" stroke-width="4"/>
+ <path d="M120 84 C103 62 77 66 76 85 C74 106 99 111 120 84 C141 57 166 63 164 85 C163 104 137 108 120 84Z" fill="none" stroke="#467056" stroke-width="8" stroke-linecap="round"/>
+ <circle cx="96" cy="86" r="4" fill="#467056"/><circle cx="145" cy="86" r="4" fill="#467056"/>
+ <path d="M112 110 Q120 115 128 110" fill="none" stroke="#467056" stroke-width="3" stroke-linecap="round"/>
+ <rect x="102" y="145" width="36" height="25" rx="8" fill="#CFDFD6"/>
+ <path d="M110 153H130 M110 161H124" stroke="#467056" stroke-width="3" stroke-linecap="round"/>
+ 
+</svg>
