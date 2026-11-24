@@ -9,7 +9,7 @@ import Icon from "@/components/Icon";
 import Modal from "@/components/Modal";
 import Field from "@/components/Field";
 import Button from "@/components/Button";
-import { getInitialConversations, useChatSessions } from "./chat/ChatSessions";
+import { getInitialConversations, useChatSessions } from "@/app/context/ChatSessions";
 const historyItemClasses =
   "h-[32px] flex items-center justify-between relative gap-1 rounded-md px-[5px] text-[14px] text-green-light [&.ui-appsidebar-selected]:font-bold [&_>_a]:overflow-hidden [&_>_a]:text-ellipsis [&_>_a]:whitespace-nowrap [&_.ui-history-menu-trigger]:opacity-0 [&:hover_.ui-history-menu-trigger]:opacity-100 [&:focus-within_.ui-history-menu-trigger]:opacity-100 [&_.ui-history-menu-trigger[aria-expanded=true]]:opacity-100 [@media(hover:_none)]:[&_.ui-history-menu-trigger]:opacity-100";
 
@@ -121,7 +121,7 @@ export default function AppSidebar({ viewer, active, chat }) {
           ? "/viewer/chat/park"
           : viewer
             ? "/viewer/chat"
-            : "/chat";
+            : "/owner/chat";
 
         router.push(path + "?conversation=" + draftId);
       }
@@ -178,7 +178,7 @@ export default function AppSidebar({ viewer, active, chat }) {
       document.removeEventListener("keydown", escape);
     };
   }, [profileOpen]);
-  const base = viewer ? "/viewer" : "";
+  const base = viewer ? "/viewer" : "/owner";
   const links = viewer
     ? [
       ["clones", "이용 가능 클론", "user", "/viewer/clones"],
@@ -186,16 +186,16 @@ export default function AppSidebar({ viewer, active, chat }) {
       ["chat", "AI 대변인", "chat", "/viewer/chat"],
     ]
     : [
-      ["chat", "AI 대화", "chat", "/chat"],
-      ["clone", "AI 클론", "user", "/clone"],
-      ["members", "정보이용자 관리", "users", "/members"],
+      ["chat", "AI 대화", "chat", "/owner/chat"],
+      ["clone", "AI 클론", "user", "/owner/clone"],
+      ["members", "정보이용자 관리", "users", "/owner/members"],
     ];
   return (
     <>
       <aside className="[--line:var(--green-light)] w-full min-w-0 h-dvh sticky top-0 self-start [&_svg]:shrink-0 [&_nav]:min-w-0 [&_nav_>_div]:min-w-0 [&_>_*]:shrink-0 p-[24px_16px] flex flex-col bg-green text-green-light [&_button:focus-visible]:outline-green-light [&_a:focus-visible]:outline-green-light [scrollbar-color:var(--green-light)_transparent] z-10 overflow-x-hidden overflow-y-auto [&_>_.ui-brand]:flex [&_>_.ui-brand]:items-center [&_>_.ui-brand]:gap-2.5 [&_>_.ui-brand]:m-[0_12px] [&_>_nav]:[border-top:1px_solid_var(--line)] [&_>_nav]:pt-4 [@media(max-width:_760px)]:static [@media(max-width:_760px)]:w-full [@media(max-width:_760px)]:h-auto [@media(max-width:_760px)]:p-5 [@media(max-width:_760px)]:[&_>_.ui-brand]:m-0 [@media(max-width:_760px)]:[&_nav]:flex [@media(max-width:_760px)]:[&_nav]:gap-1.5 [@media(max-width:_760px)]:[&_nav]:overflow-visible [@media(max-width:_760px)]:[&_nav]:flex-wrap">
         <Link
           className="ui-brand min-w-0 flex-wrap text-[clamp(22px,2.4vw,32px)] [font-family:'Trebuchet_MS',Verdana,sans-serif] font-semibold tracking-[1.5px] text-green-light leading-[1.2]"
-          href={viewer ? "/viewer/clones" : "/chat"}
+          href={viewer ? "/viewer/clones" : "/owner/chat"}
         >
           <span className="size-9 shrink-0">
             <EvermeMascot animated={false} />
@@ -207,7 +207,7 @@ export default function AppSidebar({ viewer, active, chat }) {
         </p>
         <Link
           className="m-[0_4px_28px] relative border-0 rounded-lg p-[15px] list-none cursor-pointer text-[length:inherit] font-bold text-green-light [&:hover]:text-green [&:hover_span]:text-green flex items-center gap-2.5 [&_>_span:last-child]:ml-auto [&_>_span:last-child]:text-green-light [&:hover]:bg-green-light min-w-0 flex-wrap [@media(max-width:_760px)]:w-fit [@media(max-width:_760px)]:max-w-full [@media(max-width:_760px)]:m-0 [@media(max-width:_760px)]:p-2.5 [@media(max-width:_760px)]:text-[13px]"
-          href={viewer ? "/chat" : "/viewer/clones"}
+          href={viewer ? "/owner/chat" : "/viewer/clones"}
           aria-label={viewer ? "사용자 모드로 전환" : "정보이용자 모드로 전환"}
           title={viewer ? "사용자 모드로 전환" : "정보이용자 모드로 전환"}
         >
@@ -280,7 +280,7 @@ export default function AppSidebar({ viewer, active, chat }) {
                             (i === 0 ||
                               historyPeriod(datedConversations[i - 1]) !==
                               historyPeriod(conversation)) && (
-                              <h3 className="m-0 flex h-7 items-center px-[5px] text-[11px] font-medium text-green-light/70">
+                              <h3 className="m-0 flex h-7 items-center px-[5px] text-[11px] font-medium text-green-light/95">
                                 {historyPeriod(conversation)}
                               </h3>
                             )}
@@ -356,7 +356,7 @@ export default function AppSidebar({ viewer, active, chat }) {
             >
               <p className="text-[12px] text-green m-[4px_10px_8px]">내 계정</p>
               <Link
-                href={base + "/settings"}
+                href="/settings"
                 onClick={() => {
                   setProfileOpen(false);
                 }}
@@ -446,7 +446,7 @@ export default function AppSidebar({ viewer, active, chat }) {
             <button
               type="button"
               role="menuitem"
-              className="text-[#dc4040]"
+              className="text-[#b83232]"
               onClick={() =>
                 openConversationAction("delete", historyMenu.conversation)
               }

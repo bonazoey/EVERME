@@ -1,4 +1,4 @@
-import ChatContent from "../../../chat/ChatContent";
+import ChatContent from "../../../owner/chat/ChatContent";
 export default async function Page({ searchParams }) {
   const params = await searchParams;
   const conversationId =

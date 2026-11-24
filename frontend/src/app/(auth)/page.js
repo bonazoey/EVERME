@@ -23,7 +23,7 @@ export default function LoginPage() {
         >
           비밀번호를 잊으셨나요?
         </Link>
-        <Button href="/chat">로그인</Button>
+        <Button href="/owner/chat">로그인</Button>
         <div
           className={
             'text-center text-muted text-[13px] flex items-center gap-3.5 m-[36px_0_24px] [&:before]:[content:""] [&:before]:h-[1px] [&:before]:bg-[var(--line)] [&:before]:flex-1 [&:after]:[content:""] [&:after]:h-[1px] [&:after]:bg-[var(--line)] [&:after]:flex-1'
@@ -31,10 +31,10 @@ export default function LoginPage() {
         >
           또는 소셜 계정으로 시작하기
         </div>
-        <Button variant="secondary" href="/chat">
+        <Button variant="secondary" href="/owner/chat">
           카카오로 계속하기
         </Button>
-        <Button variant="secondary" href="/chat">
+        <Button variant="secondary" href="/owner/chat">
           Google로 계속하기
         </Button>
         <Link

@@ -11,7 +11,7 @@ npm run dev
 ```
 
 시작 화면: http://localhost:3000
-사용자 대화: /chat
+사용자 대화: /owner/chat
 정보이용자 모드: /viewer/clones
 
 ## 구조
@@ -34,32 +34,29 @@ src/
     (service)/                   # 서비스 화면 그룹
       layout.js                  # 공통 사이드바·헤더 및 현재 메뉴 표시
       AppSidebar.js
-      AppHeader.js
-      chat/
-        page.js                  # /chat
-        ChatContent.js           # 대화·음성·모달 화면이 공유하는 내용
-        voice/page.js
-        edit/page.js
-        ...
-      clone/
-        page.js
-        history/page.js
-      members/
-        page.js
-        MembersContent.js
-        invite/page.js
-        ...
+      owner/
+        chat/
+          page.js                # /owner/chat
+          ChatContent.js
+          ChatInput.js
+        clone/
+          page.js                # /owner/clone
+          CloneDashboard.js
+          AccessHistory.js
+        members/page.js          # /owner/members
       settings/
-        page.js
-        SettingsContent.js
-        voice/page.js
-        ...
+        page.js                  # /settings
+        BasicSettings.js
+        EvermeSettings.js
+        PrivacySettings.js
       viewer/
         chat/page.js
+        chat/park/page.js
         clones/page.js
         invitations/page.js
-        settings/page.js
-        ...
+    context/
+      ChatSessions.js
+      ServiceMode.js
   components/                    # 여러 기능에서 공유하는 단일 파일 UI
     Button.js
     Field.js
@@ -72,7 +69,7 @@ src/
 - 여러 화면이 공유하는 UI만 components 아래에 둡니다.
 - 레이아웃은 Next.js의 layout.js에서 한 번 적용합니다.
 - 사용자·정보이용자 대화와 설정은 같은 내용 컴포넌트를 재사용합니다.
-- 변형 화면은 기존 URL을 유지합니다. 예: /members/invite, /viewer/chat/evidence.
+- 변형 화면은 기존 URL을 유지합니다. 예: /owner/members/invite, /viewer/chat/evidence.
 - 전체 화면 목록과 catch-all 라우트, 화면 대응표는 사용하지 않습니다.
 
 ## 스타일 관리

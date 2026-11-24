@@ -1,5 +1,5 @@
 const buttonVariants = {
-  danger: "border-transparent bg-[#dc4040] text-white",
+  danger: "border-transparent bg-[#b83232] text-white",
   primary:
     "border-transparent bg-green text-white hover:bg-[color-mix(in_srgb,var(--green)_85%,black)]",
   secondary: "border-line bg-white text-green hover:bg-green-light",

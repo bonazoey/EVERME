@@ -2,11 +2,20 @@
 
 import { usePathname } from "next/navigation";
 import AppSidebar from "./AppSidebar";
-import { ChatSessionsProvider } from "./chat/ChatSessions";
+import { ChatSessionsProvider } from "@/app/context/ChatSessions";
+import { ServiceModeProvider, useServiceMode } from "@/app/context/ServiceMode";
 export default function ServiceLayout({ children }) {
+  return (
+    <ServiceModeProvider>
+      <ServiceContent>{children}</ServiceContent>
+    </ServiceModeProvider>
+  );
+}
+
+function ServiceContent({ children }) {
   const pathname = usePathname();
-  const viewer = pathname.startsWith("/viewer/");
-  const section = pathname.split("/")[viewer ? 2 : 1];
+  const { viewer } = useServiceMode();
+  const section = pathname === "/settings" ? "settings" : pathname.split("/")[2];
   const active = section;
   return (
     <ChatSessionsProvider>
