@@ -131,7 +131,7 @@ export default function ChatContent({
                 소소한 일상부터 오래 간직한 기억까지, 편하게 이야기해 주세요.
               </p>
               <p className="ui-muted text-muted">
-                EVERME는 당신의 이야기를 기억하고, 당신의 생각을 다른 사람에게 이야기 해 줄 수 있어요.
+                EVERME는 당신의 이야기를 기억하고, 당신의 생각을 다른 사람에게 이야기 해줄 수 있어요.
               </p>
               <div
                 className={`gap-3 mt-8 [&_.ui-button]:rounded-full ${viewer ? "flex flex-wrap justify-center" : "grid grid-cols-10 [&_.ui-button]:col-span-2 [&_.ui-button]:min-w-0 [&_.ui-button]:px-2 [&_.ui-button:nth-child(6)]:col-start-2 [@media(max-width:_760px)]:grid-cols-2 [@media(max-width:_760px)]:[&_.ui-button]:col-span-1 [@media(max-width:_760px)]:[&_.ui-button:nth-child(6)]:col-start-auto"}`}
