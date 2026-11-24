@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="robot-04-memo-title robot-04-memo-desc">
+  <title id="robot-04-memo-title">EVERME · 메모봇</title>
+  <desc id="robot-04-memo-desc">소중한 기억을 보관하는 로봇. 녹색과 연녹색으로 구성된 마스코트 후보.</desc>
+  <rect x="88" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="129" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="53" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/><rect x="168" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/>
+ <rect x="74" y="126" width="92" height="71" rx="18" fill="#CFDFD6" stroke="#467056" stroke-width="4"/>
+ <path d="M88 54 L82 37 M152 54 L158 37" stroke="#467056" stroke-width="4" stroke-linecap="round"/>
+ <circle cx="80" cy="32" r="5" fill="#88AB94"/><circle cx="160" cy="32" r="5" fill="#88AB94"/>
+ <rect x="66" y="53" width="108" height="71" rx="22" fill="#467056"/>
+ <rect x="78" y="65" width="84" height="47" rx="14" fill="#CFDFD6"/>
+ <rect x="93" y="80" width="7" height="13" rx="3.5" fill="#467056"/><rect x="140" y="80" width="7" height="13" rx="3.5" fill="#467056"/>
+ <path d="M112 101H128" stroke="#467056" stroke-width="3" stroke-linecap="round"/>
+ <rect x="91" y="139" width="58" height="42" rx="9" fill="#467056"/>
+ <path d="M120 152 C111 143 101 156 120 169 C139 156 129 143 120 152Z" fill="#CFDFD6"/>
+ <path d="M100 188H140" stroke="#88AB94" stroke-width="3" stroke-linecap="round"/>
+ 
+</svg>

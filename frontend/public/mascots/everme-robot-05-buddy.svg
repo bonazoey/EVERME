@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="robot-05-buddy-title robot-05-buddy-desc">
+  <title id="robot-05-buddy-title">EVERME · 버디봇</title>
+  <desc id="robot-05-buddy-desc">단순하고 친근한 로봇 실루엣. 녹색과 연녹색으로 구성된 마스코트 후보.</desc>
+  
+ <rect x="87" y="181" width="24" height="32" rx="11" fill="#467056"/><rect x="131" y="181" width="24" height="32" rx="11" fill="#467056"/>
+ <rect x="45" y="120" width="20" height="59" rx="10" fill="#88AB94"/><rect x="175" y="120" width="20" height="59" rx="10" fill="#88AB94"/>
+ <path d="M76 66 L67 47 M164 66 L173 47" stroke="#467056" stroke-width="5" stroke-linecap="round"/>
+ <path d="M69 106 C69 68 91 48 120 48 C149 48 171 68 171 106Z" fill="#467056"/>
+ <path d="M79 117 H161 V166 Q161 190 139 190 H101 Q79 190 79 166Z" fill="#467056"/>
+ <rect x="82" y="76" width="76" height="21" rx="10.5" fill="#CFDFD6"/>
+ <circle cx="101" cy="86.5" r="4" fill="#467056"/><circle cx="139" cy="86.5" r="4" fill="#467056"/>
+ <path d="M110 145 C96 149 99 166 112 166 C124 166 126 145 138 145 C151 145 154 162 140 166" fill="none" stroke="#CFDFD6" stroke-width="5" stroke-linecap="round"/>
+ 
+</svg>

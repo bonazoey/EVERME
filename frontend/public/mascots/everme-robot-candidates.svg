@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="640" viewBox="0 0 1600 640">
+ <defs><symbol id="candidate-0" viewBox="0 0 240 240"><rect x="88" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="129" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="53" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/><rect x="168" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/><rect x="78" y="124" width="84" height="72" rx="23" fill="#467056"/>
+ <path d="M120 55V40" stroke="#467056" stroke-width="5" stroke-linecap="round"/>
+ <path d="M119 42 C99 44 91 32 94 20 C112 20 122 29 119 42Z" fill="#467056"/>
+ <path d="M121 42 C122 24 137 18 151 23 C149 38 137 46 121 42Z" fill="#88AB94"/>
+ <rect x="65" y="53" width="110" height="70" rx="28" fill="#CFDFD6" stroke="#467056" stroke-width="4"/>
+ <rect x="77" y="66" width="86" height="45" rx="19" fill="#467056"/>
+ <circle cx="57" cy="88" r="7" fill="#467056"/><circle cx="183" cy="88" r="7" fill="#467056"/>
+ <rect x="92" y="83" width="8" height="15" rx="4" fill="#CFDFD6"/><rect x="140" y="83" width="8" height="15" rx="4" fill="#CFDFD6"/><path d="M111 104 Q120 111 129 104" fill="none" stroke="#CFDFD6" stroke-width="3" stroke-linecap="round"/><circle cx="120" cy="157" r="16" fill="#CFDFD6"/><circle cx="120" cy="157" r="6" fill="#467056"/></symbol><symbol id="candidate-1" viewBox="0 0 240 240">
+ <rect x="96" y="189" width="19" height="23" rx="9" fill="#467056"/><rect x="127" y="189" width="19" height="23" rx="9" fill="#467056"/>
+ <path d="M87 155 Q65 163 62 145 M155 155 Q178 162 181 144" fill="none" stroke="#88AB94" stroke-width="15" stroke-linecap="round"/>
+ <rect x="87" y="132" width="68" height="62" rx="26" fill="#CFDFD6" stroke="#467056" stroke-width="4"/>
+ <path d="M120 49V32" stroke="#467056" stroke-width="4"/><circle cx="120" cy="26" r="8" fill="#88AB94"/>
+ <rect x="47" y="73" width="17" height="39" rx="8" fill="#88AB94"/><rect x="176" y="73" width="17" height="39" rx="8" fill="#88AB94"/>
+ <rect x="59" y="48" width="122" height="86" rx="37" fill="#467056"/>
+ <rect x="72" y="63" width="96" height="56" rx="25" fill="#EAF2ED"/>
+ <path d="M89 85 Q96 76 103 85 M137 85 Q144 76 151 85" fill="none" stroke="#467056" stroke-width="4" stroke-linecap="round"/>
+ <path d="M111 102 Q120 112 129 102" fill="none" stroke="#467056" stroke-width="3" stroke-linecap="round"/>
+ <path d="M120 158 C108 144 94 162 120 178 C146 162 132 144 120 158Z" fill="#467056"/>
+ </symbol><symbol id="candidate-2" viewBox="0 0 240 240"><rect x="88" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="129" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="53" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/><rect x="168" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/><rect x="78" y="124" width="84" height="72" rx="23" fill="#467056"/>
+ <path d="M120 51V33" stroke="#467056" stroke-width="5" stroke-linecap="round"/>
+ <circle cx="120" cy="26" r="9" fill="#CFDFD6" stroke="#467056" stroke-width="4"/>
+ <rect x="59" y="51" width="122" height="73" rx="25" fill="#CFDFD6" stroke="#467056" stroke-width="4"/>
+ <path d="M120 84 C103 62 77 66 76 85 C74 106 99 111 120 84 C141 57 166 63 164 85 C163 104 137 108 120 84Z" fill="none" stroke="#467056" stroke-width="8" stroke-linecap="round"/>
+ <circle cx="96" cy="86" r="4" fill="#467056"/><circle cx="145" cy="86" r="4" fill="#467056"/>
+ <path d="M112 110 Q120 115 128 110" fill="none" stroke="#467056" stroke-width="3" stroke-linecap="round"/>
+ <rect x="102" y="145" width="36" height="25" rx="8" fill="#CFDFD6"/>
+ <path d="M110 153H130 M110 161H124" stroke="#467056" stroke-width="3" stroke-linecap="round"/>
+ </symbol><symbol id="candidate-3" viewBox="0 0 240 240"><rect x="88" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="129" y="188" width="23" height="28" rx="10" fill="#467056"/><rect x="53" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/><rect x="168" y="129" width="19" height="51" rx="9.5" fill="#88AB94"/>
+ <rect x="74" y="126" width="92" height="71" rx="18" fill="#CFDFD6" stroke="#467056" stroke-width="4"/>
+ <path d="M88 54 L82 37 M152 54 L158 37" stroke="#467056" stroke-width="4" stroke-linecap="round"/>
+ <circle cx="80" cy="32" r="5" fill="#88AB94"/><circle cx="160" cy="32" r="5" fill="#88AB94"/>
+ <rect x="66" y="53" width="108" height="71" rx="22" fill="#467056"/>
+ <rect x="78" y="65" width="84" height="47" rx="14" fill="#CFDFD6"/>
+ <rect x="93" y="80" width="7" height="13" rx="3.5" fill="#467056"/><rect x="140" y="80" width="7" height="13" rx="3.5" fill="#467056"/>
+ <path d="M112 101H128" stroke="#467056" stroke-width="3" stroke-linecap="round"/>
+ <rect x="91" y="139" width="58" height="42" rx="9" fill="#467056"/>
+ <path d="M120 152 C111 143 101 156 120 169 C139 156 129 143 120 152Z" fill="#CFDFD6"/>
+ <path d="M100 188H140" stroke="#88AB94" stroke-width="3" stroke-linecap="round"/>
+ </symbol><symbol id="candidate-4" viewBox="0 0 240 240">
+ <rect x="87" y="181" width="24" height="32" rx="11" fill="#467056"/><rect x="131" y="181" width="24" height="32" rx="11" fill="#467056"/>
+ <rect x="45" y="120" width="20" height="59" rx="10" fill="#88AB94"/><rect x="175" y="120" width="20" height="59" rx="10" fill="#88AB94"/>
+ <path d="M76 66 L67 47 M164 66 L173 47" stroke="#467056" stroke-width="5" stroke-linecap="round"/>
+ <path d="M69 106 C69 68 91 48 120 48 C149 48 171 68 171 106Z" fill="#467056"/>
+ <path d="M79 117 H161 V166 Q161 190 139 190 H101 Q79 190 79 166Z" fill="#467056"/>
+ <rect x="82" y="76" width="76" height="21" rx="10.5" fill="#CFDFD6"/>
+ <circle cx="101" cy="86.5" r="4" fill="#467056"/><circle cx="139" cy="86.5" r="4" fill="#467056"/>
+ <path d="M110 145 C96 149 99 166 112 166 C124 166 126 145 138 145 C151 145 154 162 140 166" fill="none" stroke="#CFDFD6" stroke-width="5" stroke-linecap="round"/>
+ </symbol></defs>
+ <rect width="1600" height="640" fill="#F7F9F8"/>
+ <g font-family="Malgun Gothic, Arial, sans-serif">
+ <text x="48" y="54" fill="#467056" font-size="13" font-weight="700" letter-spacing="3">EVERME / ROBOT MASCOT STUDIES</text>
+ <text x="48" y="99" fill="#17212B" font-size="30" font-weight="700">나를 닮아가는 다섯 로봇 친구</text>
+ <text x="1544" y="93" text-anchor="end" fill="#64748B" font-size="13">SVG · 5 CONCEPTS · #467056</text>
+ <g>
+ <rect x="48" y="140" width="280" height="416" rx="24" fill="white" stroke="#E0E7E4"/>
+ <use href="#candidate-0" x="68" y="162" width="240" height="240"/>
+ <text x="72" y="444" font-size="19" font-weight="700" fill="#17212B">01 · 새싹봇</text>
+ <text x="72" y="475" font-size="13" fill="#64748B">자라나는 기억을 담은 클론</text>
+ <use href="#candidate-0" x="71" y="494" width="40" height="40"/>
+ <rect x="120" y="492" width="44" height="44" rx="12" fill="#467056"/>
+ <use href="#candidate-0" x="122" y="494" width="40" height="40"/>
+ <text x="180" y="521" font-size="11" fill="#64748B">SMALL SIZE</text>
+ </g><g>
+ <rect x="352" y="140" width="280" height="416" rx="24" fill="white" stroke="#E0E7E4"/>
+ <use href="#candidate-1" x="372" y="162" width="240" height="240"/>
+ <text x="376" y="444" font-size="19" font-weight="700" fill="#17212B">02 · 에코봇</text>
+ <text x="376" y="475" font-size="13" fill="#64748B">내 이야기에 귀 기울이는 친구</text>
+ <use href="#candidate-1" x="375" y="494" width="40" height="40"/>
+ <rect x="424" y="492" width="44" height="44" rx="12" fill="#467056"/>
+ <use href="#candidate-1" x="426" y="494" width="40" height="40"/>
+ <text x="484" y="521" font-size="11" fill="#64748B">SMALL SIZE</text>
+ </g><g>
+ <rect x="656" y="140" width="280" height="416" rx="24" fill="white" stroke="#E0E7E4"/>
+ <use href="#candidate-2" x="676" y="162" width="240" height="240"/>
+ <text x="680" y="444" font-size="19" font-weight="700" fill="#17212B">03 · 링크봇</text>
+ <text x="680" y="475" font-size="13" fill="#64748B">무한대 로고와 연결된 동반자</text>
+ <use href="#candidate-2" x="679" y="494" width="40" height="40"/>
+ <rect x="728" y="492" width="44" height="44" rx="12" fill="#467056"/>
+ <use href="#candidate-2" x="730" y="494" width="40" height="40"/>
+ <text x="788" y="521" font-size="11" fill="#64748B">SMALL SIZE</text>
+ </g><g>
+ <rect x="960" y="140" width="280" height="416" rx="24" fill="white" stroke="#E0E7E4"/>
+ <use href="#candidate-3" x="980" y="162" width="240" height="240"/>
+ <text x="984" y="444" font-size="19" font-weight="700" fill="#17212B">04 · 메모봇</text>
+ <text x="984" y="475" font-size="13" fill="#64748B">소중한 기억을 보관하는 로봇</text>
+ <use href="#candidate-3" x="983" y="494" width="40" height="40"/>
+ <rect x="1032" y="492" width="44" height="44" rx="12" fill="#467056"/>
+ <use href="#candidate-3" x="1034" y="494" width="40" height="40"/>
+ <text x="1092" y="521" font-size="11" fill="#64748B">SMALL SIZE</text>
+ </g><g>
+ <rect x="1264" y="140" width="280" height="416" rx="24" fill="white" stroke="#E0E7E4"/>
+ <use href="#candidate-4" x="1284" y="162" width="240" height="240"/>
+ <text x="1288" y="444" font-size="19" font-weight="700" fill="#17212B">05 · 버디봇</text>
+ <text x="1288" y="475" font-size="13" fill="#64748B">단순하고 친근한 로봇 실루엣</text>
+ <use href="#candidate-4" x="1287" y="494" width="40" height="40"/>
+ <rect x="1336" y="492" width="44" height="44" rx="12" fill="#467056"/>
+ <use href="#candidate-4" x="1338" y="494" width="40" height="40"/>
+ <text x="1396" y="521" font-size="11" fill="#64748B">SMALL SIZE</text>
+ </g>
+ <text x="48" y="602" fill="#64748B" font-size="13">클론 · 기억 · 연결     /     투명 배경 SVG + 작은 크기 미리보기</text>
+ </g>
+</svg>

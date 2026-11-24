@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="02-infinity-title 02-infinity-desc">
+  <title id="02-infinity-title">EVERME · 무한 동반자</title>
+  <desc id="02-infinity-desc">EVERME의 연결을 닮은 친구. 녹색과 연녹색으로 구성된 마스코트 후보.</desc>
+  
+ <path d="M87 186 L81 203 M153 186 L159 203" stroke="#467056" stroke-width="9" stroke-linecap="round"/>
+ <path d="M120 100 C91 65 49 73 37 107 C22 150 48 188 83 185 C100 184 112 174 120 163 C128 174 140 184 157 185 C192 188 218 150 203 107 C191 73 149 65 120 100Z" fill="#467056"/>
+ <path d="M120 115 C99 86 64 92 56 117 C45 150 67 170 86 164 C101 160 109 143 120 129 C131 143 139 160 154 164 C173 170 195 150 184 117 C176 92 141 86 120 115Z" fill="#CFDFD6"/>
+ <path d="M106 113 C111 119 116 125 120 129 C124 124 129 118 134 113" fill="none" stroke="#467056" stroke-width="8" stroke-linecap="round"/>
+ <ellipse cx="77" cy="129" rx="4" ry="5" fill="#294B38"/><ellipse cx="163" cy="129" rx="4" ry="5" fill="#294B38"/>
+ <path d="M110 153 Q120 163 130 153" fill="none" stroke="#294B38" stroke-width="3.5" stroke-linecap="round"/>
+ <circle cx="191" cy="62" r="6" fill="#88AB94"/>
+ 
+</svg>

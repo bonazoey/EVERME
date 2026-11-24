@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="robot-02-echo-title robot-02-echo-desc">
+  <title id="robot-02-echo-title">EVERME · 에코봇</title>
+  <desc id="robot-02-echo-desc">내 이야기에 귀 기울이는 친구. 녹색과 연녹색으로 구성된 마스코트 후보.</desc>
+  
+ <rect x="96" y="189" width="19" height="23" rx="9" fill="#467056"/><rect x="127" y="189" width="19" height="23" rx="9" fill="#467056"/>
+ <path d="M87 155 Q65 163 62 145 M155 155 Q178 162 181 144" fill="none" stroke="#88AB94" stroke-width="15" stroke-linecap="round"/>
+ <rect x="87" y="132" width="68" height="62" rx="26" fill="#CFDFD6" stroke="#467056" stroke-width="4"/>
+ <path d="M120 49V32" stroke="#467056" stroke-width="4"/><circle cx="120" cy="26" r="8" fill="#88AB94"/>
+ <rect x="47" y="73" width="17" height="39" rx="8" fill="#88AB94"/><rect x="176" y="73" width="17" height="39" rx="8" fill="#88AB94"/>
+ <rect x="59" y="48" width="122" height="86" rx="37" fill="#467056"/>
+ <rect x="72" y="63" width="96" height="56" rx="25" fill="#EAF2ED"/>
+ <path d="M89 85 Q96 76 103 85 M137 85 Q144 76 151 85" fill="none" stroke="#467056" stroke-width="4" stroke-linecap="round"/>
+ <path d="M111 102 Q120 112 129 102" fill="none" stroke="#467056" stroke-width="3" stroke-linecap="round"/>
+ <path d="M120 158 C108 144 94 162 120 178 C146 162 132 144 120 158Z" fill="#467056"/>
+ 
+</svg>

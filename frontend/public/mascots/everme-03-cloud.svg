@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="03-cloud-title 03-cloud-desc">
+  <title id="03-cloud-title">EVERME · 기억 구름</title>
+  <desc id="03-cloud-desc">이야기를 포근하게 품는 구름. 녹색과 연녹색으로 구성된 마스코트 후보.</desc>
+  
+ <path d="M68 174 C36 175 27 142 43 122 C46 97 66 88 86 94 C88 69 117 58 137 77 C164 60 191 81 187 106 C217 111 224 146 204 164 C197 178 179 183 159 178 C142 193 120 188 108 179 C91 190 75 185 68 174Z" fill="#CFDFD6" stroke="#467056" stroke-width="5" stroke-linejoin="round"/>
+ <path d="M73 172 Q66 186 56 180 M174 174 Q183 189 192 180" fill="none" stroke="#467056" stroke-width="6" stroke-linecap="round"/>
+ <path d="M175 63 Q187 43 203 52" fill="none" stroke="#88AB94" stroke-width="3" stroke-linecap="round"/>
+ <circle cx="207" cy="53" r="7" fill="#467056"/>
+ <circle cx="175" cy="40" r="3.5" fill="#88AB94"/>
+ <ellipse cx="96" cy="135" rx="4" ry="5.5" fill="#294B38"/><ellipse cx="139" cy="135" rx="4" ry="5.5" fill="#294B38"/>
+ <path d="M110 151 Q119 160 128 151" fill="none" stroke="#294B38" stroke-width="3.5" stroke-linecap="round"/>
+ 
+</svg>
