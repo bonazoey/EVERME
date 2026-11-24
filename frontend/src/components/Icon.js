@@ -1,5 +1,6 @@
 const paths = {
   "arrow-right": "M5 12h14m-6-6 6 6-6 6",
+  "switch-mode": "M4 8h16m-4-4 4 4-4 4M20 16H4m4-4-4 4 4 4",
   "refresh-single": "M20 4v5h-5M20 9a8 8 0 1 0 0 7",
   copy: "M9 8h10v13H9V8ZM15 8V3H4v13h5",
   refresh: "M20 3v5h-5M4 21v-5h5M19.5 8A8 8 0 0 0 5 6M4.5 16A8 8 0 0 0 19 18",

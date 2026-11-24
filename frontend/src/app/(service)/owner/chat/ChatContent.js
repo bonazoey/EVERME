@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getInitialConversations, useChatSessions } from "@/app/context/ChatSessions";
 import ChatInput from "./ChatInput";
@@ -10,39 +10,39 @@ import Badge from "@/components/Badge";
 import Icon from "@/components/Icon";
 import Field from "@/components/Field";
 import Modal from "@/components/Modal";
+const viewerQuestionSets = [
+  [
+    "평소에 가장 좋아하는 음식은 무엇인가요?",
+    "오래 기억에 남은 순간은 언제인가요?",
+    "살면서 가장 중요하게 여겨 온 것은 무엇인가요?",
+  ],
+  [
+    "쉬는 날에는 주로 무엇을 하시나요?",
+    "어릴 적 가장 좋아했던 놀이는 무엇인가요?",
+    "힘들 때 위로가 됐던 말이 있나요?",
+  ],
+  [
+    "언젠가 다시 가보고 싶은 곳은 어디인가요?",
+    "오랫동안 즐겨 온 취미는 무엇인가요?",
+    "소중한 사람에게 전하고 싶은 말이 있나요?",
+  ],
+];
+
 const topicSets = [
   [
-    "오늘 하루 이야기",
-    "좋아하는 음식",
-    "소중한 사람들",
-    "기억에 남는 여행",
-    "어릴 적 추억",
-    "나의 취미",
-    "요즘 드는 생각",
-    "나의 가치관",
-    "미래의 나에게",
+    "오늘 가장 기억에 남는 순간은?",
+    "어릴 때 자주 가던 곳은?",
+    "요즘 문득 떠오르는 사람은?",
   ],
   [
-    "최근 웃었던 순간",
-    "나만의 휴식법",
-    "기억에 남는 선물",
-    "다시 가고 싶은 곳",
-    "좋아하는 계절",
-    "힘이 된 한마디",
-    "배워보고 싶은 것",
-    "나의 작은 습관",
-    "고마운 사람에게",
+    "최근에 무엇 때문에 웃었나요?",
+    "다시 가보고 싶은 곳은?",
+    "힘이 됐던 한마디가 있나요?",
   ],
   [
-    "설레었던 첫 만남",
-    "위로가 되는 노래",
-    "오래 간직한 물건",
-    "주말에 하고픈 일",
-    "나의 어린 시절 꿈",
-    "함께한 기념일",
-    "새로 도전한 일",
-    "편안해지는 장소",
-    "오늘의 작은 행복",
+    "오래 간직해 온 물건이 있나요?",
+    "마음이 편해지는 장소는?",
+    "오늘의 작은 행복은 뭐였나요?",
   ],
 ];
 export default function ChatContent({
@@ -73,7 +73,35 @@ export default function ChatContent({
   const [deletedMessages, setDeletedMessages] = useState([]);
   const [answerFeedback, setAnswerFeedback] = useState({});
   const empty = !message && (conversationId ? !conversation : initialEmpty);
-  const closeModal = useCallback(() => setModal(null), []);
+  const messageListRef = useRef(null);
+  const [showJump, setShowJump] = useState(false);
+  const sentCount = sentTurns.length;
+  const updateScrollPosition = useCallback((list) => {
+    setShowJump(list.scrollHeight - list.clientHeight - list.scrollTop > 4);
+  }, []);
+
+  useEffect(() => {
+    const list = messageListRef.current;
+    if (!empty && list) list.scrollTop = list.scrollHeight;
+  }, [conversationId, empty, sentCount]);
+
+  useEffect(() => {
+    const list = messageListRef.current;
+    if (empty || !list) return;
+    const observer = new ResizeObserver(() => updateScrollPosition(list));
+    observer.observe(list);
+    if (list.firstElementChild) observer.observe(list.firstElementChild);
+    return () => observer.disconnect();
+  }, [empty, updateScrollPosition]);
+
+  function jumpToLatest() {
+    const list = messageListRef.current;
+    if (!list) return;
+    list.focus({ preventScroll: true });
+    list.scrollTop = list.scrollHeight;
+    updateScrollPosition(list);
+  }
+  const closeModal = useCallback(() => setModal(null), [setModal]);
   const currentMessage =
     message ||
     (viewer
@@ -99,64 +127,76 @@ export default function ChatContent({
       router.replace(base + "?conversation=" + encodeURIComponent(session.id));
     }
   }
+  const questionSets = viewer ? viewerQuestionSets : topicSets;
   return (
     <>
-      <div className="min-h-dvh flex flex-col [@media(max-width:_760px)]:min-h-[calc(100dvh_-_205px)]">
+      <div
+        data-chat-scroll={empty ? "" : undefined}
+        className={`flex h-full min-h-0 flex-col ${empty ? "overflow-y-auto overscroll-contain" : ""}`}
+      >
         {viewer && (
-          <header className="p-[22px_28px] [border-bottom:1px_solid_var(--line)] [&_h2]:mb-3 [&_p]:text-[14px] [&_p]:mb-0 [&_h2_.ui-badge]:ml-3 [&_h2_.ui-badge]:[vertical-align:middle] [@media(max-width:_760px)]:p-5 [@media(max-width:_760px)]:[&_h2]:text-[18px]">
+          <header className="shrink-0 p-[22px_28px] [border-bottom:1px_solid_var(--line)] [&_h2]:mb-3 [&_p]:text-[14px] [&_p]:mb-0 [&_h2_.ui-badge]:ml-3 [&_h2_.ui-badge]:[vertical-align:middle] [@media(max-width:_760px)]:p-5 [@media(max-width:_760px)]:[&_h2]:text-[18px]">
             <h2>
               <>
-                {owner}님의 AI 클론 <Badge>{level}</Badge>
+                {owner}님의 AI 대변인 <Badge>{level}</Badge>
               </>
             </h2>
             <p className="ui-muted text-muted">
-              {`실제 ${owner}님이 아닌 AI 클론과 대화 중입니다.`}
+              {`AI가 ${owner}님을 대신해 답변합니다.`}
             </p>
           </header>
         )}
         <div
-          className={`p-[24px_28px] flex-1 min-h-97.5 [@media(min-width:_1600px)]:pt-8 [@media(max-width:_760px)]:p-5 [@media(max-width:_760px)]:min-h-75 ${empty ? "flex items-center justify-center [&_.ui-chatcontent-empty-chat]:m-0 [&_.ui-chatcontent-empty-chat]:w-full" : ""}`}
+          ref={messageListRef}
+          data-chat-scroll={empty ? undefined : ""}
+          role={empty ? undefined : "region"}
+          aria-label={empty ? undefined : "대화 내용"}
+          tabIndex={empty ? undefined : 0}
+          onScroll={empty ? undefined : (event) => updateScrollPosition(event.currentTarget)}
+          className={`px-7 pt-6 [@media(max-width:_760px)]:px-5 [@media(max-width:_760px)]:pt-5 ${empty ? "mt-auto shrink-0 pb-1" : "min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6 focus-visible:-outline-offset-2 [@media(max-width:_760px)]:pb-5 [@media(min-width:_1600px)]:pt-8"}`}
         >
           {empty ? (
-            <div className="ui-chatcontent-empty-chat max-w-200 m-[64px_auto] text-center [&_.ui-avatar]:mb-6 [&_h1]:text-[26px] [@media(max-width:_760px)]:m-[32px_auto] [@media(max-width:_760px)]:[&_h1]:text-[22px]">
+            <div className="mx-auto w-full max-w-200 text-center">
               <span
-                className="ui-avatar inline-flex w-24 items-center justify-center"
-                role="img"
-                aria-label="위를 바라보며 생각하는 에버미 마스코트"
+                className="mx-auto mb-5 inline-flex size-24 items-center justify-center rounded-full bg-green-light p-3 [@media(max-width:_760px)]:mb-3 [@media(max-width:_760px)]:size-18"
+                aria-hidden="true"
               >
                 <EvermeMascot animated={false} thinking />
               </span>
-              <h1>오늘은 어떤 이야기를 나눠볼까요?</h1>
-              <p className="ui-muted text-muted mb-0">
-                소소한 일상부터 오래 간직한 기억까지, 편하게 이야기해 주세요.
+              <h1 className="mb-2 text-[clamp(22px,3vw,34px)] font-bold leading-tight tracking-tight text-balance">
+                {viewer
+                  ? `${owner}님에 대해 무엇이 궁금하세요?`
+                  : "오늘은 어떤 이야기를 나눠볼까요?"}
+              </h1>
+              <p className="m-0 text-muted">
+                {viewer
+                  ? "AI 대변인이 공유된 이야기와 기억을 바탕으로 답해요."
+                  : "오늘의 일상부터 오래 간직한 기억까지, 편하게 이야기해 주세요."}
               </p>
-              <p className="ui-muted text-muted">
-                EVERME는 당신의 이야기를 기억하고, 당신의 생각을 다른 사람에게 이야기 해줄 수 있어요.
-              </p>
-              <div
-                className={`gap-3 mt-8 [&_.ui-button]:rounded-full ${viewer ? "flex flex-wrap justify-center" : "grid grid-cols-10 [&_.ui-button]:col-span-2 [&_.ui-button]:min-w-0 [&_.ui-button]:px-2 [&_.ui-button:nth-child(6)]:col-start-2 [@media(max-width:_760px)]:grid-cols-2 [@media(max-width:_760px)]:[&_.ui-button]:col-span-1 [@media(max-width:_760px)]:[&_.ui-button:nth-child(6)]:col-start-auto"}`}
-              >
-                {(viewer
-                  ? ["오늘 하루 이야기", "좋아하는 음식", "소중한 사람들"]
-                  : topicSets[topicSet]
-                ).map((t) => (
-                  <Button key={t} variant="secondary" onClick={() => send(t)}>
-                    {t}
-                  </Button>
-                ))}
-              </div>
-              {!viewer && (
-                <button
-                  type="button"
-                  className="mt-5 inline-flex min-h-11.5 items-center justify-center gap-2 rounded-full border-0 bg-green px-5 py-2.5 text-[15px] font-semibold text-white cursor-pointer hover:bg-[color-mix(in_srgb,var(--green)_85%,black)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green"
-                  onClick={() =>
-                    setTopicSet((current) => (current + 1) % topicSets.length)
-                  }
-                >
-                  <Icon name="refresh-single" size={18} />
-                  새로운 이야기 거리
-                </button>
-              )}
+                <div className="mx-auto mt-5 flex max-w-200 flex-col items-center gap-2">
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {questionSets[topicSet].map((topic) => (
+                      <button
+                        key={topic}
+                        type="button"
+                        className="min-h-11 rounded-full border border-line bg-surface px-4 py-2 text-[14px] text-green hover:bg-green-light"
+                        onClick={() => send(topic)}
+                      >
+                        {topic}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-[13px] font-semibold text-muted hover:text-green hover:underline underline-offset-4"
+                    onClick={() =>
+                      setTopicSet((current) => (current + 1) % questionSets.length)
+                    }
+                  >
+                    <Icon name="refresh-single" size={15} />
+                    다른 질문 보기
+                  </button>
+                </div>
             </div>
           ) : (
             <div className="mx-auto w-full max-w-200 space-y-8 py-4">
@@ -204,18 +244,18 @@ export default function ChatContent({
                     </article>
                   )}
                   <article
-                    className={`group/message flex flex-col gap-4 leading-[1.8] break-words [overflow-wrap:anywhere] [&_p]:m-0 ${!viewer ? "pl-11 [@media(max-width:_760px)]:pl-6" : ""}`}
+                    className="group/message relative flex flex-col items-start gap-3 pl-16 leading-[1.8] break-words [overflow-wrap:anywhere] [&_p]:m-0 [@media(max-width:_760px)]:pl-12"
                     aria-label="AI 답변"
                   >
-                    <span className="relative block text-[12px] font-medium text-muted">
-                      {!viewer && index === turns.length - 1 && (
-                        <span className="absolute -left-11 top-1/2 w-9 -translate-y-1/2 [@media(max-width:_760px)]:-left-6 [@media(max-width:_760px)]:w-5">
-                          <EvermeMascot />
-                        </span>
-                      )}
-                      {viewer ? `${owner} AI 클론` : "EVERME"}
+                    {index === turns.length - 1 && (
+                      <div className="absolute left-0 top-5 size-14 rounded-full bg-green-light p-0.5 [@media(max-width:_760px)]:size-10">
+                        <EvermeMascot animated={false} />
+                      </div>
+                    )}
+                    <span className="block text-[12px] font-medium text-muted">
+                      {viewer ? `${owner}님의 AI 대변인` : "EVERME"}
                     </span>
-                    <div data-answer className="space-y-4">
+                    <div data-answer className="relative max-w-full space-y-4 rounded-[20px] rounded-tl-sm bg-surface px-5 py-3 before:absolute before:-left-1.5 before:top-3 before:size-3 before:rotate-45 before:rounded-[2px] before:bg-surface">
                       {viewer ? (
                         <>
                           <p>
@@ -249,7 +289,7 @@ export default function ChatContent({
                         </>
                       )}
                     </div>
-                    <div className="-mt-3 flex items-center gap-1 text-muted opacity-0 pointer-events-none group-hover/message:opacity-100 group-hover/message:pointer-events-auto group-focus-within/message:opacity-100 group-focus-within/message:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto">
+                    <div className="-mt-2 flex items-center gap-1 text-muted opacity-0 pointer-events-none group-hover/message:opacity-100 group-hover/message:pointer-events-auto group-focus-within/message:opacity-100 group-focus-within/message:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto">
                       <button
                         type="button"
                         className="inline-flex size-8 items-center justify-center rounded-lg hover:bg-green-light hover:text-green focus-visible:outline-2 focus-visible:outline-green"
@@ -316,7 +356,20 @@ export default function ChatContent({
             </div>
           )}
         </div>
-        <div className="p-[0_28px_16px] [&_>_small]:block [&_>_small]:text-center [@media(max-width:_760px)]:p-[0_20px_20px] [@media(max-width:_760px)]:[&_>_small]:text-[10px]">
+        <div className={`relative shrink-0 bg-white p-[8px_28px_16px] [&_>_small]:block [&_>_small]:text-center [@media(max-width:_760px)]:p-[8px_20px_20px] [@media(max-width:_760px)]:[&_>_small]:text-[10px] ${empty ? "mb-auto" : ""}`}>
+          {!empty && showJump && (
+            <button
+              type="button"
+              className="absolute bottom-full left-1/2 z-10 mb-2 flex size-11 -translate-x-1/2 cursor-pointer items-center justify-center rounded-full bg-white text-green shadow-[0_4px_16px_#17212b22] hover:bg-green-light"
+              aria-label="최신 메시지로 이동"
+              title="최신 메시지로 이동"
+              onClick={jumpToLatest}
+            >
+              <span className="rotate-180">
+                <Icon name="chevron-up" />
+              </span>
+            </button>
+          )}
           <ChatInput onSend={send} />
           <small className="ui-muted text-muted">
             {viewer
