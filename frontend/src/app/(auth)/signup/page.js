@@ -82,7 +82,7 @@ export default function SignupPage() {
         hidden={step !== "consent"}
         onSubmit={(event) => {
           event.preventDefault();
-          router.push("/chat");
+          router.push("/owner/chat");
         }}
         className="mt-11 [&_>_.ui-button]:flex [&_>_.ui-button]:w-full [&_>_.ui-button]:m-[10px_0] [&_.ui-field]:m-[0_0_26px]"
       >

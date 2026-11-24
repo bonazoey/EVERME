@@ -20,10 +20,10 @@
     font-weight: 700;
   }
   :root {
-    --green: #678b75;
-    --green-light: #cfdfd6;
+    --green: #4c7059;
+    --green-light: #eaf7ef;
     --ink: #17212b;
-    --muted: #688874;
+    --muted: #526d5b;
     --line: #e0e7e4;
     --surface: #f7f9f8;
   }

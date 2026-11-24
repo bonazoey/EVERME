@@ -1,10 +1,8 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
-import Button from "@/components/Button";
-import Notice from "@/components/Notice";
 
 const updatedAt = new Date("2026-11-23T09:20:00+09:00");
 const updateDate = new Intl.DateTimeFormat("ko-KR", {
@@ -41,7 +39,7 @@ function formatUpdatedTime(currentMinute) {
   return updateDate;
 }
 
-export default function ClonePage() {
+export default function CloneDashboard() {
   const currentMinute = useSyncExternalStore(
     subscribeToClock,
     getCurrentMinute,
@@ -55,40 +53,16 @@ export default function ClonePage() {
     ["가치관 / 신념", 79],
     ["관계 / 주변", 85],
   ];
-  const highlights = [
-    [
-      "가족 중심의 일상",
-      "가족과 함께하는 시간을 소중히 여기며, 함께한 일상의 경험을 나누는 것을 좋아해요.",
-    ],
-    [
-      "기억과 경험의 연결",
-      "익숙한 경험과 오래 간직한 기억을 바탕으로 나의 이야기를 이어가요.",
-    ],
-    [
-      "따뜻한 대화",
-      "소소한 일상과 새로운 이야기를 편안하게 주고받는 모습을 보여요.",
-    ],
-  ];
+  const keywordDetails = {
+    "가족 중심": "가족과 함께하는 시간을 소중히 여기며, 함께한 일상의 경험을 나누는 것을 좋아해요. 가족과의 식사나 소소한 순간들이 대화 속에서 의미 있는 기억으로 나타나요.",
+    "기억과 경험": "익숙한 경험과 오래 간직한 기억을 바탕으로 이야기를 이어가요. 과거의 추억을 오늘의 일상과 연결하며, 그때 느꼈던 감정과 의미를 함께 나눠요.",
+    "일상의 대화": "특별한 사건뿐 아니라 식사, 산책, 취미처럼 소소한 일상도 편안하게 나눠요. 평범한 하루의 이야기가 쌓이며 관심사와 생활 속 선호가 드러나요.",
+    "따뜻함": "가까운 사람들과 안부를 나누고 서로를 배려하는 마음이 대화에서 드러나요. 함께한 순간에 대한 고마움과 다정한 표현에서 관계를 소중히 여기는 모습을 발견할 수 있어요.",
+  };
+  const [selectedKeyword, setSelectedKeyword] = useState("가족 중심");
 
   return (
-    <main className="p-[34px_40px_48px] max-w-400 mx-auto [@media(max-width:_1100px)]:p-[28px_24px] [@media(max-width:_760px)]:p-[24px_20px]">
-      <header className="flex items-center justify-between gap-6 mb-8 [@media(max-width:_760px)]:flex-col [@media(max-width:_760px)]:items-start">
-        <div>
-          <p className="text-[12px] font-bold tracking-[0.12em] text-green mb-3">
-            MY AI CLONE
-          </p>
-          <h1 className="mb-3 [@media(max-width:_760px)]:text-[24px]">
-            대화 속 나를 이해하는 AI 클론
-          </h1>
-          <p className="text-muted m-0">
-            쌓여가는 기억과 선호를 통해, 나를 닮은 클론을 만들어가요.
-          </p>
-        </div>
-        <Button href="/chat" className="shrink-0">
-          ＋ 대화 이어가기
-        </Button>
-      </header>
-
+    <>
       <div className="grid grid-cols-4 gap-4 mb-5 [&_>_.ui-card]:m-0 [@media(max-width:_1100px)]:grid-cols-2 [@media(max-width:_760px)]:gap-3">
         {[
           ["누적 대화 수", "128건", "지금까지 쌓아온 나의 이야기"],
@@ -169,18 +143,35 @@ export default function ClonePage() {
                 가족과 함께하는 일상을 소중히 여기며, 익숙한 경험과 새로운
                 이야기를 나누는 것을 좋아해요.
               </p>
-              <div className="flex flex-wrap gap-2">
-                {["가족 중심", "기억과 경험", "일상의 대화", "따뜻함"].map(
-                  (tag) => (
-                    <Badge key={tag}>{tag}</Badge>
-                  ),
-                )}
+              <div className="flex flex-wrap gap-2" role="group" aria-label="프로필 키워드">
+                {Object.keys(keywordDetails).map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    aria-pressed={selectedKeyword === tag}
+                    aria-controls="keyword-description"
+                    onClick={() => setSelectedKeyword(tag)}
+                    className={
+                      "inline-flex min-h-11 items-center justify-center rounded-[7px] border px-3 py-2 text-[13px] font-medium cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green " +
+                      (selectedKeyword === tag
+                        ? "border-green bg-green text-white"
+                        : "border-transparent bg-green-light text-green hover:border-green")
+                    }
+                  >
+                    {tag}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
-          <p className="rounded-xl bg-surface p-4 text-[14px] leading-relaxed mt-6 mb-5">
-            대화에서 드러난 기억과 선호를 바탕으로 김영희님을 이해하는 프로필을
-            만들어가고 있어요.
+          <p
+            id="keyword-description"
+            aria-live="polite"
+            aria-atomic="true"
+            className="rounded-xl bg-surface p-4 text-[14px] leading-relaxed mt-6 mb-5"
+          >
+            <strong className="mb-2 block text-green">{selectedKeyword}</strong>
+            {keywordDetails[selectedKeyword]}
           </p>
           <p className="text-[12px] text-muted m-0">
             새로운 대화가 쌓이면 요약 프로필도 함께 갱신됩니다.
@@ -215,88 +206,6 @@ export default function ClonePage() {
           </p>
         </Card>
       </div>
-
-      <div className="mt-5 [&_>_.ui-card]:m-0">
-        <Card>
-          <div className="flex items-center justify-between gap-4 mb-6 [&_h2]:m-0">
-            <h2>대화에서 발견한 주요 특징</h2>
-            <span className="text-[12px] text-muted">나를 이해하는 단서</span>
-          </div>
-          <div className="grid grid-cols-3 gap-6 [@media(max-width:_760px)]:grid-cols-1">
-            {highlights.slice(0, 3).map(([title, description], index) => (
-              <div key={title} className="border-t border-line pt-4">
-                <span className="text-[12px] font-semibold text-green tabular-nums">
-                  0{index + 1}
-                </span>
-                <h3 className="mt-3 mb-2 text-[15px]">{title}</h3>
-                <p className="text-[13px] text-muted leading-relaxed m-0">
-                  {description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <div id="access-history" className="mt-5 scroll-mt-6 [&_>_.ui-card]:m-0">
-        <Card>
-          <div className="flex items-center justify-between gap-4 mb-5 [@media(max-width:_760px)]:flex-col [@media(max-width:_760px)]:items-start [&_h2]:m-0">
-            <div>
-              <h2>접근 이력</h2>
-              <p className="text-[13px] text-muted mt-2 mb-0">
-                AI 클론에 대한 정보이용자의 접근과 이용 내역입니다.
-              </p>
-            </div>
-            <Button variant="secondary" href="/members">
-              정보이용자 관리
-            </Button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-[680px]">
-              <thead>
-                <tr>
-                  {[
-                    "접근 일시",
-                    "정보이용자",
-                    "이용 대상",
-                    "접근 유형",
-                    "결과 / 상세",
-                  ].map((t) => (
-                    <th key={t}>{t}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ["11.23 09:42", "김민수", "텍스트 대화", "허용됨"],
-                  ["11.22 18:20", "박지은", "음성 대화", "허용됨"],
-                  ["11.22 18:18", "박지은", "원본 근거 조회", "등급 초과 제한"],
-                  ["11.21 12:10", "김민수", "원본 근거 조회", "허용됨"],
-                ].map(([d, n, t, s]) => (
-                  <tr key={d}>
-                    <td>{d}</td>
-                    <td>{n}</td>
-                    <td>김영희 AI 클론</td>
-                    <td>{t}</td>
-                    <td>
-                      <Badge tone={s === "허용됨" ? "" : "amber"}>{s}</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[12px] text-muted mt-5 mb-0">
-            원하지 않는 이용이 있다면 정보이용자 관리에서 접근 권한을 변경하거나
-            철회할 수 있어요.
-          </p>
-        </Card>
-      </div>
-
-      <Notice>
-        대화로 쌓인 정보가 클론의 이해도를 높여요. 새로운 대화가 쌓이면 나를
-        이해하는 정보도 함께 갱신됩니다.
-      </Notice>
-    </main>
+    </>
   );
 }

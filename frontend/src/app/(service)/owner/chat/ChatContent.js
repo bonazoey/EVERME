@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getInitialConversations, useChatSessions } from "./ChatSessions";
+import { getInitialConversations, useChatSessions } from "@/app/context/ChatSessions";
 import ChatInput from "./ChatInput";
 import EvermeMascot from "@/components/EvermeMascot";
 import Button from "@/components/Button";
@@ -56,7 +56,7 @@ export default function ChatContent({
     ? owner === "박정호"
       ? "/viewer/chat/park"
       : "/viewer/chat"
-    : "/chat";
+    : "/owner/chat";
   const router = useRouter();
   const mode = viewer ? "viewer" : "user";
   const { conversations, completeConversation } = useChatSessions();
