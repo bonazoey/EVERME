@@ -11,7 +11,7 @@ export default function EvermeMascot({ animated = true, thinking = false }) {
   const thoughtRef = useRef(null);
 
   useEffect(() => {
-    if (!thinking) return;
+    if (!animated || !thinking) return;
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     let motion;
     function syncMotion() {
@@ -34,7 +34,7 @@ export default function EvermeMascot({ animated = true, thinking = false }) {
       motion?.cancel();
       preference.removeEventListener("change", syncMotion);
     };
-  }, [thinking]);
+  }, [animated, thinking]);
 
   useEffect(() => {
     if (!animated || thinking) return;

@@ -9,7 +9,7 @@ export default async function Page({ searchParams }) {
     <ChatContent
       key={conversationId ?? (hasTitle ? params.title : "new")}
       conversationId={conversationId}
-      initialEmpty={false}
+      initialEmpty={!hasTitle}
       viewer={true}
       owner="김영희"
       level="L2 개인"

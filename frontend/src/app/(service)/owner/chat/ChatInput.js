@@ -34,7 +34,7 @@ export default function ChatInput({ onSend }) {
   return (
     <>
       <div
-        className="w-full max-w-200 mx-auto h-19 flex items-center gap-3 [border:1px_solid_var(--line)] rounded-[38px] p-3 mb-3.5 [&_input]:flex-1 [&_input]:min-w-0 [&_input]:min-h-12.5 [&_input]:rounded-[25px] [&_input]:border-0 [&_input]:p-[4px_8px] [&_input]:bg-transparent [&_input]:text-ink"
+        className="w-full max-w-200 mx-auto h-19 flex items-center gap-3 bg-white shadow-[0_7px_22px_#17212b14] border border-line rounded-[38px] p-3 mb-3.5 has-[input:focus]:border-green has-[input:focus]:ring-2 has-[input:focus]:ring-green-light [&_input]:flex-1 [&_input]:min-w-0 [&_input]:min-h-12.5 [&_input]:rounded-[25px] [&_input]:border-0 [&_input]:p-[4px_8px] [&_input]:bg-transparent [&_input]:text-ink"
         onKeyDown={(event) => {
           if (recording && event.key === "Escape") {
             event.preventDefault();
