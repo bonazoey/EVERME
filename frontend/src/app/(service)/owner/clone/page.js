@@ -1,4 +1,3 @@
-import Button from "@/components/Button";
 import Notice from "@/components/Notice";
 import CloneDashboard from "./CloneDashboard";
 import AccessHistory from "./AccessHistory";
@@ -18,9 +17,6 @@ export default function ClonePage() {
             쌓여가는 기억과 선호를 통해, 나를 닮은 클론을 만들어가요.
           </p>
         </div>
-        <Button href="/owner/chat" className="shrink-0">
-          ＋ 대화 이어가기
-        </Button>
       </header>
 
       <CloneDashboard />

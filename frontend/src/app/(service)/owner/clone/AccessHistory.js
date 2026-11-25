@@ -1,6 +1,5 @@
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
-import Button from "@/components/Button";
 
 export default function AccessHistory() {
   return (
@@ -13,9 +12,6 @@ export default function AccessHistory() {
               AI 클론에 대한 정보이용자의 접근과 이용 내역입니다.
             </p>
           </div>
-          <Button variant="secondary" href="/owner/members">
-            정보이용자 관리
-          </Button>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-[680px]">
