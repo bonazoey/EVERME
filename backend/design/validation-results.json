@@ -1,0 +1,35 @@
+{
+  "date": "2026-11-26",
+  "tables": 30,
+  "coreTables": 29,
+  "runtimeEndpoints": 58,
+  "designEndpoints": 59,
+  "javaUnchanged": true,
+  "tests": [
+    "valid FACT version + matching detail",
+    "valid MEMORY version + matching detail",
+    "valid VALUE version + matching detail",
+    "valid PREFERENCE version + matching detail",
+    "valid BEHAVIOR version + matching detail",
+    "missing required detail at COMMIT rejected (23514)",
+    "mixed detail kind rejected (23503)",
+    "forged detail type guard rejected (23514)",
+    "duplicate detail per version rejected (23505)",
+    "detail strength outside CHECK rejected (23514)",
+    "knowledge detail rewrite rejected (23514)",
+    "knowledge content rewrite rejected (23514)",
+    "knowledge kind rewrite rejected (23514)",
+    "source from another owner job rejected (23514)",
+    "cross-clone group FK rejected (23503)",
+    "running job without lease rejected (23514)",
+    "conflict across different knowledge items rejected (23514)",
+    "stale worker token update blocked",
+    "classification failure recorded as completed without knowledge/job creation"
+  ],
+  "limitations": [
+    "in-memory PostgreSQL relational checks only",
+    "vector is stand-in domain; no pgvector ANN/search benchmark",
+    "single connection: SKIP LOCKED multi-worker races require implementation integration tests",
+    "no production DB connection"
+  ]
+}

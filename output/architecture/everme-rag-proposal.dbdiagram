@@ -1,0 +1,199 @@
+{
+  "version": "4.0.0",
+  "darkMode": false,
+  "gridEnabling": false,
+  "currentViewName": null,
+  "defaultView": {
+    "detailLevel": "All",
+    "relationshipMode": "All",
+    "tablePositions": [
+      {
+        "name": "accounts",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 0
+      },
+      {
+        "name": "social_identities",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 0
+      },
+      {
+        "name": "auth_sessions",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 0
+      },
+      {
+        "name": "password_reset_tokens",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 460
+      },
+      {
+        "name": "consent_documents",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 460
+      },
+      {
+        "name": "consent_events",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 460
+      },
+      {
+        "name": "deactivation_requests",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 920
+      },
+      {
+        "name": "clones",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 920
+      },
+      {
+        "name": "clone_assessments",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 920
+      },
+      {
+        "name": "clone_invitations",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 1380
+      },
+      {
+        "name": "clone_permissions",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 1380
+      },
+      {
+        "name": "conversation_sessions",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 1380
+      },
+      {
+        "name": "messages",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 1840
+      },
+      {
+        "name": "message_revisions",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 1840
+      },
+      {
+        "name": "analysis_jobs",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 1840
+      },
+      {
+        "name": "knowledge_items",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 2300
+      },
+      {
+        "name": "knowledge_versions",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 2300
+      },
+      {
+        "name": "knowledge_sources",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 2300
+      },
+      {
+        "name": "knowledge_conflicts",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 2760
+      },
+      {
+        "name": "response_segments",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 2760
+      },
+      {
+        "name": "response_evidence",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 2760
+      },
+      {
+        "name": "audit_events",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 3220
+      },
+      {
+        "name": "member_groups",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 3220
+      },
+      {
+        "name": "knowledge_embeddings",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 3220
+      },
+      {
+        "name": "embedding_jobs",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 3680
+      },
+      {
+        "name": "fact_details",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 3680
+      },
+      {
+        "name": "memory_details",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 3680
+      },
+      {
+        "name": "value_details",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 4140
+      },
+      {
+        "name": "preference_details",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 4140
+      },
+      {
+        "name": "behavior_details",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 4140
+      }
+    ],
+    "tableGroupCollapseStates": [],
+    "stickyNoteLayouts": [],
+    "referencePaths": [],
+    "elementPositions": [],
+    "groupCollapseStates": [],
+    "linkPaths": []
+  },
+  "views": {}
+}

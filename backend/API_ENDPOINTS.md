@@ -2,6 +2,8 @@
 
 기준: 2026-11-26. Notion 요구사항·화면·ETL/RAG 아키텍처를 반영한다. X·구현 범위 밖·관리자는 제외하며 검토 중 항목은 초안으로 포함한다.
 
+설계 변경: 실행 코드 58개는 유지하며, 아래 지식 5대 분류 목표 계약은 59개다. 상세는 문서 끝의 변경 설계를 참조한다.
+
 ## 구현 경계
 
 컨트롤러 9개, 엔드포인트 58개. 모든 엔드포인트 메서드 본문은 `return null;` 한 줄만 포함한다. 반환형은 향후 응답 계약 확정을 위한 `ResponseEntity<?>`이며 501 응답·예외·상태 처리 코드는 없다. 현재 정상 바인딩 요청은 기본 빈 응답이므로 실제 기능 성공을 의미하지 않는다. Spring MVC의 기본 입력 바인딩은 동작한다.
@@ -234,3 +236,20 @@ Service·Dao는 XxxService·XxxDao 이름의 빈 클래스만 유지한다. 업�
 | [NFR-028 모듈 독립성](https://app.notion.com/0be1a5bdc5208330938d0147a0da35cb) | 확정 | 후속 내부/UI/운영 |
 | [NFR-029 모델 확장성](https://app.notion.com/1ee1a5bdc52083859c5d813084cf4038) | 확정 | 후속 내부/UI/운영 |
 | [NFR-030 API 문서화](https://app.notion.com/e151a5bdc520838c912a81c2195dd88d) | 확정 | 후속 내부/UI/운영 |
+
+## 지식 5대 분류 변경 설계 (2026-11-26)
+
+아래는 **설계 계약 변경**이며 현재 Java/DTO/EndpointContractTests는 변경하지 않았다. 위 목록은 실행 코드 58개 경로의 인벤토리다. 목표는 기존 9개 도메인 그대로 59개 경로다.
+
+| 메서드 | 경로 | 변경 | 현재 코드 |
+| --- | --- | --- | --- |
+| GET | /api/me/analysis?kind=FACT | 기존 목록에 선택 필터 추가 | kind 미바인딩 |
+| GET | /api/me/analysis?kind=MEMORY | 같은 목록의 필터 값 | kind 미바인딩 |
+| GET | /api/me/analysis?kind=VALUE | 같은 목록의 필터 값 | kind 미바인딩 |
+| GET | /api/me/analysis?kind=PREFERENCE | 같은 목록의 필터 값 | kind 미바인딩 |
+| GET | /api/me/analysis?kind=BEHAVIOR | 같은 목록의 필터 값 | kind 미바인딩 |
+| GET | /api/me/analysis/summary | 신규 경로 1개 | 전용 핸들러 없음 |
+
+kind는 FACT/MEMORY/VALUE/PREFERENCE/BEHAVIOR 중 하나이며 미지정 전체다. informationId는 knowledge_items.id다. 상세는 해당 버전의 단일 분류 상세 테이블을 JOIN하고 이력·출처·충돌을 제공한다. summary는 버전 수가 아닌 유효한 활성 항목 수를 5종별 집계한다.
+
+요청/응답과 후속 테스트는 [ANALYSIS_API.md](design/ANALYSIS_API.md), 기계 판독 계약은 [openapi.json](design/openapi.json), 호출·TX·병합·권한 설계는 [BACKEND_ARCHITECTURE.md](design/BACKEND_ARCHITECTURE.md)를 따른다. 조회 필터는 분류별 공개 권한 설정이 아니며 지식 수정/제외 API는 추가하지 않는다.

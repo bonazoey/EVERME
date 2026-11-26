@@ -1,0 +1,15 @@
+{
+  "name": "everme-design-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Design synchronization and isolated relational validation; no production database connection",
+  "scripts": {
+    "sync:dbml": "node update-design.cjs",
+    "sync:contracts": "node sync-artifacts.cjs",
+    "test": "node validate-design.cjs"
+  },
+  "devDependencies": {
+    "@dbml/core": "13.0.0",
+    "@electric-sql/pglite": "0.6.0"
+  }
+}

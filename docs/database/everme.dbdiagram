@@ -1,0 +1,680 @@
+{
+  "version": "4.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "currentViewName": null,
+  "defaultView": {
+    "detailLevel": "All",
+    "relationshipMode": "All",
+    "tablePositions": [
+      {
+        "name": "accounts",
+        "schemaName": "public",
+        "x": 12,
+        "y": 12
+      },
+      {
+        "name": "social_identities",
+        "schemaName": "public",
+        "x": 520.97265625,
+        "y": 12
+      },
+      {
+        "name": "auth_sessions",
+        "schemaName": "public",
+        "x": 520.97265625,
+        "y": 250
+      },
+      {
+        "name": "password_reset_tokens",
+        "schemaName": "public",
+        "x": 520.97265625,
+        "y": 520
+      },
+      {
+        "name": "consent_documents",
+        "schemaName": "public",
+        "x": 12,
+        "y": 410
+      },
+      {
+        "name": "consent_events",
+        "schemaName": "public",
+        "x": 520.97265625,
+        "y": 1634
+      },
+      {
+        "name": "deactivation_requests",
+        "schemaName": "public",
+        "x": 520.97265625,
+        "y": 790
+      },
+      {
+        "name": "clones",
+        "schemaName": "public",
+        "x": 520.97265625,
+        "y": 1029
+      },
+      {
+        "name": "clone_assessments",
+        "schemaName": "public",
+        "x": 1069.56591796875,
+        "y": 442
+      },
+      {
+        "name": "clone_invitations",
+        "schemaName": "public",
+        "x": 1069.56591796875,
+        "y": 12
+      },
+      {
+        "name": "clone_permissions",
+        "schemaName": "public",
+        "x": 1069.56591796875,
+        "y": 745
+      },
+      {
+        "name": "conversation_sessions",
+        "schemaName": "public",
+        "x": 1069.56591796875,
+        "y": 1079
+      },
+      {
+        "name": "messages",
+        "schemaName": "public",
+        "x": 1691.3974609375,
+        "y": 12
+      },
+      {
+        "name": "message_revisions",
+        "schemaName": "public",
+        "x": 2218.18408203125,
+        "y": 12
+      },
+      {
+        "name": "analysis_jobs",
+        "schemaName": "public",
+        "x": 2755.53076171875,
+        "y": 12
+      },
+      {
+        "name": "knowledge_items",
+        "schemaName": "public",
+        "x": 520.97265625,
+        "y": 1300
+      },
+      {
+        "name": "knowledge_versions",
+        "schemaName": "public",
+        "x": 1069.56591796875,
+        "y": 1478
+      },
+      {
+        "name": "knowledge_sources",
+        "schemaName": "public",
+        "x": 3336.09619140625,
+        "y": 12
+      },
+      {
+        "name": "knowledge_conflicts",
+        "schemaName": "public",
+        "x": 1691.3974609375,
+        "y": 808
+      },
+      {
+        "name": "response_segments",
+        "schemaName": "public",
+        "x": 2218.18408203125,
+        "y": 314
+      },
+      {
+        "name": "response_evidence",
+        "schemaName": "public",
+        "x": 2755.53076171875,
+        "y": 315
+      },
+      {
+        "name": "audit_events",
+        "schemaName": "public",
+        "x": 1691.3974609375,
+        "y": 346
+      },
+      {
+        "name": "member_groups",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 0
+      },
+      {
+        "name": "knowledge_embeddings",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 0
+      },
+      {
+        "name": "embedding_jobs",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 0
+      },
+      {
+        "name": "fact_details",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 460
+      },
+      {
+        "name": "memory_details",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 460
+      },
+      {
+        "name": "value_details",
+        "schemaName": "public",
+        "x": 3340,
+        "y": 460
+      },
+      {
+        "name": "preference_details",
+        "schemaName": "public",
+        "x": 2500,
+        "y": 920
+      },
+      {
+        "name": "behavior_details",
+        "schemaName": "public",
+        "x": 2920,
+        "y": 920
+      }
+    ],
+    "tableGroupCollapseStates": [],
+    "stickyNoteLayouts": [],
+    "referencePaths": [
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "account_id"
+        ],
+        "secondTableName": "social_identities",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "account_id"
+        ],
+        "secondTableName": "auth_sessions",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "account_id"
+        ],
+        "secondTableName": "password_reset_tokens",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "account_id"
+        ],
+        "secondTableName": "consent_events",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "consent_documents",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "document_id"
+        ],
+        "secondTableName": "consent_events",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "account_id"
+        ],
+        "secondTableName": "deactivation_requests",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "owner_id"
+        ],
+        "secondTableName": "clones",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "clones",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "clone_id"
+        ],
+        "secondTableName": "clone_assessments",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "clones",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "clone_id"
+        ],
+        "secondTableName": "clone_invitations",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "recipient_account_id"
+        ],
+        "secondTableName": "clone_invitations",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "clones",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "clone_id"
+        ],
+        "secondTableName": "clone_permissions",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "consumer_id"
+        ],
+        "secondTableName": "clone_permissions",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "participant_id"
+        ],
+        "secondTableName": "conversation_sessions",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "clones",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "clone_id"
+        ],
+        "secondTableName": "conversation_sessions",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "conversation_sessions",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "session_id"
+        ],
+        "secondTableName": "messages",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "messages",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "message_id"
+        ],
+        "secondTableName": "message_revisions",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "message_revisions",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "source_revision_id"
+        ],
+        "secondTableName": "analysis_jobs",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "owner_id"
+        ],
+        "secondTableName": "knowledge_items",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "knowledge_items",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "item_id"
+        ],
+        "secondTableName": "knowledge_versions",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "knowledge_versions",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "version_id"
+        ],
+        "secondTableName": "knowledge_sources",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "message_revisions",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "message_revision_id"
+        ],
+        "secondTableName": "knowledge_sources",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "analysis_jobs",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "analysis_job_id"
+        ],
+        "secondTableName": "knowledge_sources",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "knowledge_versions",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "existing_version_id"
+        ],
+        "secondTableName": "knowledge_conflicts",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "knowledge_versions",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "incoming_version_id"
+        ],
+        "secondTableName": "knowledge_conflicts",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "messages",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "message_id"
+        ],
+        "secondTableName": "response_segments",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "response_segments",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "segment_id"
+        ],
+        "secondTableName": "response_evidence",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "knowledge_versions",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "knowledge_version_id"
+        ],
+        "secondTableName": "response_evidence",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "actor_id"
+        ],
+        "secondTableName": "audit_events",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "accounts",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "owner_id"
+        ],
+        "secondTableName": "audit_events",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "clones",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "clone_id"
+        ],
+        "secondTableName": "audit_events",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "conversation_sessions",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "session_id"
+        ],
+        "secondTableName": "audit_events",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "clone_permissions",
+        "firstSchemaName": "public",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "permission_id"
+        ],
+        "secondTableName": "audit_events",
+        "secondSchemaName": "public",
+        "secondRelation": "*",
+        "checkPoints": []
+      }
+    ],
+    "elementPositions": [],
+    "groupCollapseStates": [],
+    "linkPaths": []
+  },
+  "views": {}
+}
