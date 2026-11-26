@@ -37,6 +37,7 @@ Desktop.ini
 #docs
 docs/
 PRODUCT.md
+output/
 
 # backend rules (scoped to /backend)
 /backend/**/HELP.md
