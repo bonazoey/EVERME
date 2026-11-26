@@ -1,7 +1,7 @@
 {
-  "runtimeCount": 58,
-  "targetCount": 59,
-  "domains": 9,
+  "runtimeCount": 57,
+  "targetCount": 58,
+  "domains": 8,
   "knowledgeKinds": [
     "FACT",
     "MEMORY",
@@ -131,7 +131,7 @@
       "controller": "AccountController",
       "method": "DELETE",
       "path": "/api/me",
-      "description": "FR-007; NFR-013: 회원탈퇴 및 논리 비활성화. 동의 철회는 탈퇴 시에만 처리한다.",
+      "description": "FR-007; NFR-013: 회원탈퇴 및 논리 비활성화.",
       "handler": "withdraw",
       "params": "",
       "status": "stub-return-null"
@@ -251,15 +251,6 @@
       "description": "FR-079: 이용 가능한 클론.",
       "handler": "availableClones",
       "params": "@RequestParam(defaultValue = \"0\") int page, @RequestParam(defaultValue = \"20\") int size",
-      "status": "stub-return-null"
-    },
-    {
-      "controller": "ConsentDocumentController",
-      "method": "GET",
-      "path": "/api/consent-documents",
-      "description": "FR-008: 약관·동의 문서 및 버전 조회.",
-      "handler": "documents",
-      "params": "",
       "status": "stub-return-null"
     },
     {
@@ -655,7 +646,7 @@
       "controller": "AccountController",
       "method": "DELETE",
       "path": "/api/me",
-      "description": "FR-007; NFR-013: 회원탈퇴 및 논리 비활성화. 동의 철회는 탈퇴 시에만 처리한다.",
+      "description": "FR-007; NFR-013: 회원탈퇴 및 논리 비활성화.",
       "handler": "withdraw",
       "params": "",
       "status": "stub-return-null"
@@ -775,15 +766,6 @@
       "description": "FR-079: 이용 가능한 클론.",
       "handler": "availableClones",
       "params": "@RequestParam(defaultValue = \"0\") int page, @RequestParam(defaultValue = \"20\") int size",
-      "status": "stub-return-null"
-    },
-    {
-      "controller": "ConsentDocumentController",
-      "method": "GET",
-      "path": "/api/consent-documents",
-      "description": "FR-008: 약관·동의 문서 및 버전 조회.",
-      "handler": "documents",
-      "params": "",
       "status": "stub-return-null"
     },
     {

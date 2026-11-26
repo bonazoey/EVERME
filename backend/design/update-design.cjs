@@ -1,9 +1,10 @@
 // Design-file synchronizer only. Never executes SQL or changes application Java.
 const fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../..');
-const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8').replace(/\r+\n/g,'\n');
 const write=(p,s)=>{fs.mkdirSync(path.dirname(path.join(root,p)),{recursive:true});fs.writeFileSync(path.join(root,p),s.trimEnd()+'\n','utf8');};
 let db=read('docs/database/everme.dbml');
+db=db.replace(/Table consent_documents \{[\s\S]*?\n\}\s*Table consent_events \{[\s\S]*?\n\}\n/,'').replace(/^  consent_(documents|events)\r?\n/gm,'');
 function table(name,text){
   const start=db.indexOf('Table '+name+' {');
   if(start<0){db+='\n\n'+text;return;}
@@ -18,8 +19,7 @@ db=db.replace(/Enum information_kind \{[\s\S]*?\}/,`Enum information_kind {
   PREFERENCE
   BEHAVIOR
 }`);
-db=db.replace(/Note: '2026-11-24[^\n]*'/,"Note: '2026-11-26 상세 설계. 기존 24 + 분류 상세 5 = 핵심 29; 그룹 API 저장 보완 1 = 총 30. 실행 migration 아님. backend/design/BACKEND_ARCHITECTURE.md 참조.'");
-db=db.replace("Note: 'FR-008. 최신 이벤트로 동의·철회 상태 판단. 갱신 동의 정책은 별도 결정.'","Note: '최신 사용자 정책: 가입 시 전체 필수 동의, 개별 조회·변경·철회 API 없음. 탈퇴 시에만 철회 이벤트 기록.'");
+db=db.replace(/Note: '2026-11-(?:24|26)[^\n]*'/,"Note: '2026-11-26 상세 설계. 약관 테이블 제거 후 22 + 분류 상세 5 = 핵심 27; 그룹 API 저장 보완 1 = 총 28. 실행 migration 아님. backend/design/BACKEND_ARCHITECTURE.md 참조.'");
 table('member_groups',`Table member_groups {
   id uuid [pk]
   clone_id uuid [not null, ref: > clones.id]
@@ -258,4 +258,4 @@ const canonical='backend/design/everme.dbml';
 db=db.replace(/\n{3,}/g,'\n\n');
 for(const p of [canonical,'docs/database/everme.dbml','output/architecture/everme-rag-proposal.dbml'])write(p,db);
 write('backend/design/knowledge-kinds.json',JSON.stringify(kinds.map(({fields,checks,...x})=>({...x,checks})),null,2));
-console.log('Synchronized 30-table DBML (29 core + member_groups)');
+console.log('Synchronized 28-table DBML (27 core + member_groups)');

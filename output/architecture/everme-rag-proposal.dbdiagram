@@ -32,18 +32,6 @@
         "y": 460
       },
       {
-        "name": "consent_documents",
-        "schemaName": "public",
-        "x": 2920,
-        "y": 460
-      },
-      {
-        "name": "consent_events",
-        "schemaName": "public",
-        "x": 3340,
-        "y": 460
-      },
-      {
         "name": "deactivation_requests",
         "schemaName": "public",
         "x": 2500,

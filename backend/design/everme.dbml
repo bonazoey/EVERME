@@ -1,6 +1,6 @@
 Project EVERME {
   database_type: 'PostgreSQL'
-  Note: '2026-11-26 상세 설계. 기존 24 + 분류 상세 5 = 핵심 29; 그룹 API 저장 보완 1 = 총 30. 실행 migration 아님. backend/design/BACKEND_ARCHITECTURE.md 참조.'
+  Note: '2026-11-26 상세 설계. 약관 테이블 제거 후 22 + 분류 상세 5 = 핵심 27; 그룹 API 저장 보완 1 = 총 28. 실행 migration 아님. backend/design/BACKEND_ARCHITECTURE.md 참조.'
 }
 
 Enum sensitivity_level {
@@ -78,26 +78,6 @@ Table password_reset_tokens {
   consumed_at timestamptz
   created_at timestamptz [not null, default: `now()`]
   Note: 'FR-005. 원문 토큰 저장 금지, 만료·일회성 소비는 서비스에서 검증.'
-}
-
-Table consent_documents {
-  id uuid [pk]
-  purpose varchar(50) [not null, note: 'privacy_collection / ai_analysis / clone_use 등. 확정 코드 목록 아님']
-  version varchar(50) [not null]
-  document_url text [not null]
-  effective_at timestamptz [not null]
-  indexes { (purpose, version) [unique] }
-  Note: 'FR-008. 동의 항목과 문서 버전 분리.'
-}
-
-Table consent_events {
-  id uuid [pk]
-  account_id uuid [not null, ref: > accounts.id]
-  document_id uuid [not null, ref: > consent_documents.id]
-  granted boolean [not null]
-  occurred_at timestamptz [not null, default: `now()`]
-  indexes { (account_id, document_id, occurred_at) }
-  Note: '최신 사용자 정책: 가입 시 전체 필수 동의, 개별 조회·변경·철회 API 없음. 탈퇴 시에만 철회 이벤트 기록.'
 }
 
 Table deactivation_requests {
@@ -358,8 +338,6 @@ TableGroup account_management {
   social_identities
   auth_sessions
   password_reset_tokens
-  consent_documents
-  consent_events
   deactivation_requests
 }
 

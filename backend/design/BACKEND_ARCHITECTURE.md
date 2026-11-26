@@ -4,9 +4,9 @@
 
 ## 적용 범위와 문서 기준
 
-- 기존 Controller → Service → Dao, 9개 HTTP 도메인과 실행 코드 58개 경로를 유지한다. 모든 기존 컨트롤러의 `return null;` 골격 및 기존 `EndpointContractTests`를 변경하지 않는다.
-- 설계 API는 기존 목록 GET에 `kind`를 추가하고 summary GET 한 개를 더해 59개다. kind 5개 값은 같은 경로의 필터이며 API 5개 추가가 아니다. 현재 코드에 kind 바인딩과 summary가 아직 없다는 차이를 명시한다.
-- DBML 기준 파일: [everme.dbml](everme.dbml). `docs/database/everme.dbml`, `output/architecture/everme-rag-proposal.dbml`은 동일 내용 사본이다. 원본 22 + 기존 벡터 제안 2 = 24, 상세 5 추가 = 핵심 29, 그룹 API의 저장 누락을 보완하는 `member_groups` 1 추가 = 전체 30개다. 임의로 기존 테이블을 삭제해 29개에 맞추지 않는다.
+- 기존 Controller → Service → Dao, 8개 HTTP 도메인과 실행 코드 57개 경로를 유지한다. 남은 컨트롤러의 `return null;` 골격은 유지하고 약관 조회 삭제를 테스트에 반영한다.
+- 설계 API는 기존 목록 GET에 `kind`를 추가하고 summary GET 한 개를 더해 58개다. kind 5개 값은 같은 경로의 필터이며 API 5개 추가가 아니다. 현재 코드에 kind 바인딩과 summary가 아직 없다는 차이를 명시한다.
+- DBML 기준 파일: [everme.dbml](everme.dbml). `docs/database/everme.dbml`, `output/architecture/everme-rag-proposal.dbml`은 동일 내용 사본이다. 원본에서 약관 2개 제거 후 20 + 기존 벡터 제안 2 = 22, 상세 5 추가 = 핵심 27, 그룹 API의 저장 누락을 보완하는 `member_groups` 1 추가 = 전체 28개다. 약관 문서와 동의 이력 테이블 2개는 최신 요청에 따라 제거했다.
 - 설계 무결성 보완 SQL: [constraints-design.sql](constraints-design.sql). DBML의 PK/FK/UNIQUE/CHECK를 보완하는 트리거 설계이며 자동 실행 migration이 아니다.
 - [API_ENDPOINTS.md](../API_ENDPOINTS.md)는 현재/목표 계약을 구분한다. [ANALYSIS_API.md](ANALYSIS_API.md)는 조회 계약 상세다. `architecture-model.json`과 기존 HTML은 DBML에서 재생성한 테이블·FK 및 본 문서의 호출 계약을 사용한다.
 - `docs/`, `output/`은 기존 gitignore 대상이므로 추적 가능한 기준 설계는 `backend/design/`에 둔다. .gitignore를 임의로 변경하거나 commit/push하지 않는다.
@@ -15,7 +15,7 @@
 
 ```mermaid
 flowchart LR
-    UI[기존 Next.js 화면] --> C[기존 9개 Controller]
+    UI[기존 Next.js 화면] --> C[기존 8개 Controller]
     C --> S[도메인 Service / 짧은 TX]
     S --> D[MyBatis Dao]
     D --> PG[(PostgreSQL 원본·지식·권한)]
@@ -151,7 +151,7 @@ TX-4는 유효 지식마다 source_fingerprint(HMAC)와 embedding_model을 가�
 ## 대변인 RAG·Tool Calling·권한
 
 1. ViewerConversationController.send → ViewerConversationService.answer. 인증 계정과 세션 participant/clone 관계 확인.
-2. AccessPolicyService.resolve: accounts/consent_events/clones/clone_permissions + 선택 member_groups를 조회한다. 소유자와 max_level을 서버가 결정한다. 클론은 별도 활성화 승인이 없으며 is_active는 개인정보 비활성화에만 사용한다.
+2. AccessPolicyService.resolve: accounts/clones/clone_permissions + 선택 member_groups를 조회한다. 소유자와 max_level을 서버가 결정한다. 클론은 별도 활성화 승인이 없으며 is_active는 개인정보 비활성화에만 사용한다.
 3. 질문을 spokesperson 세션 messages/message_revisions에 저장한다. analysis_jobs는 만들지 않는다.
 4. RagService.retrieve → KnowledgeDao.searchCandidates. owner_id·is_active·sensitivity≤현재 max_level·모델 조건으로 knowledge_embeddings 검색.
 5. KnowledgeDao.loadVersionWithDetail. knowledge_versions → knowledge_items → 정확한 분류 상세를 JOIN. 원본 owner/등급/활성·유효 출처를 **2차 검사**한다. 신규 상세 필드 때문에 분류별 공개 권한을 추가하지 않는다.
@@ -183,7 +183,7 @@ FROM candidate WHERE j.id = candidate.id RETURNING j.*;
 ```
 
 ```sql
--- 설명용 후보 검색. 인증·동의 검사와 현재 권한 확보는 서비스가 선행한다.
+-- 설명용 후보 검색. 인증·계정 활성 상태 검사와 현재 권한 확보는 서비스가 선행한다.
 SELECT e.knowledge_version_id
 FROM knowledge_embeddings e
 JOIN knowledge_versions v ON v.id = e.knowledge_version_id
@@ -213,5 +213,5 @@ LIMIT :candidate_count;
 - 실제 PostgreSQL 버전·pgvector 설치·모델/차원·키 보관·백업 암호화·운영 규모를 확인해야 한다. 설계 검증은 실제 운영 DB에 접속하지 않는다.
 - worker timeout과 heartbeat/lease 길이·상한은 운영 설정으로 분리한다. lease 회수·재점유·두 워커 DB 반영 경쟁은 구현 시 다중 연결 통합 테스트가 필요하다.
 - DBML은 타입 배타성, SQL 보완안은 상세 누락·불변 식별·출처 소유자를 다룬다. 세션/계정 소유자 변경 금지, 상세 불변, 같은 owner의 충돌 쌍 등 추가 서비스 검증도 필요하다.
-- 그룹 저장 테이블 추가로 29개 목표보다 한 개 많다. 그룹을 완전히 보류하면 member_groups와 group_id/복합 FK를 제외한 핵심 29개로 축소 가능하나, 그 경우 기존 그룹 API도 미구현 상태임을 명시해야 한다.
-- 실제 경로 58와 계획 59를 혼동하지 않는다. 후속 코드 작업은 kind enum 바인딩/summary 추가/DTO·Service·Dao/테스트 59 반영을 하나의 변경으로 진행한다. 현재 테스트를 59로 바꾸어 실행하지 않은 구현을 통과시킨 것처럼 만들지 않는다.
+- 그룹 저장 테이블 추가로 핵심 27개보다 한 개 많다. 그룹을 완전히 보류하면 member_groups와 group_id/복합 FK를 제외한 핵심 27개로 축소 가능하나, 그 경우 기존 그룹 API도 미구현 상태임을 명시해야 한다.
+- 실제 경로 57과 계획 58를 혼동하지 않는다. 후속 코드 작업은 kind enum 바인딩/summary 추가/DTO·Service·Dao/테스트 58 반영을 하나의 변경으로 진행한다. 현재 테스트를 58로 바꾸어 실행하지 않은 구현을 통과시킨 것처럼 만들지 않는다.

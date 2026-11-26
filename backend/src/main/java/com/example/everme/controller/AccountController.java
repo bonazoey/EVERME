@@ -28,7 +28,7 @@ public class AccountController {
         return null;
     }
 
-    /** FR-007; NFR-013: 회원탈퇴 및 논리 비활성화. 동의 철회는 탈퇴 시에만 처리한다. */
+    /** FR-007; NFR-013: 회원탈퇴 및 논리 비활성화. */
     @DeleteMapping("")
     public ResponseEntity<?> withdraw() {
         return null;

@@ -5,18 +5,20 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/** Access 기능별 엔드포인트 골격. 업무 로직과 계층 주입은 후속 구현한다. */
+// 정보이용자 관리
 @RestController
 @RequestMapping(value = "/api/me", produces = "application/json")
 public class AccessController {
 
-    /** FR-071,074,075: 정보이용자 목록. */
+    // 정보이용자 목록 조회
+    // FR-071, 074, 075
     @GetMapping("/members")
     public ResponseEntity<?> members(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return null;
     }
 
-    /** FR-074,075,077-05: 개별 최대 접근 등급 변경. */
+    // 개별 최대 접근 등급 변경
+    // FR-074, 075, 077-05
     @PatchMapping("/members/{memberId}/access")
     public ResponseEntity<?> changeAccess(@PathVariable("memberId") UUID memberId, @RequestBody AccessRequest request) {
         return null;

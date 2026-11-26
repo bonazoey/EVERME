@@ -2,11 +2,11 @@
 
 기준: 2026-11-26. Notion 요구사항·화면·ETL/RAG 아키텍처를 반영한다. X·구현 범위 밖·관리자는 제외하며 검토 중 항목은 초안으로 포함한다.
 
-설계 변경: 실행 코드 58개는 유지하며, 아래 지식 5대 분류 목표 계약은 59개다. 상세는 문서 끝의 변경 설계를 참조한다.
+설계 변경: 실행 코드 57개, 지식 5대 분류 목표 계약은 58개다. 상세는 문서 끝의 변경 설계를 참조한다.
 
 ## 구현 경계
 
-컨트롤러 9개, 엔드포인트 58개. 모든 엔드포인트 메서드 본문은 `return null;` 한 줄만 포함한다. 반환형은 향후 응답 계약 확정을 위한 `ResponseEntity<?>`이며 501 응답·예외·상태 처리 코드는 없다. 현재 정상 바인딩 요청은 기본 빈 응답이므로 실제 기능 성공을 의미하지 않는다. Spring MVC의 기본 입력 바인딩은 동작한다.
+컨트롤러 8개, 엔드포인트 57개. 모든 엔드포인트 메서드 본문은 `return null;` 한 줄만 포함한다. 반환형은 향후 응답 계약 확정을 위한 `ResponseEntity<?>`이며 501 응답·예외·상태 처리 코드는 없다. 현재 정상 바인딩 요청은 기본 빈 응답이므로 실제 기능 성공을 의미하지 않는다. Spring MVC의 기본 입력 바인딩은 동작한다.
 
 Service·Dao는 XxxService·XxxDao 이름의 빈 클래스만 유지한다. 업무 메서드·주입·SQL·인증·인가·검증·ETL·RAG·음성 처리·DB 변경은 후속 구현한다. 기존 루트 HomeController는 유지한다.
 
@@ -34,7 +34,7 @@ Service·Dao는 XxxService·XxxDao 이름의 빈 클래스만 유지한다. 업�
 | AccountController | GET | `/api/me` | 없음 | FR-006: 내 프로필. |
 | AccountController | PATCH | `/api/me` | ProfileRequest | FR-006: 프로필 변경. |
 | AccountController | POST | `/api/me/profile-image` | multipart file | FR-006: 프로필 이미지 업로드. |
-| AccountController | DELETE | `/api/me` | 없음 | FR-007; NFR-013: 회원탈퇴 및 논리 비활성화. 동의 철회는 탈퇴 시에만 처리한다. |
+| AccountController | DELETE | `/api/me` | 없음 | FR-007; NFR-013: 회원탈퇴 및 논리 비활성화.  |
 | AccountController | GET | `/api/me/conversation-settings` | 없음 | FR-019: 대화 설정. |
 | AccountController | PATCH | `/api/me/conversation-settings` | SettingsRequest | FR-019: 음성 종류 변경. |
 | AuthController | POST | `/api/auth/signup` | SignupRequest | FR-001,008: 회원가입. |
@@ -46,7 +46,6 @@ Service·Dao는 XxxService·XxxDao 이름의 빈 클래스만 유지한다. 업�
 | AuthController | POST | `/api/auth/password-resets` | PasswordChangeRequest | FR-005: 본인 인증 토큰으로 비밀번호 재설정. |
 | CloneController | GET | `/api/me/clone` | 없음 | FR-048,055: 클론 요약 프로필·충분성·최근 갱신. |
 | CloneController | GET | `/api/viewer/clones` | 경로/쿼리 | FR-079: 이용 가능한 클론. |
-| ConsentDocumentController | GET | `/api/consent-documents` | 없음 | FR-008: 약관·동의 문서 및 버전 조회. |
 | InvitationController | POST | `/api/me/invitations` | InvitationRequest | FR-071,072: 초대를 통한 정보이용자 등록. |
 | InvitationController | GET | `/api/viewer/invitations` | 경로/쿼리 | FR-073: 받은 초대 목록. |
 | InvitationController | PATCH | `/api/viewer/invitations/{invitationId}` | InvitationResponseRequest | FR-073: 초대 수락 또는 거절. |
@@ -83,7 +82,7 @@ Service·Dao는 XxxService·XxxDao 이름의 빈 클래스만 유지한다. 업�
 ## 요청과 정책
 
 - ViewerConversationRequest는 cloneId만 포함한다. 사용자 세션 생성에는 요청 DTO가 없다. 목록은 page=0, size=20 기본값이며 대변인 목록에만 선택 cloneId 필터가 있다.
-- 가입은 모든 필수 문서 동의를 요구한다. 개별 동의 조회·변경·철회 API는 없고 탈퇴 시만 철회한다. 약관 문서 조회는 유지한다.
+- 가입 요청은 agreedToTerms=true를 요구하는 계약이다. 동의 문서·이력 저장 및 개별 동의 API는 없다. 약관은 프론트에 하드코딩하며 문서 조회 API와 동의 저장 테이블은 없다.
 - text/voice 전환은 프론트엔드 상태이며 /mode API는 없다. 음성 종류는 계정 설정으로 유지한다.
 - DELETE는 외부 자원 제거 계약이며 DB에서는 논리 비활성화로 구현할 예정이다.
 - 메시지는 content를 받는다. 향후 messageId로 스트림·중단·음성·근거 경로를 연결한다. SSE·TTS·STT 전달 프로토콜과 성공 응답 DTO는 후속 확정한다.
@@ -118,7 +117,7 @@ Service·Dao는 XxxService·XxxDao 이름의 빈 클래스만 유지한다. 업�
 | [FR-005 비밀번호 재설정](https://app.notion.com/b0d1a5bdc52082ad995e01914ec99d44) | 확정 | `POST /api/auth/password-reset-requests`<br>`POST /api/auth/password-resets` |
 | [FR-006 프로필 관리](https://app.notion.com/0981a5bdc52082b0942d011b31ccec37) | 확정 | `GET /api/me`<br>`PATCH /api/me`<br>`POST /api/me/profile-image` |
 | [FR-007 회원탈퇴](https://app.notion.com/5fe1a5bdc5208313a8fd01834e6b6b1e) | 확정 | `DELETE /api/me` |
-| [FR-008 약관 및 동의 관리](https://app.notion.com/8071a5bdc52082ffab00014440d14a09) | 확정 | `POST /api/auth/signup`에서 전체 동의 수신; `GET /api/consent-documents`; 탈퇴 시에만 철회 |
+| [FR-008 약관 및 동의 관리](https://app.notion.com/8071a5bdc52082ffab00014440d14a09) | 확정 | 프론트에 약관 하드코딩; `POST /api/auth/signup`에서 agreedToTerms 수신; 동의 테이블 없음 |
 | [FR-009 텍스트 대화](https://app.notion.com/a851a5bdc52082c791d8011f1b7dacfe) | 확정 | `POST /api/owner/conversations/{conversationId}/messages`<br>`POST /api/viewer/conversations/{conversationId}/messages` |
 | [FR-010 실시간 음성 인식](https://app.notion.com/6bb1a5bdc5208282bd050131fda8dcbf) | 확정 | `POST /api/owner/conversations/{conversationId}/speech-recognitions`<br>`POST /api/viewer/conversations/{conversationId}/speech-recognitions` |
 | [FR-011 실시간 음성 출력](https://app.notion.com/a391a5bdc520831f9f0b81b533056688) | 확정 | `GET /api/owner/conversations/{conversationId}/messages/{messageId}/audio`<br>`GET /api/viewer/conversations/{conversationId}/messages/{messageId}/audio` |
@@ -239,7 +238,7 @@ Service·Dao는 XxxService·XxxDao 이름의 빈 클래스만 유지한다. 업�
 
 ## 지식 5대 분류 변경 설계 (2026-11-26)
 
-아래는 **설계 계약 변경**이며 현재 Java/DTO/EndpointContractTests는 변경하지 않았다. 위 목록은 실행 코드 58개 경로의 인벤토리다. 목표는 기존 9개 도메인 그대로 59개 경로다.
+아래는 **설계 계약 변경**이며 약관 제거에 따라 Java/DTO/EndpointContractTests를 갱신했다. 위 목록은 실행 코드 57개 경로의 인벤토리다. 목표는 기존 8개 도메인 그대로 58개 경로다.
 
 | 메서드 | 경로 | 변경 | 현재 코드 |
 | --- | --- | --- | --- |

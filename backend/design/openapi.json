@@ -3,11 +3,11 @@
   "info": {
     "title": "EVERME backend design contract",
     "version": "2026-11-26-knowledge-v2",
-    "description": "설계 목표 59개 경로 계약 / 실제 58개 null 골격. 신규 summary와 kind 필터는 DESIGN ONLY. 기존 Java와 EndpointContractTests는 수정하지 않았다. 나머지 응답 객체는 후속 DTO 설계가 필요하다."
+    "description": "설계 목표 58개 경로 계약 / 실제 57개 null 골격. 신규 summary와 kind 필터는 DESIGN ONLY. 약관 조회 계층·가입 DTO·관련 테스트를 최신 정책에 맞춰 수정했다. 나머지 응답 객체는 후속 DTO 설계가 필요하다."
   },
-  "x-runtime-route-count": 58,
-  "x-target-route-count": 59,
-  "x-http-domain-count": 9,
+  "x-runtime-route-count": 57,
+  "x-target-route-count": 58,
+  "x-http-domain-count": 8,
   "servers": [
     {
       "url": "http://localhost:8080"
@@ -581,7 +581,7 @@
         "tags": [
           "AccountController"
         ],
-        "summary": "FR-007; NFR-013: 회원탈퇴 및 논리 비활성화. 동의 철회는 탈퇴 시에만 처리한다.",
+        "summary": "FR-007; NFR-013: 회원탈퇴 및 논리 비활성화.",
         "operationId": "AccountController_withdraw",
         "x-implementation-status": "stub-return-null",
         "parameters": [],
@@ -1241,39 +1241,6 @@
             "description": "권한 없음"
           }
         }
-      }
-    },
-    "/api/consent-documents": {
-      "get": {
-        "tags": [
-          "ConsentDocumentController"
-        ],
-        "summary": "FR-008: 약관·동의 문서 및 버전 조회.",
-        "operationId": "ConsentDocumentController_documents",
-        "x-implementation-status": "stub-return-null",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "설계 목표 응답. 현재 null 골격의 빈 응답과 구분; 최종 DTO 미확정."
-          },
-          "400": {
-            "description": "목표 입력 오류",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "인증 필요"
-          },
-          "403": {
-            "description": "권한 없음"
-          }
-        },
-        "security": []
       }
     },
     "/api/me/invitations": {
@@ -2791,12 +2758,9 @@
             "type": "string",
             "writeOnly": true
           },
-          "consents": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConsentSelection"
-            },
-            "minItems": 1
+          "agreedToTerms": {
+            "type": "boolean",
+            "const": true
           }
         },
         "additionalProperties": false,
@@ -2804,28 +2768,7 @@
           "name",
           "email",
           "password",
-          "consents"
-        ]
-      },
-      "ConsentSelection": {
-        "type": "object",
-        "properties": {
-          "consentType": {
-            "type": "string"
-          },
-          "documentVersion": {
-            "type": "string"
-          },
-          "agreed": {
-            "type": "boolean",
-            "const": true
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "consentType",
-          "documentVersion",
-          "agreed"
+          "agreedToTerms"
         ]
       },
       "LoginRequest": {

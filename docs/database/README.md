@@ -4,15 +4,15 @@
 
 ## 기준 파일
 
-- [everme.dbml](everme.dbml): 전체 30개. 기준본은 [backend/design/everme.dbml](../../backend/design/everme.dbml)이며 내용이 동일하다.
+- [everme.dbml](everme.dbml): 전체 28개. 기준본은 [backend/design/everme.dbml](../../backend/design/everme.dbml)이며 내용이 동일하다.
 - [백엔드 상세 아키텍처](../../backend/design/BACKEND_ARCHITECTURE.md): 클래스/메서드, TX-1~4, ETL·병합·임베딩·RAG·권한.
-- [API 설계](../../backend/design/ANALYSIS_API.md): 실행 58개 유지, 목표 59개. kind 5개 필터와 summary 1개 추가 설계.
+- [API 설계](../../backend/design/ANALYSIS_API.md): 실행 57개 유지, 목표 58개. kind 5개 필터와 summary 1개 추가 설계.
 - [변경 보고](../../backend/design/CHANGE_REPORT.md), [검증 결과](../../backend/design/validation-results.json).
 - docs/output은 기존 gitignore 대상이며 추적 가능한 기준 자료는 backend/design에 있다.
 
 ## 개수와 기존 설계 대비
 
-기존 원본 22개 + 벡터 제안 2개 = 24개. 5종 상세를 추가한 핵심 29개에 그룹 API 저장 보완 member_groups 1개를 더해 총 30개다. 기존 테이블 삭제는 없다. 29개를 엄격히 유지하려면 그룹 저장·API 구현을 보류해야 하므로 이번안은 그룹 권한 요구를 반영해 30개를 선택했다.
+기존 원본에서 약관 2개 제거 후 20개 + 벡터 제안 2개 = 22개. 5종 상세를 추가한 핵심 27개에 그룹 API 저장 보완 member_groups 1개를 더해 총 28개다. 약관 문서·동의 이력 테이블 2개를 제거했다. 27개를 엄격히 유지하려면 그룹 저장·API 구현을 보류해야 하므로 이번안은 그룹 권한 요구를 반영해 28개를 선택했다.
 
 분류는 FACT/MEMORY/VALUE/PREFERENCE/BEHAVIOR 5개다. 기존 7종 소문자 enum에서 personality/linguistic_style은 자동 변환하지 않는다. 원문과 기존 값을 보존한 별도 전환 계획이 필요하다.
 
@@ -24,8 +24,6 @@
 | social_identities | 소셜 계정 연결 | 기존 |
 | auth_sessions | 로그인 세션 | 기존 |
 | password_reset_tokens | 비밀번호 재설정 토큰 | 기존 |
-| consent_documents | 동의 문서·버전 | 기존 |
-| consent_events | 가입 동의·탈퇴 철회 | 기존 수정 |
 | deactivation_requests | 논리 비활성화 요청 | 기존 |
 | clones | 클론 식별·소유자 | 기존 |
 | clone_assessments | 정보 충분성 평가 | 기존 |
@@ -65,9 +63,9 @@ knowledge_sources는 지식 버전과 원문 revision을 N:M 연결한다. respo
 
 - 사용자/대변인 대화는 공통 테이블, kind=personal/spokesperson. 참여 계정과 클론 소유자는 다르다.
 - 사용자 personal/user 발언만 지식 추출 대상. AI 답변·정보이용자 질문은 사용자 사실로 축적하지 않는다.
-- 가입 시 전체 필수 동의, 탈퇴 시만 철회. 개별 동의 API 없음.
+- 약관은 프론트에 하드코딩한다. 가입 시 agreedToTerms=true를 요구하는 계약이며 동의 문서·이력은 DB에 저장하지 않는다.
 - 삭제는 논리 비활성화. 지식 내용/민감도 직접 수정·개별 활용 제외 API 없음.
-- 클론은 별도 활성화 신청 없이 이용하며 개인정보 비활성화·동의·현재 접근 권한은 검사한다.
+- 클론은 별도 활성화 신청 없이 이용하며 개인정보 비활성화·현재 접근 권한은 검사한다.
 - 유효한 과거 정보도 전체 누적 기록의 일부로 검색. 기간별 페르소나 기능 없음.
 - 벡터 검색 필터와 LLM 전달 전 2차 인가, 응답·근거·이력·TTS에도 현재 권한 적용.
 

@@ -1,12 +1,14 @@
 # 지식 5대 분류 상세 설계 변경 보고
 
-기준일: 2026-11-26. 실제 기능 구현이 아닌 설계 변경이다. 기존 Java·프론트엔드·빌드 의존성·실제 DB는 변경하지 않았다. 실행 코드 9개 도메인/58개 경로와 기존 테스트의 null 골격을 유지한다.
+기준일: 2026-11-26. 실제 기능 구현이 아닌 설계 변경이다. 약관 조회 계층·가입 DTO·관련 테스트를 수정했다. 프론트엔드·빌드 의존성·실제 DB는 변경하지 않았다. 실행 코드 8개 도메인/57개 경로와 기존 테스트의 null 골격을 유지한다.
 
 ## 주요 결과와 요청 대비 판단
 
-1. 기존 24개 기반에 `fact_details`, `memory_details`, `value_details`, `preference_details`, `behavior_details`를 추가해 **핵심 29개**로 설계했다.
-2. 기존 그룹 API는 있었으나 저장 테이블이 없어 접근권한 요구와 모순됐다. `member_groups`와 clone_permissions.group_id를 보완해 **전체 설계는 30개**다. 기존 테이블을 임의로 제거하지 않았다.
-3. 기존 목록 경로에 kind를 설계하고 summary GET 한 개를 추가해 **목표 API는 59개**다. 현재 소스는 58개이며 kind 미바인딩/summary 미등록 차이를 계약에 명시했다. Java 변경 금지 지시에 따라 이를 숨기거나 기존 테스트 숫자만 바꾸지 않았다.
+최신 약관 정책: 프론트 하드코딩으로 전환하여 ConsentDocumentController/Service/Dao와 GET /api/consent-documents를 제거했다. DBML의 consent_documents·consent_events 및 RAG의 동의 이력 조회도 제거했다. 가입 DTO는 문서별 consents 목록 대신 agreedToTerms를 받으며 true 검증은 후속 구현한다. 동의 이력은 저장하지 않는다. 현재 8개 도메인/57개 경로, 설계 목표 58개 경로, DBML 28개 테이블이다.
+
+1. 약관 테이블 제거 후 22개 기반에 `fact_details`, `memory_details`, `value_details`, `preference_details`, `behavior_details`를 추가해 **핵심 27개**로 설계했다.
+2. 기존 그룹 API는 있었으나 저장 테이블이 없어 접근권한 요구와 모순됐다. `member_groups`와 clone_permissions.group_id를 보완해 **전체 설계는 28개**다. 약관 문서·동의 이력 테이블 2개는 최신 요청에 따라 제거했다.
+3. 기존 목록 경로에 kind를 설계하고 summary GET 한 개를 추가해 **목표 API는 58개**다. 현재 소스는 57개이며 kind 미바인딩/summary 미등록 차이를 계약에 명시했다. 약관 제거에 따른 경로 감소만 테스트에 반영했으며 summary는 아직 구현하지 않았다.
 4. 상세는 항목이 아닌 지식 버전과 1:1 연결한다. kind 복합 FK/상수 CHECK로 종류 혼합을 막고, 커밋 시점 지연 제약 트리거로 상세 누락을 막는다.
 5. lease_token/lease_until과 최종 CAS를 도입했다. DB 행을 장시간 잠근 채 LLM/API를 호출하지 않는다. 분류 실패는 완료 결과 개수만 남기며 지식 재시도는 하지 않는다.
 
@@ -14,18 +16,18 @@
 
 | 파일 | 변경 |
 | --- | --- |
-| backend/design/everme.dbml | 신규 추적 가능한 기준 DBML. 전체 30개, 5종 상세·복합 관계·CHECK·인덱스·lease |
+| backend/design/everme.dbml | 신규 추적 가능한 기준 DBML. 전체 28개, 5종 상세·복합 관계·CHECK·인덱스·lease |
 | docs/database/everme.dbml | 기존 DBML을 기준본과 동일하게 갱신 |
 | output/architecture/everme-rag-proposal.dbml | 구버전 벡터 제안 사본을 동일 기준본으로 갱신 |
 | docs/database/everme.dbdiagram | 기존 darkMode/레이아웃 유지, 신규 테이블 배치 추가 |
 | output/architecture/everme-rag-proposal.dbdiagram | 기존 형식/표현 유지, 신규 테이블 배치 추가 |
-| docs/database/README.md | 기존 7종·22개/보류 설명을 5종·29+1 설계와 최신 정책으로 정정 |
+| docs/database/README.md | 기존 7종·22개/보류 설명을 5종·27+1 설계와 최신 정책으로 정정 |
 | backend/design/BACKEND_ARCHITECTURE.md | 계층/호출/동기·비동기/TX/병합/임베딩/RAG/권한/전환 상세 |
-| backend/API_ENDPOINTS.md | 기존 58개 인벤토리 유지, kind/summary 목표 계약 및 구현 상태 추가 |
+| backend/API_ENDPOINTS.md | 기존 57개 인벤토리 유지, kind/summary 목표 계약 및 구현 상태 추가 |
 | backend/design/ANALYSIS_API.md | 목록·상세·summary의 요청/응답·집계·DTO·후속 테스트 |
-| backend/design/openapi.json | 9개 도메인/59개 목표 API, 현재/계획 상태 구분 |
-| backend/design/endpoint-contract.json | 실제 58개와 목표 59개 경로 인벤토리 |
-| backend/design/architecture-model.json | DBML에서 추출한 30개 테이블·FK·9개 보기·호출 계약 |
+| backend/design/openapi.json | 8개 도메인/58개 목표 API, 현재/계획 상태 구분 |
+| backend/design/endpoint-contract.json | 실제 57개와 목표 58개 경로 인벤토리 |
+| backend/design/architecture-model.json | DBML에서 추출한 28개 테이블·FK·9개 보기·호출 계약 |
 | output/architecture/everme-data-architecture.html | 기존 색상·범례·테이블 선택 방식 유지. 동기 대화·5종·병합/임베딩·클래스 보기 추가 |
 | backend/design/constraints-design.sql | 상세 누락·불변 지식·원문 소유자·충돌 항목 검사 SQL 설계. 자동 실행 migration 아님 |
 | backend/design/knowledge-kinds.json | 분류별 상세 속성·제약의 기계 판독 정의 |
@@ -35,7 +37,7 @@
 | backend/design/sync-artifacts.cjs | OpenAPI/모델/기존 HTML/레이아웃 동기화 도구 |
 | backend/design/validate-design.cjs | DBML 파싱·문서/계약 일치·격리 관계형 제약 검증 |
 | backend/design/validation-results.json | 검증 결과와 한계 기록 |
-| output/architecture/check-architecture.cjs | 9개 보기·선택·모바일/데스크톱 화면 검증으로 확장 |
+| output/architecture/check-architecture.cjs | 8개 보기·선택·모바일/데스크톱 화면 검증으로 확장 |
 
 기존 docs/output은 gitignore 대상이다. 기준 설계를 backend/design에 두었으며 ignore 정책을 임의로 수정하지 않았다. 이 작업에서 commit/push는 하지 않는다.
 
@@ -54,7 +56,6 @@
 | embedding_jobs | lease·시도 횟수·fingerprint·실패/완료 시각 추가. 버전/모델 UNIQUE·상태/lease CHECK |
 | member_groups | 그룹 식별·clone FK·이름·default_level·활성·시각. UNIQUE(clone_id,name), UNIQUE(id,clone_id) |
 | clone_permissions | group_id 추가 및 (group_id,clone_id) 복합 FK. max_level을 그룹 일괄 변경 시 같은 TX에서 갱신 |
-| consent_events | 스키마 유지, 가입/탈퇴 외 개별 철회 API가 없다는 정책 설명 정정 |
 
 기존 회원·대화·클론·초대·감사 테이블을 삭제하지 않았다. 상세의 version_id가 PK이므로 같은 분류 상세 2행은 불가능하고 다른 kind 상세는 복합 FK/상수 CHECK로 차단한다. DBML은 정확히 한 상세의 존재를 단독 보장하지 못하므로 SQL 보완안이 필요하다. 상세 UPDATE/DELETE는 차단하며 새 버전으로 이력을 보존한다.
 
@@ -71,6 +72,6 @@
 
 ## 검증과 실제 적용 전 과제
 
-검증 결과의 구체적 목록은 validation-results.json을 따른다. DBML 현대 파서로 30개 및 복합 FK/CHECK를 파싱하고, 격리된 PostgreSQL 엔진에서 5종 정상 저장과 잘못된 상세/누락/덮어쓰기/그룹/lease/소유자 등을 검증했다. pgvector는 관계형 검증에서 대체 타입을 사용했으므로 실제 ANN·암호화·성능을 검증한 것은 아니다. 운영 DB에는 접속하지 않는다.
+검증 결과의 구체적 목록은 validation-results.json을 따른다. DBML 현대 파서로 28개 및 복합 FK/CHECK를 파싱하고, 격리된 PostgreSQL 엔진에서 5종 정상 저장과 잘못된 상세/누락/덮어쓰기/그룹/lease/소유자 등을 검증했다. pgvector는 관계형 검증에서 대체 타입을 사용했으므로 실제 ANN·암호화·성능을 검증한 것은 아니다. 운영 DB에는 접속하지 않는다.
 
-후속 과제: 모델/차원·키 관리·L4 상세 메타데이터 보호·HMAC 정규화/키 교체, 7→5종 데이터 전환, 그룹 정책 최종 합의, 다중 연결 SKIP LOCKED 경합/lease heartbeat 테스트, 실제 벡터 인덱스 실행 계획·회수율, summary/kind 코드·DTO·테스트 59 반영. Java 소스는 이 설계 작업에서 변경하지 않았다.
+후속 과제: 모델/차원·키 관리·L4 상세 메타데이터 보호·HMAC 정규화/키 교체, 7→5종 데이터 전환, 그룹 정책 최종 합의, 다중 연결 SKIP LOCKED 경합/lease heartbeat 테스트, 실제 벡터 인덱스 실행 계획·회수율, summary/kind 코드·DTO·테스트 58 반영. 약관 조회 계층·가입 DTO·관련 테스트를 최신 정책에 맞춰 수정했다.

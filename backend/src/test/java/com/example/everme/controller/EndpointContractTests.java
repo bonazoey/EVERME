@@ -21,7 +21,7 @@ class EndpointContractTests {
         controllers = new Object[]{
                 new AuthController(), new AccountController(), new OwnerConversationController(),
                 new ViewerConversationController(), new CloneController(), new AnalysisController(),
-                new AccessController(), new InvitationController(), new ConsentDocumentController()};
+                new AccessController(), new InvitationController()};
         mvc = MockMvcBuilders.standaloneSetup(controllers).build();
     }
 
@@ -48,6 +48,7 @@ class EndpointContractTests {
 
     @Test
     void unsupportedOperationsHaveNoMapping() throws Exception {
+        mvc.perform(get("/api/consent-documents")).andExpect(status().isNotFound());
         mvc.perform(get("/api/me/consents")).andExpect(status().isNotFound());
         mvc.perform(patch("/api/me/analysis/00000000-0000-0000-0000-000000000001")
                         .contentType("application/json").content("{}"))
@@ -58,10 +59,10 @@ class EndpointContractTests {
     }
 
     @Test
-    void all58EndpointsReturnNull() throws Exception {
+    void all57EndpointsReturnNull() throws Exception {
         var mapping = mvc.getDispatcherServlet().getWebApplicationContext()
                 .getBean(RequestMappingHandlerMapping.class);
-        assertEquals(58, mapping.getHandlerMethods().size());
+        assertEquals(57, mapping.getHandlerMethods().size());
         for (Object controller : controllers) {
             for (var method : controller.getClass().getDeclaredMethods()) {
                 Object[] args = Arrays.stream(method.getParameterTypes())

@@ -6,9 +6,8 @@ package com.example.everme.dto;
  */
 public final class EndpointRequests {
     private EndpointRequests() {}
-    /** 모든 필수 문서에 동의해야 가입 가능. 누락·false·문서 버전 검증은 후속 서비스에서 처리한다. */
-    public record SignupRequest(String name, String email, String password, java.util.List<ConsentSelection> consents) {}
-    public record ConsentSelection(String consentType, String documentVersion, Boolean agreed) {}
+    /** 프론트에 표시한 필수 약관 동의 여부. true 검증은 후속 구현하며 문서·동의 이력은 DB에 저장하지 않는다. */
+    public record SignupRequest(String name, String email, String password, Boolean agreedToTerms) {}
     public record LoginRequest(String email, String password) {}
     public record PasswordResetRequest(String email) {}
     public record PasswordChangeRequest(String token, String newPassword) {}

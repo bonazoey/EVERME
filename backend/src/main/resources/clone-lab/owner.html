@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>EVERME · 클론 실험실</title><link rel="stylesheet" href="/lab/assets/lab.css"><script src="/lab/assets/lab.js" defer></script></head>
+<body data-view="owner">
+<header><a class="brand" href="/lab">EVERME <span>CLONE LAB</span></a><nav aria-label="실험 화면"><a href="/lab" aria-current="page">대화·분석</a><a href="/lab/viewer">클론과 대화</a></nav><span class="lab-label">실험 환경</span></header>
+<main>
+<div class="page-heading"><div><p class="eyebrow">01 / BUILD A MEMORY</p><h1>대화가 쌓이면, 이해가 됩니다.</h1><p class="muted">대화를 생성하고 근거를 확인한 뒤, 클론의 140개 요소를 갱신하세요.</p></div><button id="export" class="secondary" disabled>결과 내보내기</button></div>
+<section class="setup" aria-label="실험 설정"><div class="field"><label for="user">테스트 사용자</label><select id="user"><option value="">사용자를 선택하세요</option></select></div><button id="open-create" class="secondary">새 가상 인물</button><div class="field topic-field"><label for="topic">대화 주제</label><input id="topic" maxlength="1000" placeholder="예: 주말 여행을 계획하며 있었던 일"></div></section>
+<div class="actions"><button id="generate" disabled>10개 대화 생성</button><button id="analyze" class="secondary" disabled>분석</button><button id="save" class="secondary" disabled>저장</button><span class="action-divider"></span><button id="run" class="secondary" disabled>1000개 테스트</button><button id="stop" class="quiet" disabled>중단</button><button id="resume" class="quiet" disabled>재개</button></div>
+<p id="notice" role="status" aria-live="polite" class="notice">새 가상 인물을 만들거나 기존 사용자를 선택하세요.</p>
+<section id="run-panel" class="run-panel" hidden aria-label="자동 테스트 진행"><div class="progress-heading"><strong id="run-state"></strong><span id="run-count"></span></div><progress id="progress" max="1000" value="0"></progress><p id="run-metrics" class="muted"></p></section>
+<div class="workspace">
+<section class="conversation-panel"><div class="panel-heading"><div><p class="eyebrow">SOURCE</p><h2>대화 내역 <span id="turn-count" class="count">0</span></h2></div><select id="batch" aria-label="대화 배치"><option value="">아직 대화가 없습니다</option></select></div><div id="conversation" class="conversation"><div class="empty"><span class="empty-index">01</span><h3>한 사람의 이야기를 시작하세요.</h3><p>주제를 입력하고 ‘10개 대화 생성’을 누르세요.<br>생성만으로는 분석하거나 프로필을 저장하지 않습니다.</p></div></div></section>
+<section class="analysis-panel"><div class="panel-heading"><div><p class="eyebrow">UNDERSTANDING</p><h2>분석 결과</h2></div><span id="coverage" class="count">0 / 140 확인</span></div><div id="domains" class="domain-tabs" role="group" aria-label="분석 영역"></div><div class="score-legend"><span>0 낮음·한쪽 극</span><span>50 중간</span><span>100 높음·반대 극</span></div><p class="muted small">미확인은 중간값과 다릅니다. 요소를 열면 정의·수치 기준·근거를 볼 수 있습니다.</p><div id="elements" class="elements"></div></section>
+</div>
+<footer><span>7개 영역 · 140개 요소 · 근거가 있는 만큼만</span><span id="model-info">모델 설정 불러오는 중</span></footer>
+</main>
+<dialog id="create-dialog"><form id="create-form"><div class="dialog-heading"><h2>고정 가상 인물 만들기</h2><button type="button" id="close-create" class="quiet" aria-label="닫기">닫기</button></div><p class="muted">인물 설정은 대화 생성과 평가에만 사용합니다. 분석·클론 답변에는 전달하지 않습니다.</p><label for="name">이름</label><input id="name" required maxlength="80" placeholder="예: 여행을 좋아하는 민서"><label for="seed">인물의 배경</label><textarea id="seed" required maxlength="3000" rows="5" placeholder="나이, 직업, 경험, 좋아하는 것, 평소 습관 등을 적어주세요."></textarea><p id="create-notice" role="status" aria-live="polite" class="notice"></p><button id="create" type="submit">인물 생성</button></form></dialog>
+</body></html>

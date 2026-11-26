@@ -188,82 +188,6 @@
       "example": "설계안 · 실행 코드/DB 적용 전",
       "api": []
     },
-    "consent_documents": {
-      "name": "consent_documents",
-      "group": "회원·동의",
-      "shortRole": "동의 문서·버전",
-      "role": "FR-008. 동의 항목과 문서 버전 분리.",
-      "status": "기존",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid PK",
-          "meaning": "식별자"
-        },
-        {
-          "name": "purpose",
-          "type": "varchar(50) NOT NULL",
-          "meaning": "privacy_collection / ai_analysis / clone_use 등. 확정 코드 목록 아님"
-        },
-        {
-          "name": "version",
-          "type": "varchar(50) NOT NULL",
-          "meaning": "컬럼 정의·제약은 DBML 참조"
-        },
-        {
-          "name": "document_url",
-          "type": "text NOT NULL",
-          "meaning": "컬럼 정의·제약은 DBML 참조"
-        },
-        {
-          "name": "effective_at",
-          "type": "timestamptz NOT NULL",
-          "meaning": "컬럼 정의·제약은 DBML 참조"
-        }
-      ],
-      "read": "요청 및 Worker 호출 표 참조",
-      "write": "아래 단계별 DML·호출 계약 참조",
-      "example": "설계안 · 실행 코드/DB 적용 전",
-      "api": []
-    },
-    "consent_events": {
-      "name": "consent_events",
-      "group": "회원·동의",
-      "shortRole": "가입 동의·탈퇴 철회",
-      "role": "최신 사용자 정책: 가입 시 전체 필수 동의, 개별 조회·변경·철회 API 없음. 탈퇴 시에만 철회 이벤트 기록.",
-      "status": "기존 수정",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid PK",
-          "meaning": "식별자"
-        },
-        {
-          "name": "account_id",
-          "type": "uuid NOT NULL",
-          "meaning": "컬럼 정의·제약은 DBML 참조"
-        },
-        {
-          "name": "document_id",
-          "type": "uuid NOT NULL",
-          "meaning": "컬럼 정의·제약은 DBML 참조"
-        },
-        {
-          "name": "granted",
-          "type": "boolean NOT NULL",
-          "meaning": "컬럼 정의·제약은 DBML 참조"
-        },
-        {
-          "name": "occurred_at",
-          "type": "timestamptz NOT NULL",
-          "meaning": "컬럼 정의·제약은 DBML 참조"
-        }
-      ],
-      "read": "요청 및 Worker 호출 표 참조",
-      "write": "아래 단계별 DML·호출 계약 참조",
-      "example": "설계안 · 실행 코드/DB 적용 전",
-      "api": []
-    },
     "deactivation_requests": {
       "name": "deactivation_requests",
       "group": "회원·동의",
@@ -1755,18 +1679,6 @@
       "id"
     ],
     [
-      "consent_events",
-      "account_id",
-      "accounts",
-      "id"
-    ],
-    [
-      "consent_events",
-      "document_id",
-      "consent_documents",
-      "id"
-    ],
-    [
       "deactivation_requests",
       "account_id",
       "accounts",
@@ -2039,7 +1951,7 @@
   ],
   "views": {
     "all": {
-      "label": "기존 24 + 상세 5 = 핵심 29 / 그룹 저장 보완 1 = 총 30 · 설계 전용",
+      "label": "약관 테이블 제거 후 22 + 상세 5 = 핵심 27 / 그룹 저장 보완 1 = 총 28 · 설계 전용",
       "groups": [
         [
           "회원·동의",
@@ -2048,8 +1960,6 @@
             "social_identities",
             "auth_sessions",
             "password_reset_tokens",
-            "consent_documents",
-            "consent_events",
             "deactivation_requests"
           ]
         ],
@@ -2404,7 +2314,7 @@
     "rag": [
       [
         "1 ViewerConversationService.answer → AccessPolicyService.resolve",
-        "accounts/consent_events/clones/clone_permissions/member_groups",
+        "accounts/clones/clone_permissions/member_groups",
         "조회/질문 저장 TX",
         "질문자는 consumer, 검색 대상은 clone.owner. 그룹 변경은 현재 max_level에 반영"
       ],
@@ -2523,7 +2433,7 @@
       "AccountController",
       "DELETE /api/me",
       "stub-return-null",
-      "FR-007; NFR-013: 회원탈퇴 및 논리 비활성화. 동의 철회는 탈퇴 시에만 처리한다."
+      "FR-007; NFR-013: 회원탈퇴 및 논리 비활성화."
     ],
     [
       "AccountController",
@@ -2602,12 +2512,6 @@
       "GET /api/viewer/clones",
       "stub-return-null",
       "FR-079: 이용 가능한 클론."
-    ],
-    [
-      "ConsentDocumentController",
-      "GET /api/consent-documents",
-      "stub-return-null",
-      "FR-008: 약관·동의 문서 및 버전 조회."
     ],
     [
       "InvitationController",
@@ -2953,13 +2857,13 @@
   "decisions": [
     [
       "코드와 계약",
-      "실행 58 / 목표 59",
-      "9개 도메인 유지. kind는 기존 목록 필터. summary 1개만 설계 추가. Java와 기존 테스트는 그대로."
+      "실행 57 / 목표 58",
+      "8개 도메인 유지. kind는 기존 목록 필터. summary 1개만 설계 추가. 약관 조회 계층·가입 DTO·테스트는 갱신."
     ],
     [
       "테이블 수",
-      "핵심 29 + 그룹 1",
-      "기존 24개에 상세 5개. 기존 그룹 API 저장 누락 때문에 member_groups 보완."
+      "핵심 27 + 그룹 1",
+      "약관 테이블 제거 후 22개에 상세 5개. 기존 그룹 API 저장 누락 때문에 member_groups 보완."
     ],
     [
       "상세 버전 연결",
@@ -3003,12 +2907,12 @@
     ]
   ],
   "counts": {
-    "baseline": 24,
-    "core": 29,
-    "total": 30,
-    "runtimeApis": 58,
-    "targetApis": 59,
-    "domains": 9
+    "baseline": 22,
+    "core": 27,
+    "total": 28,
+    "runtimeApis": 57,
+    "targetApis": 58,
+    "domains": 8
   },
   "knowledgeKinds": [
     "FACT",

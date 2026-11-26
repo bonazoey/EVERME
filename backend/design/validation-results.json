@@ -1,10 +1,10 @@
 {
   "date": "2026-11-26",
-  "tables": 30,
-  "coreTables": 29,
-  "runtimeEndpoints": 58,
-  "designEndpoints": 59,
-  "javaUnchanged": true,
+  "tables": 28,
+  "coreTables": 27,
+  "runtimeEndpoints": 57,
+  "designEndpoints": 58,
+  "javaUnchanged": false,
   "tests": [
     "valid FACT version + matching detail",
     "valid MEMORY version + matching detail",

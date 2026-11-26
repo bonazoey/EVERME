@@ -1,6 +1,6 @@
 # 사용자 지식 조회 API 설계
 
-2026-11-26 목표 계약. Java/DTO/Service/Dao는 이번 작업에서 수정하지 않는다. 실행 코드와 EndpointContractTests는 9개 도메인/58개 경로의 `return null;` 골격이다. 목표는 **9개 도메인/59개 경로**이며 추가 경로는 summary 한 개뿐이다. 아래 200/400/401/404 등의 응답은 구현 목표이지 현재 빈 응답 코드의 동작을 주장하는 것이 아니다.
+2026-11-26 목표 계약. 약관 조회 Controller/Service/Dao 제거와 가입 DTO 변경을 반영했다. 분석 API의 추가 구현은 하지 않는다. 실행 코드와 EndpointContractTests는 8개 도메인/57개 경로의 `return null;` 골격이다. 목표는 **8개 도메인/58개 경로**이며 추가 경로는 summary 한 개뿐이다. 아래 200/400/401/404 등의 응답은 구현 목표이지 현재 빈 응답 코드의 동작을 주장하는 것이 아니다.
 
 ## GET /api/me/analysis
 
@@ -110,7 +110,7 @@ owner_id는 인증 주체에서 결정하며 요청 필드로 받지 않는다. 
 
 ## 구현 단계의 계약 테스트 추가안
 
-현재 EndpointContractTests의 58 경로·전 메서드 null 반환 테스트를 이번 설계 작업에서 변경하지 않는다. 코드 구현 시 summary 추가와 함께 기대 경로 수를 59로 변경하고 다음을 추가한다.
+약관 조회 제거를 반영해 EndpointContractTests는 57개 경로와 null 반환을 검증한다. 후속 구현 시 summary 추가와 함께 기대 경로 수를 58로 변경하고 다음을 추가한다.
 
 1. kind 5개 값 각각 바인딩, 미지정 전체 조회, 잘못된 값 400.
 2. summary가 `analysisDetail(UUID)`에 걸리지 않고 summary 핸들러로 매핑.
