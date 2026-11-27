@@ -1,4 +1,6 @@
-package com.example.everme.lab;
+package com.example.everme.lab.service;
+
+import com.example.everme.lab.dao.LabMapper;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -21,6 +23,10 @@ class LabValidationTests {
         for(var node:List.of(json.valueToTree(-1),json.valueToTree(101),json.valueToTree("50"),json.valueToTree(50.001),json.nullNode()))assertThrows(LabException.class,()->LabValidation.score(node));
         assertEquals(50,LabValidation.score(json.valueToTree(50)).intValue());
     }
+    @Test void compactCatalogPreservesEveryCodeAnchorAndExample(){
+        var compact=catalog.analysisDocument();var codes=new HashSet<String>();for(var domain:compact.path("domains")){assertFalse(domain.path("exclude").asText().isBlank());assertFalse(domain.path("counterExample").asText().isBlank());for(var element:domain.path("elements")){String code=element.path("code").asText();assertTrue(codes.add(code));assertEquals(catalog.element(code).path("anchors"),element.path("anchors"));assertEquals(catalog.element(code).path("positiveExample"),element.path("positiveExample"));assertFalse(element.has("updatePolicy"));assertFalse(element.has("column"));}}
+        assertEquals(catalog.codes(),codes);assertTrue(compact.toString().length()<catalog.document().toString().length()/2);
+    }
     @Test void catalogRejectsMissingInvalidDuplicateAndUnknownPolicies(){
         for(int mode=0;mode<5;mode++){
             var doc=catalog.document();var elements=doc.path("domains").get(0).path("elements");var first=(ObjectNode)elements.get(0);
@@ -36,14 +42,13 @@ class LabValidationTests {
             var observations=json.createArrayNode();observations.addObject().put("code",code).put("score",60).put("strength",2).put("reason","evidence").putArray("sourceIds").add("a");
             String expected=switch(cap){case 10->"43.33";case 20->"41.82";case 40->"40.95";default->throw new AssertionError();};
             var result=json.createObjectNode();result.putArray("updates").addObject().put("code",code).put("score",new java.math.BigDecimal(expected)).put("weight",cap);
-            var point=validation.merge(old,observations,result).path(code);assertEquals(expected,point.path("score").asText());assertEquals(cap,point.path("weight").asInt());
-            ((ObjectNode)result.path("updates").get(0)).put("weight",cap==10?20:10);assertThrows(LabException.class,()->validation.merge(old,observations,result));
+            var point=validation.merge(old,observations).path(code);assertEquals(expected,point.path("score").asText());assertEquals(cap,point.path("weight").asInt());
         }
         assertEquals(Map.of(10,38,20,48,40,54),counts);
         ObjectNode old=json.createObjectNode();old.putObject("values.family").put("score",40).put("weight",20);
         var observations=json.createArrayNode();observations.addObject().put("code","values.family").put("score",60).put("strength",2).put("reason","evidence").putArray("sourceIds").add("a");
         var result=json.createObjectNode();result.putArray("updates").addObject().put("code","values.family").put("score",41.82).put("weight",22);
-        assertEquals(22,validation.merge(old,observations,result).path("values.family").path("weight").asInt());
+        assertEquals(22,validation.merge(old,observations).path("values.family").path("weight").asInt());
     }
     @Test void analysisRejectsAssistantOrForgedSourcesAndDuplicateDimensions() throws Exception {
         var analysis=json.readTree("""
@@ -65,26 +70,23 @@ class LabValidationTests {
         var valid=json.readTree("""
           {"updates":[{"code":"habits.exercise","score":40,"weight":3}]}
           """);
-        var merged=validation.merge(old,observations,valid);assertEquals(40,merged.path("habits.exercise").path("score").asInt());
+        var merged=validation.merge(old,observations);assertEquals(40,merged.path("habits.exercise").path("score").asInt());
         assertTrue(merged.path("values.family").path("score").isNull());assertEquals(50,merged.path("interests.music").path("score").asInt());
-        ((ObjectNode)valid.path("updates").get(0)).put("score",41);assertThrows(LabException.class,()->validation.merge(old,observations,valid));
     }
     @Test void capsLegacyWeightAndRejectsUncappedOrSimpleAverageResults() throws Exception {
         ObjectNode old=(ObjectNode)json.readTree("{\"habits.plan_execution\":{\"score\":40,\"weight\":200}}");
         var observations=json.readTree("[{\"code\":\"habits.plan_execution\",\"score\":60,\"strength\":2,\"sourceIds\":[\"a\"],\"reason\":\"new evidence\"}]");
         var result=json.readTree("{\"updates\":[{\"code\":\"habits.plan_execution\",\"score\":41.82,\"weight\":20}]}");
-        var merged=validation.merge(old,observations,result);assertEquals("41.82",merged.path("habits.plan_execution").path("score").asText());assertEquals(20,merged.path("habits.plan_execution").path("weight").asInt());
-        ((ObjectNode)result.path("updates").get(0)).put("weight",22);assertThrows(LabException.class,()->validation.merge(old,observations,result));
-        ((ObjectNode)result.path("updates").get(0)).put("weight",20).put("score",50);assertThrows(LabException.class,()->validation.merge(old,observations,result));
+        var merged=validation.merge(old,observations);assertEquals("41.82",merged.path("habits.plan_execution").path("score").asText());assertEquals(20,merged.path("habits.plan_execution").path("weight").asInt());
     }
     @Test void crossingCapUsesUncappedDenominatorAndNullHasNoPriorWeight() throws Exception {
         ObjectNode old=(ObjectNode)json.readTree("{\"habits.plan_execution\":{\"score\":40,\"weight\":19}}");
         var observations=json.readTree("[{\"code\":\"habits.plan_execution\",\"score\":60,\"strength\":3,\"sourceIds\":[\"a\"],\"reason\":\"new evidence\"}]");
         var result=json.readTree("{\"updates\":[{\"code\":\"habits.plan_execution\",\"score\":42.73,\"weight\":20}]}");
-        assertEquals("42.73",validation.merge(old,observations,result).path("habits.plan_execution").path("score").asText());
+        assertEquals("42.73",validation.merge(old,observations).path("habits.plan_execution").path("score").asText());
         old.withObject("/habits.plan_execution").putNull("score").put("weight",200);
         ((ObjectNode)result.path("updates").get(0)).put("score",60).put("weight",3);
-        assertEquals(3,validation.merge(old,observations,result).path("habits.plan_execution").path("weight").asInt());
+        assertEquals(3,validation.merge(old,observations).path("habits.plan_execution").path("weight").asInt());
     }
     @Test void refusesProfileIdentifierInjection(){assertThrows(IllegalArgumentException.class,()->LabMapper.ProfileSql.read(Map.of("table","emotion; DROP TABLE accounts")));}
 }

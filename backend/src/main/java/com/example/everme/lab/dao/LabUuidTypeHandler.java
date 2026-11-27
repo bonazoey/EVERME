@@ -1,4 +1,4 @@
-package com.example.everme.lab;
+package com.example.everme.lab.dao;
 
 import org.apache.ibatis.type.*;
 import java.sql.*;

@@ -1,4 +1,4 @@
-package com.example.everme.lab;
+package com.example.everme.lab.service;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.*;
@@ -29,6 +29,7 @@ class LabIntegrationTests {
     @Autowired LabService lab;
     @Autowired LabCloneService clone;
     @Autowired LabRunService runs;
+    @Autowired LabPipeline pipeline;
     @Autowired ObjectMapper json;
     @Autowired LabCatalog catalog;
     @Autowired JdbcTemplate jdbc;
@@ -47,7 +48,6 @@ class LabIntegrationTests {
                 }
                 case "summary" -> {JsonNode schema=call.getArgument(3);if(schema.path("properties").has("topic"))data.put("topic","운동과 일상 경험");else data.put("summary","The user described prior exercise experiences.");}
                 case "analysis" -> {var source=input.path("sources").get(0);data.putArray("observations").addObject().put("code","habits.exercise").put("score",80).put("strength",2).put("reason","사용자가 직접 반복 운동을 설명했다").putArray("sourceIds").add(source.path("id").asText());data.putArray("memories").addObject().put("kind","FACT").put("content","이 사용자는 달리기를 한다").putNull("occurredAt").putArray("sourceIds").add(source.path("id").asText());}
-                case "merge" -> {var updates=data.putArray("updates");for(var o:input.path("observations")){String code=o.path("code").asText();var old=input.path("previous").path(code);int w=old.path("score").isNull()?0:Math.min(input.path("maxWeights").path(code).asInt(),old.path("weight").asInt()),add=o.path("strength").asInt();double score=(old.path("score").asDouble()*w+o.path("score").asDouble()*add)/(w+add);updates.addObject().put("code",code).put("score",BigDecimal.valueOf(score).setScale(2,RoundingMode.HALF_UP)).put("weight",Math.min(input.path("maxWeights").path(code).asInt(),w+add));}}
                 case "answer" -> data.put("assistant","그런 일이 있었군요. 그때는 어떤 느낌이었나요?");
                 default -> throw new IllegalArgumentException(stage);
             }
@@ -61,14 +61,12 @@ class LabIntegrationTests {
         UUID batch=generated(user,"상한 검증");lab.analyze(user,batch,false);lab.save(user,batch,false);
         var profile=lab.profile(user).path("elements");assertEquals(46.67,profile.path("habits.exercise").path("score").asDouble());assertEquals(10,profile.path("habits.exercise").path("weight").asInt());assertEquals(20,profile.path("values.family").path("weight").asInt());
         var analysis=lab.batch(user,batch).path("analysis");assertEquals("element-cap-v1",analysis.path("updatePolicyVersion").asText());assertEquals(10,analysis.path("maxWeights").path("habits.exercise").asInt());assertEquals(1,analysis.path("maxWeights").size());
-        var requests=org.mockito.ArgumentCaptor.forClass(JsonNode.class);verify(ai).structured(eq("merge"),anyString(),requests.capture(),any(JsonNode.class));assertEquals(10,requests.getValue().path("maxWeights").path("habits.exercise").asInt());
+        verify(ai,never()).structured(eq("merge"),anyString(),any(JsonNode.class),any(JsonNode.class));
     }
-    @Test void wrongElementCapRejectsWholeSave(){
-        UUID user=user();var prior=(ObjectNode)lab.profile(user).path("elements");prior.withObject("/habits.exercise").put("score",40).put("weight",200);lab.tx.executeWithoutResult(s->lab.dao.updateProfile(user,prior));
-        UUID batch=generated(user,"잘못된 상한");lab.analyze(user,batch,false);
-        var bad=json.createObjectNode();bad.putArray("updates").addObject().put("code","habits.exercise").put("score",43.64).put("weight",20);
-        when(ai.structured(eq("merge"),anyString(),any(JsonNode.class),any(JsonNode.class))).thenReturn(new LabAi.Result(bad,"test",0,0,0));
-        assertThrows(LabException.class,()->lab.save(user,batch,false));assertEquals(0,lab.profile(user).path("version").asInt());assertEquals(200,lab.profile(user).path("elements").path("habits.exercise").path("weight").asInt());assertTrue(lab.dao.mapper().memories(user).isEmpty());assertEquals("analyzed",lab.batch(user,batch).path("status").asText());
+    @Test void mergeNoLongerCallsLegacyModel(){
+        UUID user=user(),batch=generated(user,"server merge");lab.analyze(user,batch,false);
+        when(ai.structured(eq("merge"),anyString(),any(JsonNode.class),any(JsonNode.class))).thenThrow(new AssertionError("Merge LLM must not be called"));
+        lab.save(user,batch,false);assertEquals(1,lab.profile(user).path("version").asInt());verify(ai,never()).structured(eq("merge"),anyString(),any(JsonNode.class),any(JsonNode.class));
     }
     @Test void blankTopicIsInferredOnceAtTenPairsAndUsesOnlyFirstTen(){
         UUID user=user();var first=lab.message(user,null,null,"첫 번째 이야기");UUID batch=UUID.fromString(first.path("id").asText());
@@ -90,13 +88,13 @@ class LabIntegrationTests {
         doThrow(new LabException(502,"unavailable")).when(ai).structured(eq("summary"),anyString(),any(JsonNode.class),any(JsonNode.class));
         assertThrows(LabException.class,()->lab.message(user,batch,null,"열 번째"));assertEquals(9,lab.batch(user,batch).path("turns").size());assertEquals("",lab.batch(user,batch).path("topic").asText());
     }
-    @Test void previousThirtyThreePairsProvideThreeSummariesForNextTen(){
+    @Test void previousConversationIsNotIncludedInCurrentSummaries(){
         UUID user=user(),previous=UUID.randomUUID();
         lab.tx.executeWithoutResult(status->{lab.dao.mapper().createBatch(previous,user,"previous conversation",1);for(int i=0;i<33;i++)lab.dao.mapper().createTurn(UUID.randomUUID(),previous,i+1,"previous experience "+i,"previous conversation");});
         UUID current=generated(user,"previous conversation");var result=lab.analyze(user,current,false);
-        assertEquals(3,result.path("analysis").path("windows").get(0).path("summaries").size());
+        assertEquals(0,result.path("analysis").path("windows").get(0).path("summaries").size());
         var requests=org.mockito.ArgumentCaptor.forClass(JsonNode.class);verify(ai).structured(eq("analysis"),anyString(),requests.capture(),any(JsonNode.class));
-        assertEquals(10,requests.getValue().path("sources").size());assertEquals(3,requests.getValue().path("summaries").size());assertFalse(requests.getValue().has("persona"));
+        assertEquals(10,requests.getValue().path("sources").size());assertEquals(0,requests.getValue().path("summaries").size());assertFalse(requests.getValue().has("persona"));
     }
     @Test void summariesAreLimitedToFiveAndAllFortyThreePairsAreAnalyzed(){
         UUID user=user(),previous=UUID.randomUUID();
@@ -104,7 +102,7 @@ class LabIntegrationTests {
         UUID current=generated(user,"previous conversation");lab.append(user,current);lab.append(user,current);lab.append(user,current);
         for(int i=0;i<3;i++)lab.message(user,current,null,"typed experience "+i);
         var result=lab.analyze(user,current,false);var windows=result.path("analysis").path("windows");assertEquals(5,windows.size());int count=0;
-        for(var window:windows){assertEquals(5,window.path("summaries").size());count+=window.path("sourceIds").size();}assertEquals(43,count);
+        int windowIndex=0;for(var window:windows){assertEquals(Math.min(5,windowIndex++),window.path("summaries").size());count+=window.path("sourceIds").size();}assertEquals(43,count);
         lab.save(user,current,false);assertEquals(1,lab.profile(user).path("version").asInt());
     }
     @Test void testDialogueGenerationNeverUsesGroundTruth(){
@@ -203,6 +201,15 @@ class LabIntegrationTests {
         assertEquals("INSUFFICIENT",clone.answer(user,UUID.fromString(session.path("sessionId").asText()),"생일은?").path("stage").asText());
     }
     @Test void profileToolCannotBeCalledBeforeMemory(){UUID user=user();var session=clone.start(user,null);var args=json.createObjectNode();args.putArray("codes").add("habits.exercise");when(ai.respond(anyString(),any(JsonNode.class),any(JsonNode.class),anyList())).thenReturn(call("getAnalysisProfile",args));assertThrows(LabException.class,()->clone.answer(user,UUID.fromString(session.path("sessionId").asText()),"질문"));}
+    @Test void toolCallbacksRejectDuplicateExecutionAndOwnerArguments(){
+        UUID user=user();var session=clone.start(user,null);var query=json.createObjectNode().put("query","운동");
+        var duplicate=(ObjectNode)call("searchLongTermMemory",query);((ArrayNode)duplicate.path("output")).add(call("searchLongTermMemory",query).path("output").get(0));
+        when(ai.respond(anyString(),any(JsonNode.class),any(JsonNode.class),anyList())).thenReturn(duplicate);
+        UUID sessionId=UUID.fromString(session.path("sessionId").asText());assertThrows(LabException.class,()->clone.answer(user,sessionId,"질문"));verify(ai,times(1)).embed(anyList());
+        assertTrue(clone.history(user).path("messages").isEmpty());clearInvocations(ai);
+        query.put("ownerId",UUID.randomUUID().toString());when(ai.respond(anyString(),any(JsonNode.class),any(JsonNode.class),anyList())).thenReturn(call("searchLongTermMemory",query));
+        assertThrows(LabException.class,()->clone.answer(user,sessionId,"질문"));verify(ai,never()).embed(anyList());
+    }
     @Test void databaseChecksAndSchemaAreRealPostgres(){assertEquals(11,jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='clone_lab'",Integer.class));UUID user=user();assertThrows(Exception.class,()->jdbc.update("UPDATE clone_lab.profile_relations SET social_orientation=101 WHERE user_id=?",user));}
     @Test void realHttpViewsCatalogAndValidation() throws Exception {
         mvc.perform(get("/lab")).andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith("text/html"));
@@ -211,10 +218,8 @@ class LabIntegrationTests {
         mvc.perform(get("/api/lab/catalog")).andExpect(jsonPath("$.domains.length()").value(7));
         mvc.perform(post("/api/lab/users").contentType("application/json").content("{\"name\":\"\",\"seed\":\"\"}")).andExpect(status().isBadRequest());
     }
-    @Test void failedLlmArithmeticDoesNotWriteAnyProfileOrMemory(){
-        UUID user=user(),batch=generated(user,"arithmetic "+UUID.randomUUID());lab.analyze(user,batch,false);
-        var bad=json.createObjectNode();bad.putArray("updates").addObject().put("code","habits.exercise").put("score",81).put("weight",2);
-        when(ai.structured(eq("merge"),anyString(),any(JsonNode.class),any(JsonNode.class))).thenReturn(new LabAi.Result(bad,"test",0,0,0));
+    @Test void failedEmbeddingDoesNotWriteAnyProfileOrMemory(){
+        UUID user=user(),batch=generated(user,"embedding failure");lab.analyze(user,batch,false);when(ai.embed(anyList())).thenThrow(new LabException(502,"temporary failure"));
         assertThrows(LabException.class,()->lab.save(user,batch,false));assertEquals(0,lab.profile(user).path("version").asInt());assertTrue(lab.dao.mapper().memories(user).isEmpty());
     }
     @Test void databaseFailureRollsBackAllSevenProfilesAndBatch(){
@@ -234,33 +239,54 @@ class LabIntegrationTests {
         }
         assertEquals(1,lab.dao.mapper().memories(user).size());assertEquals(2,lab.profile(user).path("elements").path("habits.exercise").path("weight").asInt());
     }
-    @Test void automaticRunGeneratesOneThousandPairConversationThenSavesOnce() throws Exception {
-        UUID user=user();runs.start(user,"자동 테스트 "+UUID.randomUUID(),false);
-        long deadline=System.nanoTime()+java.time.Duration.ofSeconds(45).toNanos();JsonNode state;
-        do{Thread.sleep(30);state=runs.state(user);}while("running".equals(state.path("status").asText())&&System.nanoTime()<deadline);
-        assertEquals("completed",state.path("status").asText(),state.toString());assertEquals(100,state.path("completedBatches").asInt());
-        for(var code:catalog.codes())assertTrue(lab.profile(user).path("elements").path(code).path("weight").asInt()<=catalog.maxWeight(code));
-        assertEquals(3,lab.profile(user).path("elements").path("habits.exercise").path("weight").asInt());
-        assertEquals(1,lab.dao.mapper().batches(user).size());assertEquals(1,lab.profile(user).path("version").asInt());assertEquals(1000,state.path("generatedPairs").asInt());assertEquals(100,lab.batch(user,UUID.fromString(state.path("batchId").asText())).path("analysis").path("windows").size());assertEquals(1000,jdbc.queryForObject("SELECT count(*) FROM clone_lab.turns t JOIN clone_lab.batches b ON b.id=t.batch_id WHERE b.user_id=?",Integer.class,user));
-        assertTrue(lab.dao.mapper().batches(user).stream().allMatch(b->"saved".equals(b.get("status"))));
-        int generations=0,analyses=0,merges=0;
-        for(var invocation:mockingDetails(ai).getInvocations())if("structured".equals(invocation.getMethod().getName())){
-            String stage=invocation.getArgument(0);JsonNode input=invocation.getArgument(2);
-            if("generation".equals(stage)&&!input.has("seed"))generations++;
-            if("analysis".equals(stage)){assertEquals(100,generations);analyses++;}
-            if("merge".equals(stage)){assertEquals(100,analyses);merges++;}
+    @Test void pipelineGeneratesOneConversationAndCommitsOneHundredOrderedSegments() throws Exception {
+        UUID user=user();var delegate=mockingDetails(ai).getStubbings().stream().filter(s->s.getInvocation().getMethod().getName().equals("structured")).findFirst().orElseThrow();
+        var generationLive=new java.util.concurrent.atomic.AtomicInteger();var analysisLive=new java.util.concurrent.atomic.AtomicInteger();var generationMax=new java.util.concurrent.atomic.AtomicInteger();var analysisMax=new java.util.concurrent.atomic.AtomicInteger();var backlogMax=new java.util.concurrent.atomic.AtomicInteger();var generatedCalls=new java.util.concurrent.atomic.AtomicInteger();var firstAnalysisCount=new java.util.concurrent.atomic.AtomicInteger(-1);var overlap=new java.util.concurrent.atomic.AtomicBoolean();var together=new java.util.concurrent.CountDownLatch(2);
+        when(ai.structured(anyString(),anyString(),any(JsonNode.class),any(JsonNode.class))).thenAnswer(call->{String stage=call.getArgument(0);boolean generation=stage.equals("generation"),analysis=stage.equals("analysis");if(generation)generationMax.accumulateAndGet(generationLive.incrementAndGet(),Math::max);if(analysis)analysisMax.accumulateAndGet(analysisLive.incrementAndGet(),Math::max);
+            try{var current=runs.state(user);if(generation){int reservation=current.path("generationReservation").path("to").asInt();backlogMax.accumulateAndGet(reservation-current.path("savedPairs").asInt(),Math::max);if(generatedCalls.incrementAndGet()==2){together.countDown();if(!together.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new LabException(502,"overlap timeout");}}
+                if(analysis&&firstAnalysisCount.compareAndSet(-1,current.path("generatedPairs").asInt())){together.countDown();if(!together.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new LabException(502,"overlap timeout");}if(generationLive.get()>0&&analysisLive.get()>0)overlap.set(true);return delegate.answer(call);
+            }finally{if(generation)generationLive.decrementAndGet();if(analysis)analysisLive.decrementAndGet();}});
+        runs.start(user,"pipeline "+UUID.randomUUID(),false);JsonNode state=awaitRun(user,60);
+        assertEquals("completed",state.path("status").asText(),state.toString());assertEquals(LabPipeline.MODE,state.path("mode").asText());assertEquals(100,state.path("completedBatches").asInt());
+        assertEquals(1000,state.path("generatedPairs").asInt());assertEquals(1000,state.path("analyzedPairs").asInt());assertEquals(1000,state.path("savedPairs").asInt());assertEquals(100,lab.profile(user).path("version").asInt());assertEquals(1,lab.dao.mapper().batches(user).size());
+        var batch=lab.batch(user,UUID.fromString(state.path("batchId").asText()));assertEquals(1000,batch.path("turns").size());assertEquals(100,batch.path("analysis").path("segments").size());
+        int index=0;for(var segment:batch.path("analysis").path("segments")){assertEquals("saved",segment.path("status").asText());assertEquals(++index,segment.path("profileVersion").asInt());assertEquals(10,segment.path("sourceIds").size());assertTrue(segment.path("analysis").path("summaries").size()<=5);}
+        for(String code:catalog.codes())assertTrue(lab.profile(user).path("elements").path(code).path("weight").asInt()<=catalog.maxWeight(code));
+        assertEquals(10,lab.profile(user).path("elements").path("habits.exercise").path("weight").asInt());
+        verify(ai,never()).structured(eq("merge"),anyString(),any(JsonNode.class),any(JsonNode.class));verify(ai,times(100)).structured(eq("analysis"),anyString(),any(JsonNode.class),any(JsonNode.class));verify(ai,times(99)).structured(eq("summary"),anyString(),any(JsonNode.class),any(JsonNode.class));
+        assertTrue(overlap.get());assertEquals(1,generationMax.get());assertEquals(1,analysisMax.get());assertTrue(backlogMax.get()<=20);assertTrue(firstAnalysisCount.get()<1000);
+    }
+    JsonNode awaitRun(UUID user,int seconds) throws Exception {long deadline=System.nanoTime()+java.time.Duration.ofSeconds(seconds).toNanos();JsonNode state;do{Thread.sleep(20);state=runs.state(user);}while(Set.of("running","stopping").contains(state.path("status").asText())&&System.nanoTime()<deadline);return state;}
+    @Test void stopPreservesCurrentGenerationAnalysisOrSaveAndRecoveryKeepsCheckpoints() throws Exception {
+        for(String phase:List.of("generation","analysis","embedding")){
+            fixture();UUID user=user();var delegate=mockingDetails(ai).getStubbings().stream().filter(s->s.getInvocation().getMethod().getName().equals("structured")).findFirst().orElseThrow();var entered=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);var blocked=new java.util.concurrent.atomic.AtomicBoolean();
+            if(phase.equals("embedding"))when(ai.embed(anyList())).thenAnswer(call->{if(blocked.compareAndSet(false,true)){entered.countDown();if(!release.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new LabException(502,"timeout");}List<?> texts=call.getArgument(0);return texts.stream().map(x->new float[1536]).toList();});
+            else when(ai.structured(anyString(),anyString(),any(JsonNode.class),any(JsonNode.class))).thenAnswer(call->{if(phase.equals(call.getArgument(0))&&blocked.compareAndSet(false,true)){entered.countDown();if(!release.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new LabException(502,"timeout");}return delegate.answer(call);});
+            runs.start(user,"stop "+phase,false);assertTrue(entered.await(5,java.util.concurrent.TimeUnit.SECONDS));runs.stop(user);release.countDown();var paused=awaitRun(user,15);assertEquals("paused",paused.path("status").asText(),paused.toString());assertTrue(paused.path("generatedPairs").asInt()<=20);assertEquals(phase.equals("embedding")?10:0,paused.path("savedPairs").asInt());assertEquals(phase.equals("generation")?0:10,paused.path("analyzedPairs").asInt());
+            UUID batch=UUID.fromString(paused.path("batchId").asText());var before=lab.batch(user,batch).deepCopy();assertThrows(LabException.class,()->lab.analyze(user,batch,false));
+            lab.tx.executeWithoutResult(s->{var row=lab.dao.mapper().lockUser(user);var run=(ObjectNode)lab.dao.parse(row.get("run_state"));run.put("status","running");run.put("activeSince",System.currentTimeMillis()-5000);run.put("heartbeatAt",System.currentTimeMillis()-2000);var reservation=run.putObject("generationReservation");reservation.put("from",run.path("generatedPairs").asInt()+1);reservation.put("to",run.path("generatedPairs").asInt()+10);lab.dao.mapper().runState(user,run.toString());});
+            runs.recoverInterrupted();var recovered=runs.state(user);assertEquals("paused",recovered.path("status").asText());assertFalse(recovered.has("activeSince"));assertTrue(recovered.path("wallElapsedMs").asLong()>=3000);assertTrue(recovered.has("generationReservation"));assertEquals(before,lab.batch(user,batch));
         }
-        assertEquals(100,generations);assertEquals(100,analyses);assertEquals(1,merges);
     }
-    @Test void failedRunResumesExistingBatchWithoutGeneratingItAgain() throws Exception {
-        UUID user=user();when(ai.embed(anyList())).thenThrow(new LabException(502,"temporary failure"));runs.start(user,"resume "+UUID.randomUUID(),false);
-        long deadline=System.nanoTime()+java.time.Duration.ofSeconds(10).toNanos();while("running".equals(runs.state(user).path("status").asText())&&System.nanoTime()<deadline)Thread.sleep(20);
-        assertEquals("failed",runs.state(user).path("status").asText());assertEquals(1,lab.dao.mapper().batches(user).size());String batch=runs.state(user).path("batchId").asText();
-        assertEquals(1000,lab.batch(user,UUID.fromString(batch)).path("turns").size());assertEquals(0,lab.profile(user).path("version").asInt());
-        fixture();runs.start(user,null,true);
-        deadline=System.nanoTime()+java.time.Duration.ofSeconds(10).toNanos();while(Set.of("running","stopping").contains(runs.state(user).path("status").asText())&&System.nanoTime()<deadline)Thread.sleep(20);
-        assertEquals("completed",runs.state(user).path("status").asText());assertEquals(1,lab.dao.mapper().batches(user).size());
-        assertEquals(batch,runs.state(user).path("batchId").asText());assertEquals(1,lab.profile(user).path("version").asInt());
-        verify(ai,never()).structured(eq("generation"),anyString(),any(JsonNode.class),any(JsonNode.class));verify(ai,never()).structured(eq("analysis"),anyString(),any(JsonNode.class),any(JsonNode.class));
+    @Test void duplicateSegmentEvidenceIsNotReappliedAndConcurrentSaveIsIdempotent() throws Exception {
+        UUID user=user();var delegate=mockingDetails(ai).getStubbings().stream().filter(s->s.getInvocation().getMethod().getName().equals("structured")).findFirst().orElseThrow();var first=new java.util.concurrent.atomic.AtomicReference<LabAi.Result>();
+        when(ai.structured(anyString(),anyString(),any(JsonNode.class),any(JsonNode.class))).thenAnswer(call->{String stage=call.getArgument(0);if(stage.equals("generation")){if(first.get()==null)first.set((LabAi.Result)delegate.answer(call));return first.get();}if(stage.equals("summary"))runs.stop(user);return delegate.answer(call);});
+        runs.start(user,"duplicate",false);var paused=awaitRun(user,15);assertEquals("paused",paused.path("status").asText(),paused.toString());assertEquals(10,paused.path("savedPairs").asInt());UUID batch=UUID.fromString(paused.path("batchId").asText());assertTrue(lab.batch(user,batch).path("analysis").path("segments").get(1).path("analysis").path("observations").isEmpty());
+        var ready=new java.util.concurrent.CountDownLatch(2);when(ai.embed(anyList())).thenAnswer(call->{ready.countDown();if(!ready.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new LabException(502,"timeout");return List.of();});
+        try(var executor=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()){var a=executor.submit(()->pipeline.saveSegment(user,batch,2));var b=executor.submit(()->pipeline.saveSegment(user,batch,2));a.get(10,java.util.concurrent.TimeUnit.SECONDS);b.get(10,java.util.concurrent.TimeUnit.SECONDS);}
+        assertEquals(2,lab.profile(user).path("version").asInt());assertEquals(2,lab.profile(user).path("elements").path("habits.exercise").path("weight").asInt());assertEquals(20,lab.batch(user,batch).path("analysis").path("processedSourceIds").size());verify(ai,times(1)).structured(eq("analysis"),anyString(),any(JsonNode.class),any(JsonNode.class));
     }
+    @Test void pipelineFailureResumesDraftAndPreservesGeneratedTurns() throws Exception {
+        UUID user=user();when(ai.embed(anyList())).thenThrow(new LabException(502,"temporary failure"));runs.start(user,"resume "+UUID.randomUUID(),false);var stopped=awaitRun(user,15);assertEquals("failed",stopped.path("status").asText(),stopped.toString());
+        UUID batch=UUID.fromString(stopped.path("batchId").asText());var before=lab.batch(user,batch).path("turns").deepCopy();assertTrue(before.size()<=20);assertEquals(0,lab.profile(user).path("version").asInt());assertEquals("analyzed",lab.batch(user,batch).path("analysis").path("segments").get(0).path("status").asText());
+        assertThrows(LabException.class,()->lab.append(user,batch));fixture();runs.start(user,null,true);var completed=awaitRun(user,60);assertEquals("completed",completed.path("status").asText(),completed.toString());assertEquals(batch.toString(),completed.path("batchId").asText());
+        var after=lab.batch(user,batch).path("turns");for(int i=0;i<before.size();i++)assertEquals(before.get(i),after.get(i));assertEquals(100,lab.profile(user).path("version").asInt());
+        verify(ai,times((1000-before.size())/10)).structured(eq("generation"),anyString(),any(JsonNode.class),any(JsonNode.class));verify(ai,times(99)).structured(eq("analysis"),anyString(),any(JsonNode.class),any(JsonNode.class));
+    }
+    @Test void previouslySavedSingleSessionRunResumesWithoutChangingProfile() throws Exception {
+        UUID user=user(),batch=generated(user,"legacy");jdbc.update("INSERT INTO clone_lab.turns(id,batch_id,ordinal,user_text,assistant_text) SELECT gen_random_uuid(),?::uuid,n,'legacy evidence ' || n,'assistant' FROM generate_series(11,1000) n",batch);lab.analyze(user,batch,false);lab.save(user,batch,false);long version=lab.profile(user).path("version").asLong();
+        lab.tx.executeWithoutResult(s->{var state=lab.object();state.put("mode","single-session-v1");state.put("status","paused");state.put("runId",UUID.randomUUID().toString());state.put("batchId",batch.toString());state.put("generatedPairs",1000);state.put("analysisCounted",true);state.put("topic","legacy");lab.dao.mapper().runState(user,state.toString());});
+        fixture();runs.start(user,null,true);assertEquals("completed",awaitRun(user,10).path("status").asText());assertEquals(version,lab.profile(user).path("version").asLong());assertEquals(1,lab.dao.mapper().batches(user).size());verify(ai,never()).structured(anyString(),anyString(),any(JsonNode.class),any(JsonNode.class));
+    }
+
 }

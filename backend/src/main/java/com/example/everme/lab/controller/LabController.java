@@ -1,4 +1,9 @@
-package com.example.everme.lab;
+package com.example.everme.lab.controller;
+
+import com.example.everme.lab.service.LabCloneService;
+import com.example.everme.lab.service.LabRunService;
+import com.example.everme.lab.service.LabService;
+import com.example.everme.lab.service.OpenAiLabClient;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;

@@ -1,4 +1,4 @@
-package com.example.everme.lab;
+package com.example.everme.lab.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -13,22 +13,25 @@ import java.util.concurrent.*;
 @Profile("clone-lab")
 public class LabRunService {
     private final LabService lab;
+    private final LabPipeline pipeline;
     private final Set<UUID> active=ConcurrentHashMap.newKeySet();
     private final ExecutorService executor=Executors.newVirtualThreadPerTaskExecutor();
-    public LabRunService(LabService lab){this.lab=lab;}
-    public void recoverInterrupted(){for(var user:lab.dao.mapper().interruptedUsers())lab.tx.executeWithoutResult(s->{var row=lab.dao.mapper().lockUser(user);var state=(ObjectNode)lab.dao.parse(row.get("run_state"));state.put("status","paused");state.put("error","서버가 재시작되었습니다. 재개하면 현재 배치부터 이어집니다.");lab.dao.mapper().runState(user,state.toString());});}
-    public JsonNode state(UUID user){return lab.dao.parse(lab.dao.requireUser(user).get("run_state"));}
+    public LabRunService(LabService lab,LabPipeline pipeline){this.lab=lab;this.pipeline=pipeline;}
+    public void recoverInterrupted(){for(var user:lab.dao.mapper().interruptedUsers())lab.tx.executeWithoutResult(s->{var row=lab.dao.mapper().lockUser(user);var state=(ObjectNode)lab.dao.parse(row.get("run_state"));if(LabPipeline.MODE.equals(state.path("mode").asText())&&state.has("activeSince")){state.put("wallElapsedMs",state.path("wallElapsedMs").asLong()+Math.max(0,state.path("heartbeatAt").asLong()-state.path("activeSince").asLong()));state.remove("activeSince");}state.put("status","paused");state.put("error","서버가 재시작되었습니다. 재개하면 현재 배치부터 이어집니다.");lab.dao.mapper().runState(user,state.toString());});}
+    public JsonNode state(UUID user){var state=(ObjectNode)lab.dao.parse(lab.dao.requireUser(user).get("run_state"));if(LabPipeline.MODE.equals(state.path("mode").asText())&&state.has("activeSince"))state.put("wallElapsedMs",state.path("wallElapsedMs").asLong()+Math.max(0,System.currentTimeMillis()-state.path("activeSince").asLong()));return state;}
     public synchronized JsonNode start(UUID user,String topic,boolean resume){
         if(active.contains(user))throw LabException.conflict("이미 자동 실행 중입니다.");
         lab.tx.executeWithoutResult(s->{var row=lab.dao.mapper().lockUser(user);if(row==null)throw new LabException(404,"테스트 사용자를 찾을 수 없습니다.");var old=lab.dao.parse(row.get("run_state"));ObjectNode state;
             if(Set.of("running","stopping").contains(old.path("status").asText()))throw LabException.conflict("이미 자동 실행 중입니다.");
             if(resume){if(!Set.of("paused","failed").contains(old.path("status").asText()))throw LabException.conflict("재개할 실행이 없습니다.");state=(ObjectNode)old.deepCopy();}
-            else {if(Set.of("paused","failed").contains(old.path("status").asText()))throw LabException.conflict("이전 실행을 먼저 재개해 주세요. 새 실험은 다른 테스트 사용자를 만드세요.");LabValidation.text(topic,1000,"주제");state=lab.object();state.put("runId",UUID.randomUUID().toString());state.put("topic",topic);state.put("targetPairs",1000);state.put("mode","single-session-v1");state.put("phase","generating");state.put("generatedPairs",0);state.put("completedBatches",0);state.put("inputTokens",0);state.put("outputTokens",0);state.put("elapsedMs",0);}
+            else {if(Set.of("paused","failed").contains(old.path("status").asText()))throw LabException.conflict("이전 실행을 먼저 재개해 주세요. 새 실험은 다른 테스트 사용자를 만드세요.");LabValidation.text(topic,1000,"주제");state=lab.object();state.put("runId",UUID.randomUUID().toString());state.put("topic",topic);state.put("targetPairs",1000);state.put("mode",LabPipeline.MODE);state.put("generationPhase","waiting");state.put("analysisPhase","waiting");state.put("generatedPairs",0);state.put("analyzedPairs",0);state.put("savedPairs",0);state.put("wallElapsedMs",0);state.put("llmElapsedMs",0);state.put("cachedTokens",0);state.put("retryCount",0);UUID batch=UUID.randomUUID();state.put("batchId",batch.toString());lab.dao.mapper().createBatch(batch,user,topic,lab.dao.mapper().nextSequence(user));var details=lab.object();details.putArray("segments");details.putArray("processedSourceIds");lab.dao.mapper().pipelineDetails(batch,details.toString(),"generated");state.put("completedBatches",0);state.put("inputTokens",0);state.put("outputTokens",0);state.put("elapsedMs",0);}
+            if(LabPipeline.MODE.equals(state.path("mode").asText())){state.put("activeSince",System.currentTimeMillis());state.put("heartbeatAt",System.currentTimeMillis());}
             state.put("status","running");state.putNull("error");lab.dao.mapper().runState(user,state.toString());});
         active.add(user);executor.submit(()->execute(user));return state(user);
     }
     public JsonNode stop(UUID user){lab.tx.executeWithoutResult(s->{var row=lab.dao.mapper().lockUser(user);if(row==null)throw new LabException(404,"사용자를 찾을 수 없습니다.");var state=(ObjectNode)lab.dao.parse(row.get("run_state"));if("running".equals(state.path("status").asText()))state.put("status","stopping");lab.dao.mapper().runState(user,state.toString());});return state(user);}
     private void execute(UUID user){
+        if(LabPipeline.MODE.equals(state(user).path("mode").asText())){try{pipeline.execute(user);}finally{active.remove(user);}return;}
         if(!"single-session-v1".equals(state(user).path("mode").asText())){executeLegacy(user);return;}
         try {
             while(!Thread.currentThread().isInterrupted()){

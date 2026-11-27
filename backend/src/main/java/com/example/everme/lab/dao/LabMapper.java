@@ -1,4 +1,4 @@
-package com.example.everme.lab;
+package com.example.everme.lab.dao;
 
 import org.apache.ibatis.annotations.*;
 import org.springframework.context.annotation.Profile;
@@ -27,6 +27,7 @@ public interface LabMapper {
     @Select("SELECT t.id,t.user_text FROM clone_lab.turns t JOIN clone_lab.batches b ON b.id=t.batch_id WHERE b.user_id=#{user} AND (b.status='saved' OR jsonb_exists(COALESCE(b.analysis->'processedSourceIds','[]'::jsonb), t.id::text))") List<Map<String,Object>> savedSources(UUID user);
     @Update("UPDATE clone_lab.batches SET status='generated',analysis=CAST(#{analysis} AS jsonb) WHERE id=#{id}") void appended(@Param("id") UUID id,@Param("analysis") String analysis);
     @Update("UPDATE clone_lab.batches SET topic=#{topic} WHERE id=#{id}") void topic(@Param("id") UUID id,@Param("topic") String topic);
+    @Update("UPDATE clone_lab.batches SET analysis=CAST(#{analysis} AS jsonb),status=#{status} WHERE id=#{id}") void pipelineDetails(@Param("id") UUID id,@Param("analysis") String analysis,@Param("status") String status);
     @Insert("INSERT INTO clone_lab.memories(id,user_id,batch_id,kind,content,source_ids,occurred_at,fingerprint,embedding) VALUES(#{id},#{user},#{batch},#{kind},#{content},CAST(#{sources} AS jsonb),#{occurredAt},#{fingerprint},CAST(#{vector} AS vector)) ON CONFLICT(user_id,fingerprint) DO NOTHING")
     void memory(@Param("id") UUID id,@Param("user") UUID user,@Param("batch") UUID batch,@Param("kind") String kind,@Param("content") String content,@Param("sources") String sources,@Param("occurredAt") String occurredAt,@Param("fingerprint") String fingerprint,@Param("vector") String vector);
     @Select("SELECT m.id,m.kind,m.content,m.source_ids::text,m.occurred_at,(m.embedding <=> CAST(#{vector} AS vector)) AS distance FROM clone_lab.memories m WHERE m.user_id=#{user} ORDER BY (m.embedding <=> CAST(#{vector} AS vector)) LIMIT 8")

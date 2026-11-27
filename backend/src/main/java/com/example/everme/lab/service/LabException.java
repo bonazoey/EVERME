@@ -1,4 +1,4 @@
-package com.example.everme.lab;
+package com.example.everme.lab.service;
 
 public class LabException extends RuntimeException {
     private final int status;

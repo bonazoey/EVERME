@@ -14,7 +14,7 @@
   const userPath=()=>'/users/'+state.user;
   function notice(text,error=false){$('notice').textContent=text;$('notice').classList.toggle('error',error);}
   function controls(){
-    const running=['running','stopping'].includes(state.run.status), locked=state.busy||running, exists=!!state.user;
+    const running=['running','stopping'].includes(state.run.status), unfinished=state.run.mode==='single-session-pipeline-v1'&&['paused','failed'].includes(state.run.status),locked=state.busy||running||unfinished, exists=!!state.user;
     $('user').disabled=state.busy;
     if(owner){
       $('generate').disabled=locked||!exists;$('run').disabled=locked||!exists||['paused','failed'].includes(state.run.status);
@@ -52,15 +52,16 @@
     $('conversation').innerHTML=turns.map(t=>`<article class="turn user"><div class="turn-label"><span>사용자 · ${t.ordinal}</span><span>${esc(String(t.id).slice(0,8))}</span></div><div class="bubble owner">${esc(t.user_text)}</div></article><article class="turn assistant"><div class="turn-label">대화 상대</div><div class="bubble">${esc(t.assistant_text)}</div></article>`).join('');
   }
   function renderElements(){
-    if(!state.catalog)return;const domain=state.catalog.domains.find(d=>d.code===state.domain),points=state.profile?.elements||{},observations=state.batch?.analysis?.observations||[];
-    const pending=state.batch?.status==='analyzed';
+    if(!state.catalog)return;const domain=state.catalog.domains.find(d=>d.code===state.domain),points=state.profile?.elements||{};
+    const segments=state.batch?.analysis?.segments||[],draft=segments.find(s=>s.status==='analyzed'),lastSaved=segments.filter(s=>s.status==='saved').at(-1),analysis=draft?.analysis||state.batch?.analysis||{},observations=analysis.observations||[];
+    const pending=!!draft||state.batch?.status==='analyzed';
     const storedCount=Object.values(points).filter(p=>p.score!==null).length;
     $('coverage').textContent=pending?`이번 분석 ${observations.length}개 · DB 저장 ${storedCount}/140개`:`DB 저장 ${storedCount}/140개`;
     $('domains').innerHTML=state.catalog.domains.map(d=>`<button type="button" data-domain="${d.code}" aria-pressed="${d.code===state.domain}">${esc(d.label)}</button>`).join('');
     const sources=Object.fromEntries((state.batch?.turns||[]).map(t=>[t.id,t.user_text]));
     $('elements').innerHTML=domain.elements.map(e=>{
       const point=points[e.code],observation=observations.find(o=>o.code===e.code),score=point?.score,reason=observation?.reason||point?.reason||'아직 관찰 근거가 없습니다.';
-      const change=state.batch?.analysis?.changes?.find(c=>c.code===e.code);
+      const change=draft?null:(lastSaved?.changes||state.batch?.analysis?.changes)?.find(c=>c.code===e.code);
       const sourceIds=observation?.sourceIds||point?.sourceIds||[];
       const initial=score===null||score===undefined;
       const preview=pending&&!!observation,displayScore=initial?50:score;
@@ -72,8 +73,12 @@
   async function pollRun(){
     if(!owner||!state.user)return;const user=state.user;const run=await api(userPath()+'/runs/current');if(user!==state.user)return;state.run=run;
     $('run-panel').hidden=!run.status;$('run-state').textContent=({running:'자동 테스트 진행 중',stopping:'현재 생성·분석·저장 단계 완료 후 중단합니다',paused:'자동 테스트 일시 정지',failed:'자동 테스트 실패 · 재개 가능',completed:'1000쌍 처리 완료'})[run.status]||'';
-    $('run-count').textContent=(run.completedBatches||0)*10+' / 1000쌍';$('progress').value=(run.completedBatches||0)*10;
-    $('run-metrics').textContent=`입력 ${(run.inputTokens||0).toLocaleString()} 토큰 · 출력 ${(run.outputTokens||0).toLocaleString()} 토큰 · ${Math.round((run.elapsedMs||0)/1000)}초${run.error?' · '+run.error:''}`;
+    const pipeline=run.mode==='single-session-pipeline-v1';
+    $('run-count').textContent=pipeline?`생성 ${run.generatedPairs||0} · 분석 ${run.analyzedPairs||0} · 저장 ${run.savedPairs||0} / 1000쌍`:(run.completedBatches||0)*10+' / 1000쌍';$('progress').value=pipeline?(run.savedPairs||0):(run.completedBatches||0)*10;
+    const phases={generating:'생성 중',waiting:'대기',completed:'완료',analyzing:'분석 중',ready_to_save:'저장 대기',saving:'저장 중'};
+    $('run-metrics').textContent=`${pipeline?`생성 작업: ${phases[run.generationPhase]||run.generationPhase} · 분석 작업: ${phases[run.analysisPhase]||run.analysisPhase} · 실제 실행 ${Math.round((run.wallElapsedMs||0)/1000)}초 · `:''}LLM 호출 합계 ${Math.round((run.llmElapsedMs??run.elapsedMs??0)/1000)}초 · 입력 ${(run.inputTokens||0).toLocaleString()} / 출력 ${(run.outputTokens||0).toLocaleString()} 토큰 · 캐시 ${(run.cachedTokens||0).toLocaleString()} 토큰 · 재시도 ${run.retryCount||0}회${run.error?' · '+run.error:''}`;
+    const progressKey=[user,run.runId,run.generatedPairs,run.analyzedPairs,run.savedPairs,run.status].join(':');
+    if(pipeline&&state.progressKey!==progressKey){state.progressKey=progressKey;state.profile=await api(userPath()+'/profile');await loadBatches(run.batchId);renderElements();}
     controls();if(['running','stopping'].includes(run.status))state.timer=setTimeout(()=>pollRun().catch(e=>{notice(e.message,true);state.timer=setTimeout(()=>pollRun().catch(()=>{}),5000);}),2500);
     else if(run.status==='completed'||run.status==='paused'||run.status==='failed'){state.profile=await api(userPath()+'/profile');await loadBatches(run.batchId);renderElements();}
   }
@@ -96,8 +101,8 @@
     $('generate').onclick=()=>action('10쌍의 대화를 생성하는 중… 분석은 실행하지 않습니다.',async()=>{const b=await api(userPath()+'/batches','POST',{topic:$('topic').value});await loadBatches(b.id);notice('10쌍을 생성했습니다. 분석 버튼으로 분석을 시작하세요.'+metrics(b.metrics));});
     $('append').onclick=()=>action('같은 주제로 대화 10쌍을 이어서 생성하는 중…',async()=>{const b=await api(userPath()+'/batches/'+state.batch.id+'/turns','POST');await loadBatches(b.id);$('conversation').scrollTop=$('conversation').scrollHeight;notice(`‘${b.topic}’ 주제로 10쌍을 추가했습니다. 총 ${b.turns.length}쌍입니다. 다시 분석해 주세요. 기존 DB 저장값은 유지됩니다.`+metrics(b.metrics));});
     $('analyze').onclick=()=>action('사용자 발언을 근거로 분석하는 중…',async()=>{const b=await api(userPath()+'/batches/'+state.batch.id+'/analysis','POST');await loadBatches(b.id);notice('분석을 완료했습니다. 아직 프로필에는 반영하지 않았습니다.'+metrics(b.analysis?.metrics));});
-    $('save').onclick=()=>action('기존 데이터와 LLM 병합 계산을 검증한 뒤 저장하는 중…',async()=>{state.profile=await api(userPath()+'/batches/'+state.batch.id+'/save','POST');await loadBatches(state.batch.id);renderElements();notice('프로필을 갱신하고 기억을 저장했습니다.'+metrics(state.profile.metrics));});
-    $('run').onclick=()=>action('1000쌍 자동 테스트를 시작하는 중…',async()=>{state.run=await api(userPath()+'/runs','POST',{topic:$('topic').value});await pollRun();notice('한 대화에 1000쌍을 생성한 뒤 전체 분석·최종 저장을 진행합니다.');});
+    $('save').onclick=()=>action('기존 데이터와 관찰값을 서버에서 계산·검증한 뒤 저장하는 중…',async()=>{state.profile=await api(userPath()+'/batches/'+state.batch.id+'/save','POST');await loadBatches(state.batch.id);renderElements();notice('프로필을 갱신하고 기억을 저장했습니다.'+metrics(state.profile.metrics));});
+    $('run').onclick=()=>action('1000쌍 자동 테스트를 시작하는 중…',async()=>{state.run=await api(userPath()+'/runs','POST',{topic:$('topic').value});await pollRun();notice('한 대화에 이어서 생성하며 10쌍마다 분석·저장합니다.');});
     $('stop').onclick=()=>action('중단을 요청하는 중…',async()=>{state.run=await api(userPath()+'/runs/current/stop','POST');notice('현재 배치가 완료되면 중단합니다.');});
     $('resume').onclick=()=>action('자동 테스트를 재개하는 중…',async()=>{state.run=await api(userPath()+'/runs/current/resume','POST');await pollRun();notice('마지막 미완료 배치부터 이어갑니다.');});
     $('export').onclick=()=>action('결과를 내보내는 중…',async()=>{const result=await api(userPath()+'/export');const url=URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='everme-lab-'+state.user+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notice('실험 결과와 평가 지표를 내보냈습니다.');});

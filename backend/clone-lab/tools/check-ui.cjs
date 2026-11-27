@@ -3,14 +3,15 @@ const fs = require('node:fs'), path = require('node:path'), assert = require('no
 const base = process.env.LAB_URL || 'http://127.0.0.1:8087', out = path.resolve(__dirname, '../../build/clone-lab-ui'); fs.mkdirSync(out, { recursive: true });
 const catalog = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../src/main/resources/clone-lab/catalog.json'), 'utf8'));
 const user = '00000000-0000-0000-0000-000000000001', batch = '00000000-0000-0000-0000-000000000002', session = '00000000-0000-0000-0000-000000000003';
+let mockRun={},pipelineSegments=null;
 let generated = false, analyzed = false, saved = false, profileStored = false, pairCount = 10, questions = [], version = 0;
 const profile = () => ({ userId: user, version, name: '민서', elements: Object.fromEntries(catalog.domains.flatMap(d => d.elements).map(e => [e.code, { score: profileStored && e.code === 'relations.social_orientation' ? 20 : null, weight: profileStored ? 2 : 0, sourceIds: [], reason: profileStored ? '소규모 모임을 선호한다고 직접 설명했습니다.' : '' }])) });
 const observation = { code: 'relations.social_orientation', score: 20, strength: 2, sourceIds: ['source-1'], reason: '낯선 큰 모임보다 조용한 소규모 모임에서 편안함을 느낍니다.' };
-const data = () => ({ id: batch, topic: '주말 자전거 여행', sequence_no: 1, status: saved ? 'saved' : analyzed ? 'analyzed' : 'generated', turns: Array.from({ length: pairCount }, (_, i) => ({ id: 'source-' + (i + 1), ordinal: i + 1, user_text: i === 0 ? '큰 모임보다 가까운 친구 둘과 조용히 여행하는 게 좋아요. 낯선 사람에게 먼저 말을 걸지는 않는 편이에요.' : '여행 전에 자전거 상태와 예산을 확인했어요. 주말에는 강변을 따라 달릴 생각이에요.', assistant_text: '어떤 코스로 떠나고 싶으세요?' })), analysis: analyzed ? { observations: [observation], memories: [] } : null });
+const data = () => ({ id: batch, topic: '주말 자전거 여행', sequence_no: 1, status: saved ? 'saved' : analyzed ? 'analyzed' : 'generated', turns: Array.from({ length: pairCount }, (_, i) => ({ id: 'source-' + (i + 1), ordinal: i + 1, user_text: i === 0 ? '큰 모임보다 가까운 친구 둘과 조용히 여행하는 게 좋아요. 낯선 사람에게 먼저 말을 걸지는 않는 편이에요.' : '여행 전에 자전거 상태와 예산을 확인했어요. 주말에는 강변을 따라 달릴 생각이에요.', assistant_text: '어떤 코스로 떠나고 싶으세요?' })), analysis: pipelineSegments?{segments:pipelineSegments}:analyzed ? { observations: [observation], memories: [] } : null });
 const answer = { answer: '기록을 보면 가까운 친구들과 조용한 여행을 더 편안하게 느끼는 것 같아요. 이번 선택도 소규모 여행 쪽으로 기울 수 있지만, 실제 의사는 확인해야 해요.', stage: 'PROFILE', inferred: true, evidenceIds: ['relations.social_orientation'], trace: [{ tool: 'searchLongTermMemory', arguments: { query: '여행 동행' }, result: [] }, { tool: 'getAnalysisProfile', arguments: { codes: ['relations.social_orientation'] }, result: { 'relations.social_orientation': { score: 20 } } }], metrics: { inputTokens: 250, outputTokens: 100, elapsedMs: 1200 } };
 function mock(route, method, body) {
     if (route === '/catalog') return catalog; if (route === '/config') return { generation: 'gpt-6.1-sol', analysis: 'gpt-6.1-sol', answer: 'gpt-6.1-terra', keyConfigured: true }; if (route === '/users') return [{ id: user, name: '민서' }];
-    if (route.endsWith('/profile')) return profile(); if (route.endsWith('/runs/current')) return {};
+    if (route.endsWith('/profile')) return profile(); if (route.endsWith('/runs/current')) return mockRun;
     if (route.endsWith('/sessions/current')) return { sessionId: session, batchId: null, messages: questions, version };
     if (route.endsWith('/sessions')) { questions = []; return { sessionId: session, messages: [], version: ++version }; }
     if (route.endsWith('/questions')) { questions.push({ question: JSON.parse(body).question, response: answer }); return answer; }
@@ -81,6 +82,14 @@ function mock(route, method, body) {
         assert.equal(saved,true);assert.equal(profileStored,true);
         await shot('owner-desktop');
         for (const width of [390, 320]) { await viewport(width); assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'), 'Owner overflow ' + width); await shot('owner-' + width); }
+        mockRun={mode:'single-session-pipeline-v1',status:'paused',runId:'test-run',batchId:batch,generatedPairs:20,analyzedPairs:10,savedPairs:0,generationPhase:'waiting',analysisPhase:'ready_to_save',wallElapsedMs:30000,llmElapsedMs:45000,cachedTokens:100,retryCount:2};pipelineSegments=[{number:1,from:1,to:10,status:'analyzed',analysis:{observations:[observation],memories:[]}}];
+        await evaluate('document.getElementById("user").dispatchEvent(new Event("change"))');await wait('!document.getElementById("resume").disabled');
+        assert(await evaluate('document.getElementById("run-count").textContent.includes("생성 20 · 분석 10 · 저장 0")'));
+        assert.equal(await evaluate('document.getElementById("progress").value'),0);
+        assert(await evaluate('document.getElementById("run-metrics").textContent.includes("실제 실행 30초") && document.getElementById("run-metrics").textContent.includes("LLM 호출 합계 45초")'));
+        await evaluate('document.querySelector("[data-domain=relations]").click()');assert(await evaluate('!!document.querySelector(".score-fill-preview") && document.getElementById("save").disabled && document.getElementById("append").disabled'));
+        for(const width of [1440,320]){await viewport(width);assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'));await shot('pipeline-'+width);}
+        mockRun={};pipelineSegments=null;
         await viewport(1440); await call('Page.navigate', { url: base + '/lab/viewer' }); await wait('document.querySelector("#send") && !document.getElementById("send").disabled');
         await evaluate('document.getElementById("question").value="다음 여행도 소규모로 갈 것 같나요?";document.getElementById("question-form").requestSubmit()'); await wait('document.querySelector("#chat .answer-stage") && !document.getElementById("send").disabled');
         assert(await evaluate('document.getElementById("chat").textContent.includes("성향에 따른 추정")')); assert.equal(await evaluate('document.querySelectorAll("#evidence details").length'), 2); await shot('viewer-desktop');

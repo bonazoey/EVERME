@@ -1,4 +1,4 @@
-package com.example.everme.lab;
+package com.example.everme.lab.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;

@@ -1,4 +1,4 @@
-package com.example.everme.lab;
+package com.example.everme.lab.service;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.*;
@@ -35,22 +35,17 @@ public class LabValidation {
             sources(memory.path("sourceIds"),allowed);if(memory.path("content").asText().isBlank()||memory.path("content").asText().length()>3000)throw LabException.invalid("기억 내용 오류입니다.");
         }
     }
-    /** LLM computes, server verifies the specified formula; never silently repairs output. */
-    public ObjectNode merge(ObjectNode old,JsonNode observations,JsonNode result){
-        var expected=new LinkedHashMap<String,JsonNode>();for(var o:observations)expected.put(o.path("code").asText(),o);
-        if(!result.path("updates").isArray()||result.path("updates").size()!=expected.size())throw LabException.invalid("병합 요소 개수가 일치하지 않습니다.");
+    /** Deterministic server-side accumulation, with per-element caps. */
+    public ObjectNode merge(ObjectNode old,JsonNode observations){
         var next=old.deepCopy();var seen=new HashSet<String>();
-        for(var update:result.path("updates")){
-            String code=update.path("code").asText();var observation=expected.get(code);
-            if(observation==null||!seen.add(code))throw LabException.invalid("병합 대상 요소 오류입니다.");
-            int cap=catalog.maxWeight(code);
-            var previous=old.path(code);int weight=previous.path("score").isNull()?0:Math.min(previous.path("weight").asInt(),cap);int addition=observation.path("strength").asInt();
+        for(var observation:observations){
+            String code=observation.path("code").asText();int cap=catalog.maxWeight(code);
+            if(!seen.add(code))throw LabException.invalid("Duplicate merge element");
+            var previous=old.path(code);int weight=previous.path("score").isNull()?0:Math.min(previous.path("weight").asInt(),cap);
+            int addition=observation.path("strength").asInt();if(addition<1||addition>3)throw LabException.invalid("Invalid evidence strength");
             int total=Math.addExact(weight,addition);var observed=score(observation.path("score"));
             var numerator=previous.path("score").isNull()?observed.multiply(BigDecimal.valueOf(addition)):score(previous.path("score")).multiply(BigDecimal.valueOf(weight)).add(observed.multiply(BigDecimal.valueOf(addition)));
-            var computed=numerator.divide(BigDecimal.valueOf(total),2,RoundingMode.HALF_UP);
-            int storedWeight=Math.min(total,cap);
-            if(score(update.path("score")).compareTo(computed)!=0||!update.path("weight").isIntegralNumber()||update.path("weight").asInt()!=storedWeight)throw LabException.invalid("LLM 병합 계산이 규칙과 다릅니다. DB에는 반영하지 않았습니다.");
-            var point=next.withObject("/"+code);point.set("score",update.path("score"));point.put("weight",storedWeight);point.set("sourceIds",observation.path("sourceIds"));point.put("reason",observation.path("reason").asText());
+            var point=next.withObject("/"+code);point.put("score",numerator.divide(BigDecimal.valueOf(total),2,RoundingMode.HALF_UP));point.put("weight",Math.min(total,cap));point.set("sourceIds",observation.path("sourceIds"));point.put("reason",observation.path("reason").asText());
         }return next;
     }
 }

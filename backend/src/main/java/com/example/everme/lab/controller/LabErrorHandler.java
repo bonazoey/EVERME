@@ -1,4 +1,6 @@
-package com.example.everme.lab;
+package com.example.everme.lab.controller;
+
+import com.example.everme.lab.service.LabException;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;

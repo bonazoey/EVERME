@@ -5,6 +5,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 otherwise uses the system code page for native processes.
+$labUtf8 = New-Object System.Text.UTF8Encoding($false)
+[Console]::InputEncoding = $labUtf8
+[Console]::OutputEncoding = $labUtf8
+$OutputEncoding = $labUtf8
 $backendPath = Split-Path -Parent $PSScriptRoot
 $containerName = 'everme-clone-lab'
 $databasePort = 55439

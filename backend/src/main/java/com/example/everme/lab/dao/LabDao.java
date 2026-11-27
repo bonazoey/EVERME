@@ -1,4 +1,7 @@
-package com.example.everme.lab;
+package com.example.everme.lab.dao;
+
+import com.example.everme.lab.service.LabCatalog;
+import com.example.everme.lab.service.LabException;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.*;

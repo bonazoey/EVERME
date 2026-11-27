@@ -1,4 +1,4 @@
-package com.example.everme.lab;
+package com.example.everme.lab.controller;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.*;

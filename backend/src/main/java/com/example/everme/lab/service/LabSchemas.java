@@ -1,4 +1,4 @@
-package com.example.everme.lab;
+package com.example.everme.lab.service;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.*;
@@ -22,7 +22,6 @@ public class LabSchemas {
         var memory=object(Map.of("kind",enumeration(List.of("FACT","EXPERIENCE","CONDITIONAL_PREFERENCE")),"content",string(),"sourceIds",array(string()),"occurredAt",nullable(string())));
         return object(Map.of("observations",array(element),"memories",array(memory)));
     }
-    public JsonNode merge(){return object(Map.of("updates",array(object(Map.of("code",string(),"score",number(),"weight",integer(1,Integer.MAX_VALUE))))));}
     public JsonNode answer(){return object(Map.of("answer",string(),"stage",enumeration(List.of("CONTEXT","MEMORY","PROFILE","INSUFFICIENT")),"inferred",json.valueToTree(Map.of("type","boolean")),"evidenceIds",array(string())));}
     public JsonNode tool(String name,String description,Map<String,JsonNode> props){return json.valueToTree(Map.of("type","function","name",name,"description",description,"strict",true,"parameters",object(props)));}
 }
