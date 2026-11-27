@@ -19,9 +19,10 @@ public class LabController {
     private final OpenAiLabClient client;
     public LabController(LabService lab,LabRunService runs,LabCloneService clone,OpenAiLabClient client){this.lab=lab;this.runs=runs;this.clone=clone;this.client=client;}
     public record UserRequest(@NotBlank @Size(max=80) String name,@NotBlank @Size(max=3000) String seed){}
-    public record TopicRequest(@NotBlank @Size(max=1000) String topic){}
+    public record TopicRequest(@Size(max=1000) String topic){}
     public record SessionRequest(UUID batchId){}
     public record QuestionRequest(@NotNull UUID sessionId,@NotBlank @Size(max=4000) String question){}
+    public record OwnerMessageRequest(UUID batchId,@Size(max=1000) String topic,@NotBlank @Size(max=8000) String content){}
     @GetMapping("/catalog") public JsonNode catalog(){return lab.catalog();}
     @GetMapping("/config") public JsonNode config(){return lab.config();}
     @PostMapping("/models/check") public JsonNode checkModels(){return client.checkModels();}
@@ -32,6 +33,8 @@ public class LabController {
     @GetMapping("/users/{user}/batches") public JsonNode batches(@PathVariable UUID user){return lab.batches(user);}
     @PostMapping("/users/{user}/batches") public JsonNode generate(@PathVariable UUID user,@Valid @RequestBody TopicRequest request){return lab.generate(user,request.topic(),false);}
     @GetMapping("/users/{user}/batches/{batch}") public JsonNode batch(@PathVariable UUID user,@PathVariable UUID batch){return lab.batch(user,batch);}
+    @PostMapping("/users/{user}/batches/{batch}/turns") public JsonNode append(@PathVariable UUID user,@PathVariable UUID batch){return lab.append(user,batch);}
+    @PostMapping("/users/{user}/messages") public JsonNode message(@PathVariable UUID user,@Valid @RequestBody OwnerMessageRequest request){return lab.message(user,request.batchId(),request.topic(),request.content());}
     @PostMapping("/users/{user}/batches/{batch}/analysis") public JsonNode analyze(@PathVariable UUID user,@PathVariable UUID batch){return lab.analyze(user,batch,false);}
     @PostMapping("/users/{user}/batches/{batch}/save") public JsonNode save(@PathVariable UUID user,@PathVariable UUID batch){return lab.save(user,batch,false);}
     @PostMapping("/users/{user}/runs") public JsonNode run(@PathVariable UUID user,@Valid @RequestBody TopicRequest request){return runs.start(user,request.topic(),false);}

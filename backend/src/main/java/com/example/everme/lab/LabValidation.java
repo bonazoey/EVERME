@@ -19,8 +19,11 @@ public class LabValidation {
         var used=new HashSet<String>();for(var id:ids)if(!id.isTextual()||!allowed.contains(id.asText())||!used.add(id.asText()))throw LabException.invalid("유효하지 않거나 중복된 사용자 근거입니다.");
     }
     public void analysis(JsonNode data,Set<String> allowed){
+        analysis(data,allowed,40);
+    }
+    public void analysis(JsonNode data,Set<String> allowed,int maxMemories){
         if(!data.path("observations").isArray()||!data.path("memories").isArray())throw LabException.invalid("분석 응답 형식 오류입니다.");
-        if(data.path("observations").size()>140||data.path("memories").size()>40)throw LabException.invalid("분석 결과가 너무 많습니다.");
+        if(data.path("observations").size()>140||data.path("memories").size()>maxMemories)throw LabException.invalid("분석 결과가 너무 많습니다.");
         var seen=new HashSet<String>();
         for(var point:data.path("observations")){
             String code=point.path("code").asText();catalog.element(code);if(!seen.add(code))throw LabException.invalid("분석 요소가 중복되었습니다.");
@@ -40,12 +43,14 @@ public class LabValidation {
         for(var update:result.path("updates")){
             String code=update.path("code").asText();var observation=expected.get(code);
             if(observation==null||!seen.add(code))throw LabException.invalid("병합 대상 요소 오류입니다.");
-            var previous=old.path(code);int weight=previous.path("weight").asInt();int addition=observation.path("strength").asInt();
+            int cap=catalog.maxWeight(code);
+            var previous=old.path(code);int weight=previous.path("score").isNull()?0:Math.min(previous.path("weight").asInt(),cap);int addition=observation.path("strength").asInt();
             int total=Math.addExact(weight,addition);var observed=score(observation.path("score"));
             var numerator=previous.path("score").isNull()?observed.multiply(BigDecimal.valueOf(addition)):score(previous.path("score")).multiply(BigDecimal.valueOf(weight)).add(observed.multiply(BigDecimal.valueOf(addition)));
             var computed=numerator.divide(BigDecimal.valueOf(total),2,RoundingMode.HALF_UP);
-            if(score(update.path("score")).compareTo(computed)!=0||!update.path("weight").isIntegralNumber()||update.path("weight").asInt()!=total)throw LabException.invalid("LLM 병합 계산이 규칙과 다릅니다. DB에는 반영하지 않았습니다.");
-            var point=next.withObject("/"+code);point.set("score",update.path("score"));point.put("weight",total);point.set("sourceIds",observation.path("sourceIds"));point.put("reason",observation.path("reason").asText());
+            int storedWeight=Math.min(total,cap);
+            if(score(update.path("score")).compareTo(computed)!=0||!update.path("weight").isIntegralNumber()||update.path("weight").asInt()!=storedWeight)throw LabException.invalid("LLM 병합 계산이 규칙과 다릅니다. DB에는 반영하지 않았습니다.");
+            var point=next.withObject("/"+code);point.set("score",update.path("score"));point.put("weight",storedWeight);point.set("sourceIds",observation.path("sourceIds"));point.put("reason",observation.path("reason").asText());
         }return next;
     }
 }

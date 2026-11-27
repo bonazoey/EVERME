@@ -14,6 +14,7 @@ import java.util.*;
 @Component
 @Profile("clone-lab")
 public class OpenAiLabClient implements LabAi {
+    private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(OpenAiLabClient.class);
     private final ObjectMapper json;
     private final String key, base, embedding;
     private final Map<String,String> models;
@@ -23,24 +24,30 @@ public class OpenAiLabClient implements LabAi {
             @Value("${lab.analysis-model}") String analysis, @Value("${lab.merge-model}") String merge,
             @Value("${lab.answer-model}") String answer, @Value("${lab.embedding-model}") String embedding) {
         this.json=json; this.key=key; this.base=base.replaceAll("/+$",""); this.embedding=embedding;
-        models=Map.of("generation",generation,"analysis",analysis,"merge",merge,"answer",answer);
+        models=Map.of("generation",generation,"summary",analysis,"analysis",analysis,"merge",merge,"answer",answer);
     }
     private JsonNode request(String route, JsonNode body) {
+        try(var timing=new LabTiming("http"+route)){
         if (key.isBlank()) throw new LabException(503,"OPENAI_API_KEY를 설정해 주세요.");
         try {
             var builder=HttpRequest.newBuilder(URI.create(base+route)).timeout(Duration.ofMinutes(5))
                     .header("Authorization","Bearer "+key).header("Content-Type","application/json");
             var req=body==null?builder.GET().build():builder.POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
+            timing.mark("serialize_request");
             var response=http.send(req,HttpResponse.BodyHandlers.ofString());
+            timing.mark("api_wait");
+            log.info("lab_http requestId={} route={} status={}",org.slf4j.MDC.get("labRequestId"),route,response.statusCode());
             if (response.statusCode()<200 || response.statusCode()>=300)
                 throw new LabException(response.statusCode()==429?429:502,"OpenAI 요청 실패 (HTTP "+response.statusCode()+"). 설정과 모델 접근 권한을 확인해 주세요.");
-            return json.readTree(response.body());
+            var parsed=json.readTree(response.body());timing.mark("parse_response_json");timing.success();return parsed;
         } catch (LabException e) { throw e; }
         catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new LabException(503,"요청이 중단되었습니다."); }
         catch (Exception e) { throw new LabException(502,"OpenAI 연결 또는 응답 해석에 실패했습니다."); }
+        }
     }
     private ObjectNode body(String stage,String instructions,JsonNode input,JsonNode schema) {
         var body=json.createObjectNode();body.put("model",models.get(stage));body.put("store",false);
+        if("generation".equals(stage))body.putObject("reasoning").put("effort","low");
         body.put("instructions",instructions);body.set("input",input.isArray()?input:json.valueToTree(List.of(Map.of("role","user","content",input.toString()))));
         body.set("text",json.valueToTree(Map.of("format",Map.of("type","json_schema","name","clone_lab","strict",true,"schema",schema))));
         return body;
@@ -55,8 +62,13 @@ public class OpenAiLabClient implements LabAi {
         throw LabException.invalid("모델의 분석 결과가 없습니다.");
     }
     @Override public Result structured(String stage,String instructions,JsonNode input,JsonNode schema) {
+        try(var timing=new LabTiming("llm."+stage)){
+        log.info("lab_llm requestId={} stage={} model={} reasoningEffort={}",org.slf4j.MDC.get("labRequestId"),stage,models.get(stage),"generation".equals(stage)?"low":"default");
         long start=System.nanoTime();var response=request("/responses",body(stage,instructions,input,schema));
-        return new Result(output(json,response),models.get(stage),response.path("usage").path("input_tokens").asLong(),response.path("usage").path("output_tokens").asLong(),(System.nanoTime()-start)/1_000_000);
+        timing.mark("api_response");var data=output(json,response);timing.mark("decode_structured_json");
+        log.info("lab_usage requestId={} stage={} inputTokens={} outputTokens={} reasoningTokens={}",org.slf4j.MDC.get("labRequestId"),stage,response.path("usage").path("input_tokens").asLong(),response.path("usage").path("output_tokens").asLong(),response.path("usage").path("output_tokens_details").path("reasoning_tokens").asLong());
+        timing.success();return new Result(data,models.get(stage),response.path("usage").path("input_tokens").asLong(),response.path("usage").path("output_tokens").asLong(),(System.nanoTime()-start)/1_000_000);
+        }
     }
     @Override public JsonNode respond(String instructions,JsonNode input,JsonNode schema,List<JsonNode> tools) {
         var body=body("answer",instructions,input,schema);body.set("tools",json.valueToTree(tools));body.put("parallel_tool_calls",false);

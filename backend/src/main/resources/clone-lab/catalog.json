@@ -1,5 +1,6 @@
 {
   "version": "lab-140-v1",
+  "updatePolicyVersion": "element-cap-v1",
   "domains": [
     {
       "code": "emotion",
@@ -9,6 +10,10 @@
       "table": "profile_emotion",
       "elements": [
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "서로 다른 상황의 반복 근거를 확인하며 반영"
+          },
           "code": "emotion.uncertainty_anxiety",
           "column": "uncertainty_anxiety",
           "label": "불확실한 상황에서의 불안",
@@ -26,6 +31,10 @@
           "counterExample": "주제에 불확실한 상황에서의 불안이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 반응 경향을 일시적인 경험으로 크게 바꾸지 않도록 보수적으로 반영"
+          },
           "code": "emotion.threat_fear",
           "column": "threat_fear",
           "label": "위협·위험에 대한 두려움",
@@ -43,6 +52,10 @@
           "counterExample": "주제에 위협·위험에 대한 두려움이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "서로 다른 상황의 반복 근거를 확인하며 반영"
+          },
           "code": "emotion.blocked_frustration",
           "column": "blocked_frustration",
           "label": "목표가 막혔을 때의 좌절 반응",
@@ -60,6 +73,10 @@
           "counterExample": "주제에 목표가 막혔을 때의 좌절 반응이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "서로 다른 상황의 반복 근거를 확인하며 반영"
+          },
           "code": "emotion.injustice_anger",
           "column": "injustice_anger",
           "label": "부당한 대우에 대한 분노 반응",
@@ -77,6 +94,10 @@
           "counterExample": "주제에 부당한 대우에 대한 분노 반응이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "서로 다른 상황의 반복 근거를 확인하며 반영"
+          },
           "code": "emotion.loss_sadness",
           "column": "loss_sadness",
           "label": "상실 상황에서의 슬픔 반응",
@@ -94,6 +115,10 @@
           "counterExample": "주제에 상실 상황에서의 슬픔 반응이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "서로 다른 상황의 반복 근거를 확인하며 반영"
+          },
           "code": "emotion.positive_joy",
           "column": "positive_joy",
           "label": "긍정적 사건에 대한 기쁨 반응",
@@ -111,6 +136,10 @@
           "counterExample": "주제에 긍정적 사건에 대한 기쁨 반응이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 스트레스·노출 환경에 따른 변화를 비교적 빠르게 수용"
+          },
           "code": "emotion.anticipation",
           "column": "anticipation",
           "label": "결과를 기다릴 때의 기대·흥분",
@@ -128,6 +157,10 @@
           "counterExample": "주제에 결과를 기다릴 때의 기대·흥분이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "서로 다른 상황의 반복 근거를 확인하며 반영"
+          },
           "code": "emotion.public_embarrassment",
           "column": "public_embarrassment",
           "label": "공개적인 실수에 대한 당혹감",
@@ -145,6 +178,10 @@
           "counterExample": "주제에 공개적인 실수에 대한 당혹감이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 반응 경향을 일시적인 경험으로 크게 바꾸지 않도록 보수적으로 반영"
+          },
           "code": "emotion.evaluation_sensitivity",
           "column": "evaluation_sensitivity",
           "label": "타인의 평가에 대한 정서적 민감성",
@@ -162,6 +199,10 @@
           "counterExample": "주제에 타인의 평가에 대한 정서적 민감성이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 스트레스·노출 환경에 따른 변화를 비교적 빠르게 수용"
+          },
           "code": "emotion.emotional_contagion",
           "column": "emotional_contagion",
           "label": "타인의 감정에 영향받는 정도",
@@ -179,6 +220,10 @@
           "counterExample": "주제에 타인의 감정에 영향받는 정도이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "서로 다른 상황의 반복 근거를 확인하며 반영"
+          },
           "code": "emotion.emotion_duration",
           "column": "emotion_duration",
           "label": "감정의 지속 시간",
@@ -196,6 +241,10 @@
           "counterExample": "주제에 감정의 지속 시간이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 스트레스·노출 환경에 따른 변화를 비교적 빠르게 수용"
+          },
           "code": "emotion.mood_amplitude",
           "column": "mood_amplitude",
           "label": "감정 변화의 폭",
@@ -213,6 +262,10 @@
           "counterExample": "주제에 감정 변화의 폭이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 스트레스·노출 환경에 따른 변화를 비교적 빠르게 수용"
+          },
           "code": "emotion.recovery_speed",
           "column": "recovery_speed",
           "label": "스트레스 후 회복 속도",
@@ -230,6 +283,10 @@
           "counterExample": "주제에 스트레스 후 회복 속도이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 스트레스·노출 환경에 따른 변화를 비교적 빠르게 수용"
+          },
           "code": "emotion.monotony_boredom",
           "column": "monotony_boredom",
           "label": "반복되는 단조로움에 대한 지루함",
@@ -247,6 +304,10 @@
           "counterExample": "주제에 반복되는 단조로움에 대한 지루함이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 반응 경향을 일시적인 경험으로 크게 바꾸지 않도록 보수적으로 반영"
+          },
           "code": "emotion.novelty_stimulation",
           "column": "novelty_stimulation",
           "label": "낯선 경험에서의 자극 추구",
@@ -264,6 +325,10 @@
           "counterExample": "주제에 낯선 경험에서의 자극 추구이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 반응 경향을 일시적인 경험으로 크게 바꾸지 않도록 보수적으로 반영"
+          },
           "code": "emotion.noise_sensitivity",
           "column": "noise_sensitivity",
           "label": "소음에 대한 민감성",
@@ -281,6 +346,10 @@
           "counterExample": "주제에 소음에 대한 민감성이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 반응 경향을 일시적인 경험으로 크게 바꾸지 않도록 보수적으로 반영"
+          },
           "code": "emotion.visual_sensitivity",
           "column": "visual_sensitivity",
           "label": "빛·시각적 복잡성에 대한 민감성",
@@ -298,6 +367,10 @@
           "counterExample": "주제에 빛·시각적 복잡성에 대한 민감성이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 반응 경향을 일시적인 경험으로 크게 바꾸지 않도록 보수적으로 반영"
+          },
           "code": "emotion.smell_sensitivity",
           "column": "smell_sensitivity",
           "label": "냄새에 대한 민감성",
@@ -315,6 +388,10 @@
           "counterExample": "주제에 냄새에 대한 민감성이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 반응 경향을 일시적인 경험으로 크게 바꾸지 않도록 보수적으로 반영"
+          },
           "code": "emotion.touch_sensitivity",
           "column": "touch_sensitivity",
           "label": "신체 접촉·촉감에 대한 민감성",
@@ -332,6 +409,10 @@
           "counterExample": "주제에 신체 접촉·촉감에 대한 민감성이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 스트레스·노출 환경에 따른 변화를 비교적 빠르게 수용"
+          },
           "code": "emotion.crowding_overload",
           "column": "crowding_overload",
           "label": "군중·밀집 환경에서의 과부하",
@@ -358,6 +439,10 @@
       "table": "profile_values",
       "elements": [
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.autonomy",
           "column": "autonomy",
           "label": "자율성",
@@ -375,6 +460,10 @@
           "counterExample": "주제에 자율성이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.security",
           "column": "security",
           "label": "안전·안정",
@@ -392,6 +481,10 @@
           "counterExample": "주제에 안전·안정이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.achievement",
           "column": "achievement",
           "label": "성취",
@@ -409,6 +502,10 @@
           "counterExample": "주제에 성취이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.fairness",
           "column": "fairness",
           "label": "공정",
@@ -426,6 +523,10 @@
           "counterExample": "주제에 공정이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.care",
           "column": "care",
           "label": "타인 배려",
@@ -443,6 +544,10 @@
           "counterExample": "주제에 타인 배려이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.family",
           "column": "family",
           "label": "가족 유대",
@@ -460,6 +565,10 @@
           "counterExample": "주제에 가족 유대이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "최근 생활 조건·목표에 따른 중요도 변화를 수용"
+          },
           "code": "values.financial_comfort",
           "column": "financial_comfort",
           "label": "경제적 여유",
@@ -477,6 +586,10 @@
           "counterExample": "주제에 경제적 여유이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.growth",
           "column": "growth",
           "label": "학습·성장",
@@ -494,6 +607,10 @@
           "counterExample": "주제에 학습·성장이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.tradition",
           "column": "tradition",
           "label": "전통",
@@ -511,6 +628,10 @@
           "counterExample": "주제에 전통이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.contribution",
           "column": "contribution",
           "label": "사회적 기여",
@@ -528,6 +649,10 @@
           "counterExample": "주제에 사회적 기여이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.honesty",
           "column": "honesty",
           "label": "정직",
@@ -545,6 +670,10 @@
           "counterExample": "주제에 정직이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.loyalty",
           "column": "loyalty",
           "label": "충성·의리",
@@ -562,6 +691,10 @@
           "counterExample": "주제에 충성·의리이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.privacy",
           "column": "privacy",
           "label": "사생활",
@@ -579,6 +712,10 @@
           "counterExample": "주제에 사생활이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "최근 생활 조건·목표에 따른 중요도 변화를 수용"
+          },
           "code": "values.health",
           "column": "health",
           "label": "건강",
@@ -596,6 +733,10 @@
           "counterExample": "주제에 건강이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "최근 생활 조건·목표에 따른 중요도 변화를 수용"
+          },
           "code": "values.pleasure",
           "column": "pleasure",
           "label": "즐거움",
@@ -613,6 +754,10 @@
           "counterExample": "주제에 즐거움이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.creativity",
           "column": "creativity",
           "label": "창의성",
@@ -630,6 +775,10 @@
           "counterExample": "주제에 창의성이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.expertise",
           "column": "expertise",
           "label": "전문성",
@@ -647,6 +796,10 @@
           "counterExample": "주제에 전문성이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "최근 생활 조건·목표에 따른 중요도 변화를 수용"
+          },
           "code": "values.recognition",
           "column": "recognition",
           "label": "사회적 인정",
@@ -664,6 +817,10 @@
           "counterExample": "주제에 사회적 인정이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.environment",
           "column": "environment",
           "label": "환경 보전",
@@ -681,6 +838,10 @@
           "counterExample": "주제에 환경 보전이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 가치 판단을 반복 근거로 갱신"
+          },
           "code": "values.spirituality",
           "column": "spirituality",
           "label": "종교·영성",
@@ -707,6 +868,10 @@
       "table": "profile_interests",
       "elements": [
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 접하는 대상과 관심 변화에 빠르게 반응하도록 실험"
+          },
           "code": "interests.technology",
           "column": "technology",
           "label": "기술·디지털",
@@ -724,6 +889,10 @@
           "counterExample": "주제에 기술·디지털이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "환경과 경험의 영향 및 지속적인 선호를 함께 반영"
+          },
           "code": "interests.science",
           "column": "science",
           "label": "과학",
@@ -741,6 +910,10 @@
           "counterExample": "주제에 과학이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "장기간 유지되는 취향이라는 가설로 보수적으로 시작"
+          },
           "code": "interests.history",
           "column": "history",
           "label": "역사",
@@ -758,6 +931,10 @@
           "counterExample": "주제에 역사이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "장기간 유지되는 취향이라는 가설로 보수적으로 시작"
+          },
           "code": "interests.philosophy",
           "column": "philosophy",
           "label": "철학",
@@ -775,6 +952,10 @@
           "counterExample": "주제에 철학이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 접하는 대상과 관심 변화에 빠르게 반응하도록 실험"
+          },
           "code": "interests.society",
           "column": "society",
           "label": "사회·정치",
@@ -792,6 +973,10 @@
           "counterExample": "주제에 사회·정치이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 접하는 대상과 관심 변화에 빠르게 반응하도록 실험"
+          },
           "code": "interests.finance",
           "column": "finance",
           "label": "경제·투자",
@@ -809,6 +994,10 @@
           "counterExample": "주제에 경제·투자이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "장기간 유지되는 취향이라는 가설로 보수적으로 시작"
+          },
           "code": "interests.literature",
           "column": "literature",
           "label": "문학",
@@ -826,6 +1015,10 @@
           "counterExample": "주제에 문학이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "장기간 유지되는 취향이라는 가설로 보수적으로 시작"
+          },
           "code": "interests.visual_art",
           "column": "visual_art",
           "label": "시각예술",
@@ -843,6 +1036,10 @@
           "counterExample": "주제에 시각예술이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "장기간 유지되는 취향이라는 가설로 보수적으로 시작"
+          },
           "code": "interests.music",
           "column": "music",
           "label": "음악",
@@ -860,6 +1057,10 @@
           "counterExample": "주제에 음악이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 접하는 대상과 관심 변화에 빠르게 반응하도록 실험"
+          },
           "code": "interests.film_performance",
           "column": "film_performance",
           "label": "영화·공연",
@@ -877,6 +1078,10 @@
           "counterExample": "주제에 영화·공연이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 접하는 대상과 관심 변화에 빠르게 반응하도록 실험"
+          },
           "code": "interests.gaming",
           "column": "gaming",
           "label": "게임",
@@ -894,6 +1099,10 @@
           "counterExample": "주제에 게임이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "환경과 경험의 영향 및 지속적인 선호를 함께 반영"
+          },
           "code": "interests.sports",
           "column": "sports",
           "label": "운동·스포츠",
@@ -911,6 +1120,10 @@
           "counterExample": "주제에 운동·스포츠이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "환경과 경험의 영향 및 지속적인 선호를 함께 반영"
+          },
           "code": "interests.travel",
           "column": "travel",
           "label": "여행",
@@ -928,6 +1141,10 @@
           "counterExample": "주제에 여행이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "환경과 경험의 영향 및 지속적인 선호를 함께 반영"
+          },
           "code": "interests.outdoors",
           "column": "outdoors",
           "label": "자연·야외활동",
@@ -945,6 +1162,10 @@
           "counterExample": "주제에 자연·야외활동이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "환경과 경험의 영향 및 지속적인 선호를 함께 반영"
+          },
           "code": "interests.cooking_food",
           "column": "cooking_food",
           "label": "요리·음식",
@@ -962,6 +1183,10 @@
           "counterExample": "주제에 요리·음식이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 접하는 대상과 관심 변화에 빠르게 반응하도록 실험"
+          },
           "code": "interests.fashion",
           "column": "fashion",
           "label": "패션·미용",
@@ -979,6 +1204,10 @@
           "counterExample": "주제에 패션·미용이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "장기간 유지되는 취향이라는 가설로 보수적으로 시작"
+          },
           "code": "interests.craft",
           "column": "craft",
           "label": "만들기·수공예",
@@ -996,6 +1225,10 @@
           "counterExample": "주제에 만들기·수공예이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "장기간 유지되는 취향이라는 가설로 보수적으로 시작"
+          },
           "code": "interests.animals",
           "column": "animals",
           "label": "동물·반려생활",
@@ -1013,6 +1246,10 @@
           "counterExample": "주제에 동물·반려생활이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "환경과 경험의 영향 및 지속적인 선호를 함께 반영"
+          },
           "code": "interests.social_gatherings",
           "column": "social_gatherings",
           "label": "사교 모임",
@@ -1030,6 +1267,10 @@
           "counterExample": "주제에 사교 모임이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "장기간 유지되는 취향이라는 가설로 보수적으로 시작"
+          },
           "code": "interests.collecting",
           "column": "collecting",
           "label": "수집",
@@ -1056,6 +1297,10 @@
       "table": "profile_decision",
       "elements": [
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복적인 선택 사례를 통해 조정"
+          },
           "code": "decision.research_depth",
           "column": "research_depth",
           "label": "정보 탐색의 깊이",
@@ -1073,6 +1318,10 @@
           "counterExample": "주제에 정보 탐색의 깊이이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 판단 경향을 보수적으로 유지"
+          },
           "code": "decision.source_verification",
           "column": "source_verification",
           "label": "근거 출처 검증",
@@ -1090,6 +1339,10 @@
           "counterExample": "주제에 근거 출처 검증이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복적인 선택 사례를 통해 조정"
+          },
           "code": "decision.alternative_breadth",
           "column": "alternative_breadth",
           "label": "대안 비교의 폭",
@@ -1107,6 +1360,10 @@
           "counterExample": "주제에 대안 비교의 폭이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 판단 경향을 보수적으로 유지"
+          },
           "code": "decision.quantitative_reasoning",
           "column": "quantitative_reasoning",
           "label": "수량·통계 활용",
@@ -1124,6 +1381,10 @@
           "counterExample": "주제에 수량·통계 활용이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 판단 경향을 보수적으로 유지"
+          },
           "code": "decision.intuition",
           "column": "intuition",
           "label": "직관 활용",
@@ -1141,6 +1402,10 @@
           "counterExample": "주제에 직관 활용이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 선택 환경과 활용 가능한 자원에 따른 변화를 수용"
+          },
           "code": "decision.consultation",
           "column": "consultation",
           "label": "타인 의견 참고",
@@ -1158,6 +1423,10 @@
           "counterExample": "주제에 타인 의견 참고이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 선택 환경과 활용 가능한 자원에 따른 변화를 수용"
+          },
           "code": "decision.deliberation_time",
           "column": "deliberation_time",
           "label": "결정 전 숙고 시간",
@@ -1175,6 +1444,10 @@
           "counterExample": "주제에 결정 전 숙고 시간이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복적인 선택 사례를 통해 조정"
+          },
           "code": "decision.risk_taking",
           "column": "risk_taking",
           "label": "위험 감수",
@@ -1192,6 +1465,10 @@
           "counterExample": "주제에 위험 감수이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 판단 경향을 보수적으로 유지"
+          },
           "code": "decision.loss_aversion",
           "column": "loss_aversion",
           "label": "손실 회피",
@@ -1209,6 +1486,10 @@
           "counterExample": "주제에 손실 회피이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 판단 경향을 보수적으로 유지"
+          },
           "code": "decision.long_term",
           "column": "long_term",
           "label": "장기 결과 고려",
@@ -1226,6 +1507,10 @@
           "counterExample": "주제에 장기 결과 고려이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 판단 경향을 보수적으로 유지"
+          },
           "code": "decision.reversibility",
           "column": "reversibility",
           "label": "되돌릴 수 있는 선택 선호",
@@ -1243,6 +1528,10 @@
           "counterExample": "주제에 되돌릴 수 있는 선택 선호이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 선택 환경과 활용 가능한 자원에 따른 변화를 수용"
+          },
           "code": "decision.small_experiments",
           "column": "small_experiments",
           "label": "작은 실험 후 결정",
@@ -1260,6 +1549,10 @@
           "counterExample": "주제에 작은 실험 후 결정이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복적인 선택 사례를 통해 조정"
+          },
           "code": "decision.explicit_criteria",
           "column": "explicit_criteria",
           "label": "결정 기준의 사전 명시",
@@ -1277,6 +1570,10 @@
           "counterExample": "주제에 결정 기준의 사전 명시이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 선택 환경과 활용 가능한 자원에 따른 변화를 수용"
+          },
           "code": "decision.context_adaptation",
           "column": "context_adaptation",
           "label": "상황에 따른 기준 조정",
@@ -1294,6 +1591,10 @@
           "counterExample": "주제에 상황에 따른 기준 조정이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복적인 선택 사례를 통해 조정"
+          },
           "code": "decision.belief_revision",
           "column": "belief_revision",
           "label": "새 근거에 따른 결정 수정",
@@ -1311,6 +1612,10 @@
           "counterExample": "주제에 새 근거에 따른 결정 수정이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복적인 선택 사례를 통해 조정"
+          },
           "code": "decision.satisficing",
           "column": "satisficing",
           "label": "충분한 대안에서 탐색 종료",
@@ -1328,6 +1633,10 @@
           "counterExample": "주제에 충분한 대안에서 탐색 종료이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복적인 선택 사례를 통해 조정"
+          },
           "code": "decision.default_retention",
           "column": "default_retention",
           "label": "기본 선택지 유지",
@@ -1345,6 +1654,10 @@
           "counterExample": "주제에 기본 선택지 유지이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 판단 경향을 보수적으로 유지"
+          },
           "code": "decision.opportunity_cost",
           "column": "opportunity_cost",
           "label": "기회비용 고려",
@@ -1362,6 +1675,10 @@
           "counterExample": "주제에 기회비용 고려이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복적인 선택 사례를 통해 조정"
+          },
           "code": "decision.tradeoffs",
           "column": "tradeoffs",
           "label": "여러 목표 간 절충",
@@ -1379,6 +1696,10 @@
           "counterExample": "주제에 여러 목표 간 절충이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본 판단 경향을 보수적으로 유지"
+          },
           "code": "decision.contingency",
           "column": "contingency",
           "label": "최악의 상황 대비",
@@ -1405,6 +1726,10 @@
       "table": "profile_habits",
       "elements": [
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근의 실제 생활 변화가 점수에 드러나도록 반영"
+          },
           "code": "habits.wake_regularity",
           "column": "wake_regularity",
           "label": "기상 시각 규칙성",
@@ -1422,6 +1747,10 @@
           "counterExample": "기상 시각 규칙성을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근의 실제 생활 변화가 점수에 드러나도록 반영"
+          },
           "code": "habits.sleep_regularity",
           "column": "sleep_regularity",
           "label": "취침 시각 규칙성",
@@ -1439,6 +1768,10 @@
           "counterExample": "취침 시각 규칙성을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근의 실제 생활 변화가 점수에 드러나도록 반영"
+          },
           "code": "habits.meal_regularity",
           "column": "meal_regularity",
           "label": "식사 시각 규칙성",
@@ -1456,6 +1789,10 @@
           "counterExample": "식사 시각 규칙성을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근의 실제 생활 변화가 점수에 드러나도록 반영"
+          },
           "code": "habits.exercise",
           "column": "exercise",
           "label": "운동 실천",
@@ -1473,6 +1810,10 @@
           "counterExample": "운동 실천을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근의 실제 생활 변화가 점수에 드러나도록 반영"
+          },
           "code": "habits.health_checks",
           "column": "health_checks",
           "label": "건강 상태 점검",
@@ -1490,6 +1831,10 @@
           "counterExample": "건강 상태 점검을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복 실행을 확인하며 중간 속도로 반영"
+          },
           "code": "habits.plan_recording",
           "column": "plan_recording",
           "label": "계획 기록",
@@ -1507,6 +1852,10 @@
           "counterExample": "계획 기록을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복 실행을 확인하며 중간 속도로 반영"
+          },
           "code": "habits.plan_execution",
           "column": "plan_execution",
           "label": "계획 이행",
@@ -1524,6 +1873,10 @@
           "counterExample": "계획 이행을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "단발성 지연이나 성공으로 신뢰 관련 행동 경향을 크게 바꾸지 않도록 보수적으로 반영"
+          },
           "code": "habits.deadline",
           "column": "deadline",
           "label": "마감 준수",
@@ -1541,6 +1894,10 @@
           "counterExample": "마감 준수을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "단발성 지연이나 성공으로 신뢰 관련 행동 경향을 크게 바꾸지 않도록 보수적으로 반영"
+          },
           "code": "habits.punctuality",
           "column": "punctuality",
           "label": "약속 시간 준수",
@@ -1558,6 +1915,10 @@
           "counterExample": "약속 시간 준수을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복 실행을 확인하며 중간 속도로 반영"
+          },
           "code": "habits.physical_order",
           "column": "physical_order",
           "label": "물리적 정리",
@@ -1575,6 +1936,10 @@
           "counterExample": "물리적 정리을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복 실행을 확인하며 중간 속도로 반영"
+          },
           "code": "habits.digital_order",
           "column": "digital_order",
           "label": "디지털 자료 정리",
@@ -1592,6 +1957,10 @@
           "counterExample": "디지털 자료 정리을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복 실행을 확인하며 중간 속도로 반영"
+          },
           "code": "habits.expense_tracking",
           "column": "expense_tracking",
           "label": "지출 기록",
@@ -1609,6 +1978,10 @@
           "counterExample": "지출 기록을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복 실행을 확인하며 중간 속도로 반영"
+          },
           "code": "habits.budget_adherence",
           "column": "budget_adherence",
           "label": "예산 준수",
@@ -1626,6 +1999,10 @@
           "counterExample": "예산 준수을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복 실행을 확인하며 중간 속도로 반영"
+          },
           "code": "habits.saving",
           "column": "saving",
           "label": "저축 실행",
@@ -1643,6 +2020,10 @@
           "counterExample": "저축 실행을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복 실행을 확인하며 중간 속도로 반영"
+          },
           "code": "habits.learning",
           "column": "learning",
           "label": "꾸준한 학습",
@@ -1660,6 +2041,10 @@
           "counterExample": "꾸준한 학습을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근의 실제 생활 변화가 점수에 드러나도록 반영"
+          },
           "code": "habits.reading",
           "column": "reading",
           "label": "독서 실행",
@@ -1677,6 +2062,10 @@
           "counterExample": "독서 실행을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복 실행을 확인하며 중간 속도로 반영"
+          },
           "code": "habits.procrastination",
           "column": "procrastination",
           "label": "할 일 미루기",
@@ -1694,6 +2083,10 @@
           "counterExample": "할 일 미루기을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근의 실제 생활 변화가 점수에 드러나도록 반영"
+          },
           "code": "habits.multitasking",
           "column": "multitasking",
           "label": "동시 작업",
@@ -1711,6 +2104,10 @@
           "counterExample": "동시 작업을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근의 실제 생활 변화가 점수에 드러나도록 반영"
+          },
           "code": "habits.rest",
           "column": "rest",
           "label": "휴식 확보",
@@ -1728,6 +2125,10 @@
           "counterExample": "휴식 확보을 앞으로 하고 싶다는 희망만으로 실천 점수를 올리지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "반복 실행을 확인하며 중간 속도로 반영"
+          },
           "code": "habits.review",
           "column": "review",
           "label": "완료 후 검토",
@@ -1754,6 +2155,10 @@
       "table": "profile_relations",
       "elements": [
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 관계 경향을 우선 보존"
+          },
           "code": "relations.social_orientation",
           "column": "social_orientation",
           "label": "사회적 교류 지향",
@@ -1771,6 +2176,10 @@
           "counterExample": "주제에 사회적 교류 지향이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 관계에서 나타난 행동을 함께 반영"
+          },
           "code": "relations.stranger_approach",
           "column": "stranger_approach",
           "label": "낯선 사람에게 먼저 접근",
@@ -1788,6 +2197,10 @@
           "counterExample": "주제에 낯선 사람에게 먼저 접근이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 관계·역할 변화에 반응"
+          },
           "code": "relations.contact_initiation",
           "column": "contact_initiation",
           "label": "관계 유지 연락 주도",
@@ -1805,6 +2218,10 @@
           "counterExample": "주제에 관계 유지 연락 주도이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 관계·역할 변화에 반응"
+          },
           "code": "relations.self_disclosure",
           "column": "self_disclosure",
           "label": "개인적 정보 공개",
@@ -1822,6 +2239,10 @@
           "counterExample": "주제에 개인적 정보 공개이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 관계에서 나타난 행동을 함께 반영"
+          },
           "code": "relations.intimacy_speed",
           "column": "intimacy_speed",
           "label": "친밀감 형성 속도",
@@ -1839,6 +2260,10 @@
           "counterExample": "주제에 친밀감 형성 속도이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 관계 경향을 우선 보존"
+          },
           "code": "relations.personal_space",
           "column": "personal_space",
           "label": "관계에서 필요한 개인 공간",
@@ -1856,6 +2281,10 @@
           "counterExample": "주제에 관계에서 필요한 개인 공간이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 관계 경향을 우선 보존"
+          },
           "code": "relations.respect_boundaries",
           "column": "respect_boundaries",
           "label": "상대의 경계 존중",
@@ -1873,6 +2302,10 @@
           "counterExample": "주제에 상대의 경계 존중이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 관계에서 나타난 행동을 함께 반영"
+          },
           "code": "relations.assert_boundaries",
           "column": "assert_boundaries",
           "label": "자신의 경계 명시",
@@ -1890,6 +2323,10 @@
           "counterExample": "주제에 자신의 경계 명시이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 관계·역할 변화에 반응"
+          },
           "code": "relations.ask_help",
           "column": "ask_help",
           "label": "도움 요청",
@@ -1907,6 +2344,10 @@
           "counterExample": "주제에 도움 요청이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 관계에서 나타난 행동을 함께 반영"
+          },
           "code": "relations.give_help",
           "column": "give_help",
           "label": "도움 제공",
@@ -1924,6 +2365,10 @@
           "counterExample": "주제에 도움 제공이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 관계·역할 변화에 반응"
+          },
           "code": "relations.role_coordination",
           "column": "role_coordination",
           "label": "협업 역할 조율",
@@ -1941,6 +2386,10 @@
           "counterExample": "주제에 협업 역할 조율이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 관계·역할 변화에 반응"
+          },
           "code": "relations.leadership",
           "column": "leadership",
           "label": "집단에서의 주도권 행사",
@@ -1958,6 +2407,10 @@
           "counterExample": "주제에 집단에서의 주도권 행사이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 관계 경향을 우선 보존"
+          },
           "code": "relations.trust_speed",
           "column": "trust_speed",
           "label": "타인 신뢰 형성 속도",
@@ -1975,6 +2428,10 @@
           "counterExample": "주제에 타인 신뢰 형성 속도이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 관계에서 나타난 행동을 함께 반영"
+          },
           "code": "relations.conflict_facing",
           "column": "conflict_facing",
           "label": "갈등 상황 직접 대면",
@@ -1992,6 +2449,10 @@
           "counterExample": "주제에 갈등 상황 직접 대면이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 관계에서 나타난 행동을 함께 반영"
+          },
           "code": "relations.compromise",
           "column": "compromise",
           "label": "갈등에서 타협안 탐색",
@@ -2009,6 +2470,10 @@
           "counterExample": "주제에 갈등에서 타협안 탐색이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 관계에서 나타난 행동을 함께 반영"
+          },
           "code": "relations.assert_position",
           "column": "assert_position",
           "label": "갈등에서 자기 입장 관철",
@@ -2026,6 +2491,10 @@
           "counterExample": "주제에 갈등에서 자기 입장 관철이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 관계에서 나타난 행동을 함께 반영"
+          },
           "code": "relations.apology",
           "column": "apology",
           "label": "잘못 인정·사과",
@@ -2043,6 +2512,10 @@
           "counterExample": "주제에 잘못 인정·사과이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 관계·역할 변화에 반응"
+          },
           "code": "relations.repair",
           "column": "repair",
           "label": "관계 회복 시도",
@@ -2060,6 +2533,10 @@
           "counterExample": "주제에 관계 회복 시도이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 관계에서 나타난 행동을 함께 반영"
+          },
           "code": "relations.perspective_check",
           "column": "perspective_check",
           "label": "상대 관점 확인",
@@ -2077,6 +2554,10 @@
           "counterExample": "주제에 상대 관점 확인이 등장했다는 이유만으로 사용자 특성을 단정하지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "지속적인 관계 경향을 우선 보존"
+          },
           "code": "relations.reciprocity",
           "column": "reciprocity",
           "label": "관계의 상호성 기대",
@@ -2103,6 +2584,10 @@
       "table": "profile_expression",
       "elements": [
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 대화 환경·주제에 따른 표현 변화를 수용"
+          },
           "code": "expression.formality",
           "column": "formality",
           "label": "격식",
@@ -2120,6 +2605,10 @@
           "counterExample": "AI가 격식의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본적인 표현 습관을 보수적으로 유지"
+          },
           "code": "expression.directness",
           "column": "directness",
           "label": "직설성",
@@ -2137,6 +2626,10 @@
           "counterExample": "AI가 직설성의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 대화 환경·주제에 따른 표현 변화를 수용"
+          },
           "code": "expression.certainty",
           "column": "certainty",
           "label": "단정성",
@@ -2154,6 +2647,10 @@
           "counterExample": "AI가 단정성의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 발언에서 나타나는 형식적 패턴을 반영"
+          },
           "code": "expression.sentence_length",
           "column": "sentence_length",
           "label": "문장 길이",
@@ -2171,6 +2668,10 @@
           "counterExample": "AI가 문장 길이의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 발언에서 나타나는 형식적 패턴을 반영"
+          },
           "code": "expression.detail",
           "column": "detail",
           "label": "설명 상세도",
@@ -2188,6 +2689,10 @@
           "counterExample": "AI가 설명 상세도의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본적인 표현 습관을 보수적으로 유지"
+          },
           "code": "expression.point_first",
           "column": "point_first",
           "label": "핵심 선제시",
@@ -2205,6 +2710,10 @@
           "counterExample": "AI가 핵심 선제시의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본적인 표현 습관을 보수적으로 유지"
+          },
           "code": "expression.examples",
           "column": "examples",
           "label": "예시 사용",
@@ -2222,6 +2731,10 @@
           "counterExample": "AI가 예시 사용의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본적인 표현 습관을 보수적으로 유지"
+          },
           "code": "expression.metaphors",
           "column": "metaphors",
           "label": "비유 사용",
@@ -2239,6 +2752,10 @@
           "counterExample": "AI가 비유 사용의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본적인 표현 습관을 보수적으로 유지"
+          },
           "code": "expression.humor",
           "column": "humor",
           "label": "유머 사용",
@@ -2256,6 +2773,10 @@
           "counterExample": "AI가 유머 사용의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본적인 표현 습관을 보수적으로 유지"
+          },
           "code": "expression.irony",
           "column": "irony",
           "label": "반어·풍자 사용",
@@ -2273,6 +2794,10 @@
           "counterExample": "AI가 반어·풍자 사용의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 대화 환경·주제에 따른 표현 변화를 수용"
+          },
           "code": "expression.emotion_words",
           "column": "emotion_words",
           "label": "감정어 사용",
@@ -2290,6 +2815,10 @@
           "counterExample": "AI가 감정어 사용의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 대화 환경·주제에 따른 표현 변화를 수용"
+          },
           "code": "expression.emphasis",
           "column": "emphasis",
           "label": "강조 표현",
@@ -2307,6 +2836,10 @@
           "counterExample": "AI가 강조 표현의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본적인 표현 습관을 보수적으로 유지"
+          },
           "code": "expression.hedging",
           "column": "hedging",
           "label": "완곡 표현",
@@ -2324,6 +2857,10 @@
           "counterExample": "AI가 완곡 표현의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 대화 환경·주제에 따른 표현 변화를 수용"
+          },
           "code": "expression.questions",
           "column": "questions",
           "label": "질문 사용",
@@ -2341,6 +2878,10 @@
           "counterExample": "AI가 질문 사용의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 발언에서 나타나는 형식적 패턴을 반영"
+          },
           "code": "expression.clarification",
           "column": "clarification",
           "label": "되묻기·요약 확인",
@@ -2358,6 +2899,10 @@
           "counterExample": "AI가 되묻기·요약 확인의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 대화 환경·주제에 따른 표현 변화를 수용"
+          },
           "code": "expression.terminology",
           "column": "terminology",
           "label": "전문용어 사용",
@@ -2375,6 +2920,10 @@
           "counterExample": "AI가 전문용어 사용의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 대화 환경·주제에 따른 표현 변화를 수용"
+          },
           "code": "expression.slang",
           "column": "slang",
           "label": "구어·속어 사용",
@@ -2392,6 +2941,10 @@
           "counterExample": "AI가 구어·속어 사용의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 10,
+            "rationale": "최근 대화 환경·주제에 따른 표현 변화를 수용"
+          },
           "code": "expression.emoji",
           "column": "emoji",
           "label": "이모지 사용",
@@ -2409,6 +2962,10 @@
           "counterExample": "AI가 이모지 사용의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 20,
+            "rationale": "여러 발언에서 나타나는 형식적 패턴을 반영"
+          },
           "code": "expression.structure",
           "column": "structure",
           "label": "목록·구조화 사용",
@@ -2426,6 +2983,10 @@
           "counterExample": "AI가 목록·구조화 사용의 말투로 답한 것을 사용자 근거로 삼지 않는다."
         },
         {
+          "updatePolicy": {
+            "maxWeight": 40,
+            "rationale": "기본적인 표현 습관을 보수적으로 유지"
+          },
           "code": "expression.personal_examples",
           "column": "personal_examples",
           "label": "개인 경험 인용",
