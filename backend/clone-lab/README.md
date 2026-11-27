@@ -10,6 +10,8 @@ Java 소스는 `backend/src/main/java/com/example/everme/lab/` 아래에서 역�
 
 실험 테스트는 대응하는 `backend/src/test/java/com/example/everme/lab/service/` 패키지에 둔다.
 
+코드 작성은 학습 프로젝트 `ch10-rag`, `ch11-tool-calling-practice`를 기준으로 2칸 들여쓰기, 명시적 import·지역 변수 타입, 중괄호가 있는 제어문, 필드·생성자·주요 메소드 구획 주석을 사용한다. ChatClient는 `prompt → system/user → options/advisors → call` 체인으로 작성한다. 도구는 `@Tool`, `@ToolParam`을 선언하고 서버가 만든 `ToolContext`로 소유자를 전달한다. 도구 실행 순서와 인자 검증은 기존 콜백 경계에서 유지한다. LLM 요청·응답은 SimpleLoggerAdvisor로 기록하고 운영 진단 로그는 Lombok `@Slf4j`를 사용한다.
+
 ## 실행
 
 저장소 루트(`EVERME`) 또는 `backend` 폴더에서 아래 명령 하나로 실행한다.
