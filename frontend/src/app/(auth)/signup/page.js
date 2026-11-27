@@ -1,10 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useContext, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/Button";
 import Field from "@/components/Field";
+import { memberSignUp } from "../../../../apis/memberApi";
+import { AuthContext } from "@/app/context/AuthContext";
+// 나라선택
 const countries = [
   "가나",
   "가봉",
@@ -271,19 +274,35 @@ function formatPhone(value) {
 }
 
 export default function SignupPage() {
+  const { login } = useContext(AuthContext);
   const [step, setStep] = useState("account");
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [consentErrors, setConsentErrors] = useState([]);
+  const [signupForm, setSignupForm] = useState({
+    name: "", email: "", birthDate: "", nationality: "", phone: "",
+    gender: "", password: "", confirmation: "",
+  });
+  const [consents, setConsents] = useState([true, true, true, true]);
   const router = useRouter();
   const headingRef = useRef(null);
+  const accountRef = useRef(null);
   const previousPhoneRef = useRef("");
   function goToStep(step) {
     setStep(step);
     headingRef.current?.focus();
   }
-  function validateAccount(form) {
-    const fields = form.elements;
+  function returnToAccount() {
+    goToStep("account");
+  }
+  function handleAccountChange(event) {
+    const { name, value } = event.currentTarget;
+    setSignupForm((current) => ({ ...current, [name]: value }));
+  }
+  function validateAccount(container) {
+    const fields = Object.fromEntries(
+      [...container.querySelectorAll("[name]")].map((field) => [field.name, field])
+    );
     const result = {};
     if (!fields.name.value.trim()) result.name = "이름을 입력해 주세요.";
     if (!fields.email.value.trim()) result.email = "이메일을 입력해 주세요.";
@@ -302,18 +321,36 @@ export default function SignupPage() {
     else if (fields.password.value !== fields.confirmation.value) result.confirmation = "비밀번호가 일치하지 않습니다.";
     return result;
   }
-  function confirmAccount(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const nextErrors = validateAccount(form);
+  function confirmAccount() {
+    const container = accountRef.current;
+    const nextErrors = validateAccount(container);
     setSubmitted(true);
     setErrors(nextErrors);
     const firstError = Object.keys(nextErrors)[0];
     if (firstError) {
-      form.elements.namedItem(firstError)?.focus();
+      container.querySelector(`[name="${firstError}"]`)?.focus();
       return;
     }
     goToStep("consent");
+  }
+  // 가입완료 
+  async function confirmConsent() {
+    const missingConsent = consents.flatMap((checked, index) => checked ? [] : [`consent-${index}`]);
+    setConsentErrors(missingConsent);
+
+    if (missingConsent.length) return;
+
+    try {
+      const resp = await memberSignUp(signupForm);
+      const token = resp.data.token;
+
+      login(signupForm.email, token);
+      router.push("/owner/chat");
+    } catch (error) {
+      console.log(error);
+    }
+
+
   }
   return (
     <>
@@ -323,10 +360,9 @@ export default function SignupPage() {
       <p className="ui-muted text-muted">
         안전한 시작을 위해 필요한 정보를 확인해 주세요.
       </p>
-      <form
+      <div
+        ref={accountRef}
         hidden={step !== "account"}
-        noValidate
-        onSubmit={confirmAccount}
         onChange={(event) => {
           if (submitted) setErrors(validateAccount(event.currentTarget));
         }}
@@ -335,6 +371,8 @@ export default function SignupPage() {
         <Field
           label="이름"
           name="name"
+          value={signupForm.name}
+          onChange={handleAccountChange}
           error={errors.name}
           autoComplete="name"
           placeholder="이름을 입력해 주세요"
@@ -345,6 +383,8 @@ export default function SignupPage() {
           placeholder="이메일 주소를 입력해 주세요"
           type="email"
           name="email"
+          value={signupForm.email}
+          onChange={handleAccountChange}
           error={errors.email}
           autoComplete="email"
           required
@@ -353,6 +393,8 @@ export default function SignupPage() {
           label="생년월일"
           type="date"
           name="birthDate"
+          value={signupForm.birthDate}
+          onChange={handleAccountChange}
           error={errors.birthDate}
           autoComplete="bday"
           required
@@ -362,7 +404,8 @@ export default function SignupPage() {
           <select
             name="nationality"
             autoComplete="country-name"
-            defaultValue=""
+            value={signupForm.nationality}
+            onChange={handleAccountChange}
             required
             aria-invalid={errors.nationality ? true : undefined}
             aria-describedby={errors.nationality ? "nationality-error" : undefined}
@@ -379,6 +422,7 @@ export default function SignupPage() {
           label="전화번호"
           type="tel"
           name="phone"
+          value={signupForm.phone}
           error={errors.phone}
           autoComplete="tel"
           inputMode="tel"
@@ -400,6 +444,7 @@ export default function SignupPage() {
             const digitsBeforeCursor = raw.slice(0, cursor).replace(/\D/g, "").length;
             const formatted = formatPhone(raw);
             input.value = formatted;
+            setSignupForm((current) => ({ ...current, phone: formatted }));
             previousPhoneRef.current = formatted;
             let nextCursor = formatted.startsWith("+") && cursor > 0 ? 1 : 0;
             let seen = 0;
@@ -414,7 +459,8 @@ export default function SignupPage() {
           <span>성별</span>
           <select
             name="gender"
-            defaultValue=""
+            value={signupForm.gender}
+            onChange={handleAccountChange}
             required
             aria-invalid={errors.gender ? true : undefined}
             aria-describedby={errors.gender ? "gender-error" : undefined}
@@ -431,6 +477,8 @@ export default function SignupPage() {
         <Field
           label="비밀번호"
           name="password"
+          value={signupForm.password}
+          onChange={handleAccountChange}
           error={errors.password}
           autoComplete="new-password"
           required
@@ -440,30 +488,24 @@ export default function SignupPage() {
         <Field
           label="비밀번호 확인"
           name="confirmation"
+          value={signupForm.confirmation}
+          onChange={handleAccountChange}
           error={errors.confirmation}
           autoComplete="new-password"
           required
           placeholder="비밀번호를 다시 입력해 주세요"
           type="password"
         />
-        <Button type="submit">다음 · 동의 확인</Button>
+        <Button onClick={confirmAccount}>다음 · 동의 확인</Button>
         <Link
           className="block text-center text-green text-[14px] mt-1"
           href="/"
         >
           이미 계정이 있어요 · 로그인
         </Link>
-      </form>
-      <form
+      </div>
+      <div
         hidden={step !== "consent"}
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          const missingConsent = [...event.currentTarget.querySelectorAll('input[required]')].filter((input) => !input.checked).map((input) => input.name);
-          setConsentErrors(missingConsent);
-          if (missingConsent.length) return;
-          router.push("/owner/chat");
-        }}
         className="mt-11 [&_>_.ui-button]:flex [&_>_.ui-button]:w-full [&_>_.ui-button]:m-[10px_0] [&_.ui-field]:m-[0_0_26px]"
       >
         {[
@@ -476,7 +518,7 @@ export default function SignupPage() {
             className="flex items-start gap-3.5 m-[22px_0] p-[8px_0] [&_small]:block [&_small]:text-muted [&_small]:mt-2"
             key={t}
           >
-            <input type="checkbox" name={`consent-${i}`} required defaultChecked aria-invalid={consentErrors.includes(`consent-${i}`) ? true : undefined} aria-describedby={consentErrors.includes(`consent-${i}`) ? `consent-${i}-error` : undefined} onChange={(event) => { if (event.currentTarget.checked) setConsentErrors((current) => current.filter((name) => name !== `consent-${i}`)); }} />
+            <input type="checkbox" name={`consent-${i}`} required checked={consents[i]} aria-invalid={consentErrors.includes(`consent-${i}`) ? true : undefined} aria-describedby={consentErrors.includes(`consent-${i}`) ? `consent-${i}-error` : undefined} onChange={(event) => { const checked = event.currentTarget.checked; setConsents((current) => current.map((value, index) => index === i ? checked : value)); if (checked) setConsentErrors((current) => current.filter(name => name !== `consent-${i}`)); }} />
             <span>
               <strong>{t}</strong>
               <small>
@@ -494,14 +536,14 @@ export default function SignupPage() {
             </span>
           </label>
         ))}
-        <Button type="submit">동의하고 시작하기</Button>
-        <Button variant="secondary" onClick={() => goToStep("account")}>
+        <Button onClick={confirmConsent}>동의하고 시작하기</Button>
+        <Button variant="secondary" onClick={returnToAccount}>
           이전 · 가입 정보 수정
         </Button>
         <p className="ui-muted text-muted">
           동의 상태는 계정 설정에서 언제든 확인할 수 있어요.
         </p>
-      </form>
+      </div>
     </>
   );
 }
