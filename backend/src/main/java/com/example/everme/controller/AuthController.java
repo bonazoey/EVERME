@@ -1,23 +1,44 @@
 package com.example.everme.controller;
 
-import com.example.everme.dto.EndpointRequests.*;
+import com.example.everme.dto.*;
+import com.example.everme.service.AuthService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/** Auth 기능별 엔드포인트 골격. 업무 로직과 계층 주입은 후속 구현한다. */
 @RestController
 @RequestMapping(value = "/api/auth", produces = "application/json")
+@Slf4j 
 public class AuthController {
+
+    private final AuthService authService;
+
+    public AuthController(AuthService authService){
+        this.authService = authService;
+    }
 
     /** FR-001,008: 회원가입. */
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest request) {
+        // int result = authService.signup();
+        
+        // 회원가입 실패
+        // if(result < 0 ){
+            
+        // }
+
         return null;
     }
 
     /** FR-002: 로그인. */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        
+        // int result = authService.login(request);
+
         return null;
     }
 

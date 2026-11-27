@@ -1,6 +1,6 @@
 package com.example.everme.controller;
 
-import com.example.everme.dto.EndpointRequests.*;
+import com.example.everme.dto.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
