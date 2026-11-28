@@ -18,6 +18,63 @@ import org.springframework.context.annotation.Profile;
 @Mapper
 @Profile("clone-lab")
 public interface LabMapper {
+  // ##### 영구 원문과 연결된 문맥 메시지를 중복 없이 보존하는 메소드 #####
+  @Insert(
+      """
+INSERT INTO clone_lab.context(conversation_id,content,type,timestamp,source_message_id,is_active)
+SELECT s.memory_key,v.content,v.type,v.received_at,m.id,false
+FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON s.session_id=m.session_id
+CROSS JOIN LATERAL (VALUES
+  (m.user_text,'USER',m.user_received_at),
+  (m.assistant_text,'ASSISTANT',m.assistant_received_at)
+) AS v(content,type,received_at)
+WHERE m.session_id=#{session}
+  AND m.pair_no > COALESCE((SELECT MAX(segment_no)*20
+    FROM clone_lab.context_summaries WHERE session_id=#{session}),0)
+ON CONFLICT (source_message_id,type) DO NOTHING
+""")
+  void preserveContext(Long session);
+
+  // ##### 가장 최근 20쌍만 활성화하고 이전 메시지는 논리 삭제하는 메소드 #####
+  @Update(
+      """
+      UPDATE clone_lab.context c SET is_active=COALESCE(c.source_message_id IN (
+        SELECT id FROM clone_lab.session_messages WHERE session_id=#{session}
+        ORDER BY pair_no DESC LIMIT 20),false)
+      WHERE c.conversation_id=CAST(#{session} AS varchar)
+        AND c.is_active IS DISTINCT FROM (c.source_message_id IN (
+          SELECT id FROM clone_lab.session_messages WHERE session_id=#{session}
+          ORDER BY pair_no DESC LIMIT 20))
+      """)
+  void slideContext(Long session);
+
+  // ##### 요약 저장이 끝난 비활성 문맥만 삭제하는 메소드 #####
+  @org.apache.ibatis.annotations.Delete(
+      """
+      DELETE FROM clone_lab.context c USING clone_lab.session_messages m
+      WHERE c.source_message_id=m.id AND m.session_id=#{session} AND NOT c.is_active
+        AND m.pair_no <= COALESCE((SELECT MAX(segment_no)*20
+          FROM clone_lab.context_summaries WHERE session_id=#{session}),0)
+      """)
+  void deleteSummarizedContext(Long session);
+
+  @org.apache.ibatis.annotations.Delete(
+      """
+      DELETE FROM clone_lab.context_summaries WHERE session_id=#{session}
+        AND segment_no > #{blocks}
+      """)
+  void discardPrematureSummaries(@Param("session") Long session, @Param("blocks") int blocks);
+
+  @Select(
+      """
+      SELECT m.id,m.user_text,m.assistant_text FROM clone_lab.session_messages m
+      JOIN clone_lab.sessions s ON s.session_id=m.session_id
+      WHERE s.session_id=#{session} AND s.owner_id=#{owner} AND s.viewer_id=#{viewer}
+        AND s.conversation_type='viewer' AND m.embedding IS NULL ORDER BY m.pair_no LIMIT 32
+      """)
+  List<Map<String, Object>> viewerMissingEmbeddings(
+      @Param("owner") Long owner, @Param("viewer") Long viewer, @Param("session") Long session);
+
   @Select("SELECT id,name,profile_version,created_at FROM clone_lab.users ORDER BY created_at DESC")
   List<Map<String, Object>> users();
 
@@ -267,6 +324,10 @@ public interface LabMapper {
   @Select("SELECT owner_id FROM clone_lab.sessions WHERE session_id=#{id}")
   Long sessionOwner(Long id);
 
+  @Select(
+      "SELECT owner_id,viewer_id,conversation_type FROM clone_lab.sessions WHERE session_id=#{id}")
+  Map<String, Object> lockFreeSession(Long id);
+
   @Update(
       "UPDATE clone_lab.runs SET result=CAST(#{result} AS jsonb) WHERE clone_owner_id=#{owner} AND"
           + " run_id=(SELECT max(run_id) FROM clone_lab.runs WHERE clone_owner_id=#{owner}) AND"
@@ -279,8 +340,8 @@ public interface LabMapper {
   List<Map<String, Object>> sessionPairs(Long id);
 
   @Select(
-      "SELECT segment_no,content FROM clone_lab.context_summaries WHERE session_id=#{id} ORDER BY"
-          + " segment_no")
+      "SELECT id,session_id,segment_no,start_message_id,end_message_id,content FROM"
+          + " clone_lab.context_summaries WHERE session_id=#{id} ORDER BY segment_no")
   List<Map<String, Object>> summaries(Long id);
 
   @Insert(

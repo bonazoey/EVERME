@@ -23,8 +23,9 @@ public class LabChatMemoryConfiguration {
         .dialect(
             new JdbcChatMemoryRepositoryDialect() {
               public String getSelectMessagesSql() {
-                return "SELECT content,type FROM clone_lab.context WHERE conversation_id=? ORDER BY"
-                           + " timestamp";
+                return "SELECT c.content,c.type FROM clone_lab.context c LEFT JOIN clone_lab.session_messages m"
+                           + " ON m.id=c.source_message_id WHERE c.conversation_id=? AND c.is_active ORDER BY"
+                           + " m.pair_no, CASE c.type WHEN 'USER' THEN 0 ELSE 1 END,c.timestamp,c.id";
               }
 
               public String getInsertMessageSql() {
@@ -37,7 +38,7 @@ public class LabChatMemoryConfiguration {
               }
 
               public String getDeleteMessagesSql() {
-                return "DELETE FROM clone_lab.context WHERE conversation_id=?";
+                return "UPDATE clone_lab.context SET is_active=false WHERE conversation_id=? AND is_active";
               }
             })
         .build();

@@ -51,6 +51,25 @@ public class LabRetrievalService {
             .build());
   }
 
+  // ##### 현재 정보이용자와 대화방 범위를 검증하고 이전 대화를 검색하는 메소드 #####
+  public List<Document> viewerHistory(Long owner, Long viewer, Long session, String question) {
+    var selected = dao.mapper().lockFreeSession(session);
+    if (selected == null
+        || !owner.equals(((Number) selected.get("owner_id")).longValue())
+        || !viewer.equals(((Number) selected.get("viewer_id")).longValue())
+        || !"viewer".equals(selected.get("conversation_type").toString())) {
+      throw LabException.invalid("정보이용자 대화방 접근 범위가 올바르지 않습니다.");
+    }
+    return context.similaritySearch(
+        SearchRequest.builder()
+            .query(question)
+            .topK(8)
+            .similarityThreshold(0.35)
+            .filterExpression(
+                scope(owner, viewer, "viewer") + " && session_id == '" + session + "'")
+            .build());
+  }
+
   // ##### 소유자의 장기 기억을 벡터 검색하는 메소드 #####
   public List<Document> memories(Long owner, String question) {
     return memory.similaritySearch(

@@ -20,6 +20,15 @@ class LabValidationTests {
   }
 
   @Test
+  void profileToolDescriptorLimitsCodeCountToOneThroughTwenty() throws Exception {
+    var tools = new LabCloneTools(null, catalog, new LabSchemas(json), null);
+    var codes = json.readTree(tools.profile(1L).getToolDefinition().inputSchema()).path("properties").path("codes");
+    assertEquals(1, codes.path("minItems").asInt());
+    assertEquals(20, codes.path("maxItems").asInt());
+    assertEquals(140, codes.path("items").path("enum").size());
+  }
+
+  @Test
   void catalogHas140DistinctElementsAndExplicitAnchors() {
     assertEquals(140, catalog.codes().size());
     assertEquals(7, catalog.domains().size());

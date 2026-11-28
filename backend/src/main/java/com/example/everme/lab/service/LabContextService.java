@@ -1,13 +1,10 @@
 package com.example.everme.lab.service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -17,7 +14,7 @@ import com.example.everme.lab.prompt.LabPrompts;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-/** 고정 20쌍 문맥을 JDBC에 보존하고 이전 구간 요약을 최근 5개로 제한한다. */
+/** 최근 20쌍 문맥을 JDBC에 보존하고 20쌍 단위 요약을 최근 5개로 제한한다. */
 @Service
 @Profile("clone-lab")
 public class LabContextService {
@@ -47,7 +44,7 @@ public class LabContextService {
 
   // ##### 다음 질문 전 완료 블록을 요약하고 최근 문맥을 읽는 메소드 #####
   public ObjectNode prepare(Long session) {
-    refresh(session, true);
+    refresh(session);
     ObjectNode input = json.createObjectNode();
     var summaries = input.putArray("summaries");
     dao.mapper()
@@ -56,25 +53,49 @@ public class LabContextService {
             row ->
                 summaries
                     .addObject()
+                    .put("id", "summary:" + row.get("id"))
+                    .put("sessionId", session.toString())
+                    .put("startMessageId", row.get("start_message_id").toString())
+                    .put("endMessageId", row.get("end_message_id").toString())
                     .put("segment", ((Number) row.get("segment_no")).intValue())
                     .put("summary", row.get("content").toString()));
     var recent = input.putArray("recent");
-    for (Message message : memory.get(session.toString()))
+    List<Message> messages = memory.get(session.toString());
+    var pairs = dao.mapper().sessionPairs(session);
+    int first = pairs.size() - messages.size() / 2;
+    for (int index = 0; index < messages.size(); index++) {
+      Message message = messages.get(index);
       recent
           .addObject()
+          .put(
+              "id",
+              "context:"
+                  + pairs.get(first + index / 2).get("id")
+                  + ":"
+                  + message.getMessageType().getValue())
+          .put("messageId", pairs.get(first + index / 2).get("id").toString())
+          .put("sessionId", session.toString())
           .put("role", message.getMessageType().getValue())
           .put("content", message.getText());
+    }
     return input;
   }
 
   // ##### 저장 원문으로 JDBC 문맥을 동기화하는 메소드 #####
   public void recorded(Long session) {
-    refresh(session, false);
+    refresh(session);
   }
 
-  private void refresh(Long session, boolean before) {
+  private void refresh(Long session) {
     List<Map<String, Object>> pairs = dao.mapper().sessionPairs(session);
-    int count = pairs.size(), blocks = Math.max(0, (count - (before ? 0 : 1)) / 20);
+    int count = pairs.size(), blocks = Math.max(0, (count - 20) / 20);
+    // 이전 정책으로 너무 일찍 생성된 요약은 원문 보존 상태에서 다시 구성한다.
+    tx.executeWithoutResult(
+        status -> {
+          dao.mapper().lockSession(session);
+          int eligible = Math.max(0, (dao.mapper().sessionPairs(session).size() - 20) / 20);
+          dao.mapper().discardPrematureSummaries(session, eligible);
+        });
     var summaries = dao.mapper().summaries(session);
     int latest =
         summaries.isEmpty() ? 0 : ((Number) summaries.getLast().get("segment_no")).intValue();
@@ -115,7 +136,7 @@ public class LabContextService {
                     ((Number) selected.getLast().get("id")).longValue(),
                     summary);
             dao.mapper().trimSummaries(session);
-            write(session, pairs, number * 20);
+            write(session);
             var run = dao.parse(user.get("run_state"));
             if (run.isObject()
                 && session.toString().equals(run.path("batchId").asText())
@@ -134,20 +155,13 @@ public class LabContextService {
     tx.executeWithoutResult(
         status -> {
           dao.mapper().lockSession(session);
-          var fresh = dao.mapper().sessionPairs(session);
-          var now = dao.mapper().summaries(session);
-          int high = now.isEmpty() ? 0 : ((Number) now.getLast().get("segment_no")).intValue();
-          write(session, fresh, high * 20);
+          write(session);
         });
   }
 
-  private void write(Long session, List<Map<String, Object>> pairs, int start) {
-    List<Message> messages = new ArrayList<>();
-    for (int i = start; i < pairs.size(); i++) {
-      messages.add(new UserMessage(pairs.get(i).get("user_text").toString()));
-      messages.add(new AssistantMessage(pairs.get(i).get("assistant_text").toString()));
-    }
-    memory.clear(session.toString());
-    if (!messages.isEmpty()) memory.add(session.toString(), messages);
+  private void write(Long session) {
+    dao.mapper().preserveContext(session);
+    dao.mapper().slideContext(session);
+    dao.mapper().deleteSummarizedContext(session);
   }
 }

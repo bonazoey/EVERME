@@ -18,6 +18,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 @Profile("clone-lab")
 public class LabCloneService {
   // ##### 필드 #####
+  private static final org.slf4j.Logger log =
+      org.slf4j.LoggerFactory.getLogger(LabCloneService.class);
   private final LabService lab;
   private final LabAi ai;
   private final LabCatalog catalog;
@@ -105,8 +107,8 @@ public class LabCloneService {
     ArrayNode input = lab.json.createArrayNode();
     ArrayNode sources = lab.json.createArrayNode();
     HashSet<String> allowed = new HashSet<String>();
-    Long sourceSession =
-        context.path("batchId").isTextual() ? Long.valueOf(context.path("batchId").asText()) : null;
+    LabAnswerEvidence evidence = new LabAnswerEvidence(lab.json);
+    evidence.checked("SESSION_RAG");
     for (org.springframework.ai.document.Document document :
         retrieval.context(user, null, question)) {
       sources
@@ -114,22 +116,43 @@ public class LabCloneService {
           .put("id", document.getId())
           .put("userText", String.valueOf(document.getMetadata().get("user_text")));
       allowed.add(document.getId());
+      ObjectNode detail =
+          lab.object()
+              .put("content", String.valueOf(document.getMetadata().get("user_text")))
+              .put("sessionId", String.valueOf(document.getMetadata().get("session_id")))
+              .put("messageId", document.getId())
+              .put("scope", "OWNER_FACT");
+      if (document.getScore() != null) detail.put("similarity", document.getScore());
+      evidence.add("SESSION_RAG", document.getId(), detail);
     }
     ObjectNode request = lab.object();
     request.put("cloneName", row.get("name").toString());
     request.set("ownerSources", sources);
     request.setAll(lab.contexts.prepare(sessionId));
+    for (String field : List.of("recent", "summaries")) {
+      String type = "recent".equals(field) ? "CHAT_CONTEXT" : "SUMMARY";
+      evidence.checked(type);
+      for (JsonNode source : request.path(field)) {
+        String id = source.path("id").asText();
+        ObjectNode detail = ((ObjectNode) source).deepCopy();
+        detail.put("scope", "VIEWER_CONVERSATION");
+        evidence.add(type, id, detail);
+        allowed.add(id);
+      }
+    }
     request.put("question", question);
     input.add(lab.json.valueToTree(Map.of("role", "user", "content", request.toString())));
     ArrayNode trace = lab.json.createArrayNode();
     HashSet<String> memoryIds = new HashSet<String>();
     HashSet<String> profileIds = new HashSet<String>();
-    boolean memoryUsed = false, profileUsed = false;
+    boolean memoryUsed = false, profileUsed = false, viewerUsed = false;
     long inTokens = 0, outTokens = 0, start = System.nanoTime();
     JsonNode finalAnswer = null;
     for (int step = 0; step < 6; step++) {
       LinkedHashMap<String, ToolCallback> callbacks =
           new LinkedHashMap<String, org.springframework.ai.tool.ToolCallback>();
+      if (!viewerUsed)
+        callbacks.put("searchViewerHistory", cloneTools.viewerHistory(user, actor, sessionId));
       if (!memoryUsed) {
         callbacks.put("searchLongTermMemory", cloneTools.memory(user));
       } else if (!profileUsed) {
@@ -189,19 +212,31 @@ public class LabCloneService {
           } catch (Exception failure) {
             throw LabException.invalid("도구 결과 JSON 오류입니다.");
           }
-          if ("searchLongTermMemory".equals(tool)) {
+          if ("searchViewerHistory".equals(tool)) {
+            evidence.checked("VIEWER_RAG");
+            for (JsonNode item : data) {
+              String id = item.path("id").asText();
+              allowed.add(id);
+              evidence.add("VIEWER_RAG", id, item);
+            }
+            viewerUsed = true;
+          } else if ("searchLongTermMemory".equals(tool)) {
+            evidence.checked("MEMORY");
             for (JsonNode item : data) {
               String id = item.path("id").asText();
               allowed.add(id);
               memoryIds.add(id);
+              evidence.add("MEMORY", id, item);
             }
             memoryUsed = true;
           } else {
+            evidence.checked("PROFILE");
             data.fieldNames()
                 .forEachRemaining(
                     code -> {
                       allowed.add(code);
                       profileIds.add(code);
+                      evidence.add("PROFILE", code, data.path(code));
                     });
             profileUsed = true;
           }
@@ -250,6 +285,7 @@ public class LabCloneService {
       throw LabException.invalid("빈 답변입니다.");
     }
     ObjectNode result = (ObjectNode) finalAnswer.deepCopy();
+    result.set("provenance", evidence.describe(finalAnswer));
     result.set("trace", trace);
     result.set(
         "metrics",
@@ -262,7 +298,17 @@ public class LabCloneService {
                 "elapsedMs",
                 (System.nanoTime() - start) / 1_000_000)));
     java.time.Instant answeredAt = java.time.Instant.now();
-    float[] vector = null; // 정보이용자 발언은 임베딩·소유자 기억으로 축적하지 않는다.
+    // 정보이용자 이력은 현재 대화방 검색에만 쓰고 소유자 장기기억에는 넣지 않는다.
+    float[] prepared = null;
+    try {
+      prepared =
+          ai.embed(List.of(LabMemoryService.content(question, result.path("answer").asText())))
+              .getFirst();
+    } catch (LabException failure) {
+      log.warn(
+          "lab_viewer_embedding_deferred sessionId={} status={}", sessionId, failure.getMessage());
+    }
+    float[] vector = prepared;
     lab.tx.executeWithoutResult(
         transaction -> {
           lab.dao.mapper().lockUser(user);

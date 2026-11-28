@@ -37,6 +37,7 @@ class LabIntegrationTests {
   @Autowired LabCloneService clone;
   @Autowired LabRunService runs;
   @Autowired LabPipeline pipeline;
+  @Autowired LabCloneTools cloneTools;
   @Autowired ObjectMapper json;
   @Autowired LabCatalog catalog;
   @Autowired JdbcTemplate jdbc;
@@ -140,6 +141,64 @@ class LabIntegrationTests {
   }
 
   @Test
+  void slidingContextKeepsTwentyPairsAndLogicallyRemovesOnlyTheOldestPair() {
+    Long user = user(), session = generated(user, "sliding context");
+    for (int i = 11; i <= 20; i++) fixtureTurn(user, session, i, "user " + i, "reply " + i);
+    lab.contexts.recorded(session);
+    var before =
+        jdbc.queryForList(
+            "SELECT id FROM clone_lab.context WHERE conversation_id=? AND is_active ORDER BY id",
+            session.toString());
+    fixtureTurn(user, session, 21, "user 21", "reply 21");
+    lab.contexts.recorded(session);
+    var input = lab.contexts.prepare(session);
+    assertEquals(40, input.path("recent").size());
+    assertEquals(0, input.path("summaries").size());
+    assertEquals(
+        42,
+        jdbc.queryForObject(
+            "SELECT count(*) FROM clone_lab.context WHERE conversation_id=?",
+            Integer.class,
+            session.toString()));
+    assertEquals(
+        2,
+        jdbc.queryForObject(
+            "SELECT count(*) FROM clone_lab.context WHERE conversation_id=? AND NOT is_active",
+            Integer.class,
+            session.toString()));
+    assertEquals(
+        38,
+        jdbc
+            .queryForList(
+                "SELECT id FROM clone_lab.context WHERE conversation_id=? AND is_active ORDER BY"
+                    + " id",
+                session.toString())
+            .stream()
+            .filter(before::contains)
+            .count());
+    for (int i = 22; i <= 41; i++) fixtureTurn(user, session, i, "user " + i, "reply " + i);
+    lab.contexts.recorded(session);
+    input = lab.contexts.prepare(session);
+    assertEquals(40, input.path("recent").size());
+    assertEquals("user 22", input.path("recent").get(0).path("content").asText());
+    assertEquals(1, input.path("summaries").size());
+    assertEquals(41, lab.dao.mapper().turns(session).size());
+    assertEquals(
+        42,
+        jdbc.queryForObject(
+            "SELECT count(*) FROM clone_lab.context WHERE conversation_id=?",
+            Integer.class,
+            session.toString()));
+    lab.contexts.prepare(session);
+    assertEquals(
+        42,
+        jdbc.queryForObject(
+            "SELECT count(*) FROM clone_lab.context WHERE conversation_id=?",
+            Integer.class,
+            session.toString()));
+  }
+
+  @Test
   void contextWindowAndFiveSummariesKeepPermanentHistoryAndSurviveRepositoryRecreation() {
     Long user = user(), batch = generated(user, "summary blocks");
     lab.tx.executeWithoutResult(
@@ -150,16 +209,16 @@ class LabIntegrationTests {
     assertEquals(121, lab.dao.mapper().turns(batch).size());
     var summaries = lab.dao.mapper().summaries(batch);
     assertEquals(5, summaries.size());
-    assertEquals(2, ((Number) summaries.getFirst().get("segment_no")).intValue());
-    assertEquals(6, ((Number) summaries.getLast().get("segment_no")).intValue());
+    assertEquals(1, ((Number) summaries.getFirst().get("segment_no")).intValue());
+    assertEquals(5, ((Number) summaries.getLast().get("segment_no")).intValue());
     var input = lab.contexts.prepare(batch);
     assertEquals(5, input.path("summaries").size());
-    assertEquals(2, input.path("recent").size());
-    assertEquals("사용자 원문 121", input.path("recent").get(0).path("content").asText());
+    assertEquals(40, input.path("recent").size());
+    assertEquals("사용자 원문 102", input.path("recent").get(0).path("content").asText());
     assertEquals(
-        2,
+        40,
         jdbc.queryForObject(
-            "SELECT count(*) FROM clone_lab.context WHERE conversation_id=?",
+            "SELECT count(*) FROM clone_lab.context WHERE conversation_id=? AND is_active",
             Integer.class,
             batch.toString()));
     var repository =
@@ -173,8 +232,8 @@ class LabIntegrationTests {
             .chatMemoryRepository(repository)
             .maxMessages(40)
             .build();
-    assertEquals(2, recreated.get(batch.toString()).size());
-    assertEquals("사용자 원문 121", recreated.get(batch.toString()).getFirst().getText());
+    assertEquals(40, recreated.get(batch.toString()).size());
+    assertEquals("사용자 원문 102", recreated.get(batch.toString()).getFirst().getText());
   }
 
   @Test
@@ -182,7 +241,7 @@ class LabIntegrationTests {
     Long user = user(), batch = generated(user, "summary retry");
     lab.tx.executeWithoutResult(
         t -> {
-          for (int i = 11; i <= 120; i++) fixtureTurn(user, batch, i, "원문 " + i, "응답 " + i);
+          for (int i = 11; i <= 139; i++) fixtureTurn(user, batch, i, "원문 " + i, "응답 " + i);
         });
     lab.contexts.recorded(batch);
     assertEquals(5, lab.dao.mapper().summaries(batch).size());
@@ -197,6 +256,7 @@ class LabIntegrationTests {
             any(JsonNode.class),
             any(JsonNode.class)))
         .thenThrow(new LabException(502, "summary unavailable"));
+    fixtureTurn(user, batch, 140, "user 140", "reply 140");
     assertThrows(LabException.class, () -> lab.contexts.prepare(batch));
     assertEquals(5, lab.dao.mapper().summaries(batch).size());
     assertEquals(
@@ -210,10 +270,10 @@ class LabIntegrationTests {
     fixture();
     var next = lab.contexts.prepare(batch);
     assertEquals(5, next.path("summaries").size());
-    assertEquals(0, next.path("recent").size());
+    assertEquals(40, next.path("recent").size());
     assertEquals(
         2, ((Number) lab.dao.mapper().summaries(batch).getFirst().get("segment_no")).intValue());
-    assertEquals(120, lab.dao.mapper().turns(batch).size());
+    assertEquals(140, lab.dao.mapper().turns(batch).size());
   }
 
   @Test
@@ -336,9 +396,20 @@ class LabIntegrationTests {
     lab.save(owner, batch, false);
     var session = clone.start(owner, actor, null);
     var otherSession = clone.start(owner, other, null);
-    String source = lab.batch(owner, batch).path("turns").get(0).path("id").asText();
     when(ai.respond(anyString(), any(JsonNode.class), any(JsonNode.class), anyList()))
-        .thenReturn(response("CONTEXT", false, List.of(source)));
+        .thenAnswer(
+            call ->
+                response(
+                    "CONTEXT",
+                    false,
+                    List.of(
+                        lab.json
+                            .readTree(
+                                ((JsonNode) call.getArgument(1)).get(0).path("content").asText())
+                            .path("ownerSources")
+                            .get(0)
+                            .path("id")
+                            .asText())));
     clone.answer(owner, actor, Long.valueOf(session.path("sessionId").asText()), "이용자만의 질문");
     assertEquals(1, clone.history(owner, actor).path("messages").size());
     assertEquals(0, clone.history(owner, other).path("messages").size());
@@ -505,7 +576,7 @@ class LabIntegrationTests {
   }
 
   @Test
-  void testDialogueGenerationNeverUsesGroundTruth() {
+  void testDialogueGenerationUsesSelectedPersona() {
     Long user = user();
     generated(user, "여행 준비");
     var inputs = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
@@ -515,18 +586,26 @@ class LabIntegrationTests {
     var request = inputs.getAllValues().getLast();
     assertEquals("여행 준비", request.path("topic").asText());
     assertFalse(request.has("catalog"));
-    assertFalse(request.has("persona"));
+    assertEquals(lab.dao.parse(lab.dao.requireUser(user).get("persona")), request.path("persona"));
     assertFalse(request.has("biography"));
     assertFalse(request.has("facts"));
     String prompt = prompts.getAllValues().getLast();
     assertTrue(prompt.contains("사용자가 대화를 주도"));
     assertTrue(prompt.contains("공감·경청·맞장구"));
     assertTrue(prompt.contains("새 주제로 전환"));
-    generated(user, "최근 대화 참고");
+    Long batch = generated(user, "최근 대화 참고");
     var third = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
     verify(ai, times(3))
         .structured(eq("generation"), anyString(), third.capture(), any(JsonNode.class));
     assertEquals(0, third.getAllValues().getLast().path("recent").size());
+    lab.append(user, batch);
+    var continued = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
+    verify(ai, times(4))
+        .structured(eq("generation"), anyString(), continued.capture(), any(JsonNode.class));
+    for (var input : continued.getAllValues().subList(3, 4)) {
+      assertEquals(request.path("persona"), input.path("persona"));
+      assertTrue(input.path("continuation").asBoolean());
+    }
   }
 
   @Test
@@ -713,11 +792,136 @@ class LabIntegrationTests {
             .put("type", "output_text");
     var answer = json.createObjectNode();
     answer.put("answer", "근거에 따른 테스트 답변");
+    answer.put("reason", "인용된 자료의 사용자 발언과 요청한 내용을 비교했습니다.");
     answer.put("stage", stage);
     answer.put("inferred", inferred);
     answer.set("evidenceIds", json.valueToTree(ids));
     content.put("text", answer.toString());
     return r;
+  }
+
+  @Test
+  void viewerHistoryRagUsesOnlyCurrentActorAndSessionAndNeverOwnerMemory() {
+    Long owner = user(), actor = user(), other = user();
+    Long session = Long.valueOf(clone.start(owner, actor, null).path("sessionId").asText());
+    Long otherSession = Long.valueOf(clone.start(owner, other, null).path("sessionId").asText());
+    for (Long target : List.of(session, otherSession)) {
+      Long viewer = target.equals(session) ? actor : other;
+      lab.tx.executeWithoutResult(
+          t ->
+              lab.memory.turn(
+                  lab.dao.mapper().nextId("session_messages", "id"),
+                  owner,
+                  viewer,
+                  target,
+                  "viewer",
+                  1,
+                  "my earlier question",
+                  "previous reply",
+                  null,
+                  java.time.Instant.now(),
+                  java.time.Instant.now(),
+                  false,
+                  null));
+      lab.dao.mapper().analysis(target, lab.object().put("version", 1).toString());
+    }
+    var items = json.createArrayNode();
+    try {
+      items =
+          (ArrayNode)
+              json.readTree(
+                  cloneTools
+                      .viewerHistory(owner, actor, session)
+                      .call("{\"query\":\"earlier question\"}"));
+    } catch (Exception failure) {
+      throw new AssertionError(failure);
+    }
+    assertEquals(1, items.size());
+    assertEquals(session.toString(), items.get(0).path("sessionId").asText());
+    assertEquals("VIEWER_CONVERSATION", items.get(0).path("scope").asText());
+    assertTrue(lab.dao.mapper().memories(owner).isEmpty());
+    assertThrows(
+        LabException.class,
+        () ->
+            cloneTools
+                .viewerHistory(owner, other, session)
+                .call("{\"query\":\"earlier question\"}"));
+    String id = items.get(0).path("id").asText();
+    when(ai.respond(anyString(), any(JsonNode.class), any(JsonNode.class), anyList()))
+        .thenReturn(
+            call("searchViewerHistory", lab.object().put("query", "earlier question")),
+            response("VIEWER_RAG", false, List.of(id)));
+    var result = clone.answer(owner, actor, session, "what did I ask earlier?");
+    assertEquals(
+        "VIEWER_RAG", result.path("provenance").path("sources").get(0).path("type").asText());
+    assertEquals(
+        2,
+        jdbc.queryForObject(
+            "SELECT count(*) FROM clone_lab.session_messages WHERE session_id=? AND embedding IS"
+                + " NOT NULL",
+            Integer.class,
+            session));
+    assertTrue(lab.dao.mapper().recent(owner).isEmpty());
+  }
+
+  @Test
+  void viewerContextCitationsAreStoredWithVerifiedSourceAndReason() throws Exception {
+    Long owner = user();
+    Long session = Long.valueOf(clone.start(owner, null).path("sessionId").asText());
+    when(ai.respond(anyString(), any(JsonNode.class), any(JsonNode.class), anyList()))
+        .thenReturn(
+            call("searchLongTermMemory", json.createObjectNode().put("query", "대화")),
+            response("INSUFFICIENT", false, List.of()));
+    clone.answer(owner, session, "내 질문을 기억해 줘");
+    String id = lab.contexts.prepare(session).path("recent").get(0).path("id").asText();
+    when(ai.respond(anyString(), any(JsonNode.class), any(JsonNode.class), anyList()))
+        .thenReturn(response("CHAT_CONTEXT", false, List.of(id)));
+    var answer = clone.answer(owner, session, "방금 내가 뭐라고 했어?");
+    var source = answer.path("provenance").path("sources").get(0);
+    assertEquals("CHAT_CONTEXT", source.path("type").asText());
+    assertEquals("VIEWER_CONVERSATION", source.path("scope").asText());
+    assertEquals("내 질문을 기억해 줘", source.path("content").asText());
+    assertEquals(
+        "NOT_CHECKED", answer.path("provenance").path("routes").get(3).path("status").asText());
+    assertEquals(
+        json.readTree(answer.toString()),
+        clone.history(owner).path("messages").get(1).path("response"));
+    assertFalse(answer.path("reason").asText().isBlank());
+  }
+
+  @Test
+  void viewerSummaryCanBeCitedOnlyAsConversationContext() {
+    Long owner = user();
+    Long session = Long.valueOf(clone.start(owner, null).path("sessionId").asText());
+    lab.tx.executeWithoutResult(
+        t -> {
+          for (int i = 1; i <= 40; i++)
+            lab.memory.turn(
+                lab.dao.mapper().nextId("session_messages", "id"),
+                owner,
+                owner,
+                session,
+                "viewer",
+                i,
+                "질문 " + i,
+                "응답 " + i,
+                null,
+                java.time.Instant.now(),
+                java.time.Instant.now(),
+                false,
+                null);
+          lab.dao.mapper().analysis(session, lab.object().put("version", 40).toString());
+        });
+    String id = lab.contexts.prepare(session).path("summaries").get(0).path("id").asText();
+    when(ai.respond(anyString(), any(JsonNode.class), any(JsonNode.class), anyList()))
+        .thenReturn(response("SUMMARY", false, List.of(id)));
+    var answer = clone.answer(owner, session, "앞에서 어떤 이야기를 했지?");
+    var source = answer.path("provenance").path("sources").get(0);
+    assertEquals("SUMMARY", source.path("type").asText());
+    assertEquals(session.toString(), source.path("sessionId").asText());
+    assertFalse(source.path("startMessageId").asText().isBlank());
+    assertEquals("VIEWER_CONVERSATION", source.path("scope").asText());
+    assertTrue(lab.dao.mapper().memories(owner).isEmpty());
   }
 
   JsonNode call(String name, JsonNode args) {

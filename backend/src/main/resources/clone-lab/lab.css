@@ -2,4 +2,6 @@
 
 .element-heading{flex-wrap:wrap}.element-heading .numbers{white-space:normal;overflow-wrap:anywhere}
 .score-fill.score-fill-preview{background:#3975b8}
+.viewer-workspace{align-items:start}
+.evidence h3{font-size:13px;margin:20px 0 10px}.evidence-routes{list-style:none;padding:0;margin:0}.evidence-route{display:flex;flex-direction:column;gap:4px;border-left:3px solid var(--line);padding:8px 10px;margin:6px 0}.evidence-route span{color:var(--muted);font-size:11px}.evidence-route.used{border-color:var(--green);background:var(--green-light)}.source-card{padding:12px 0;border-top:1px solid var(--line);min-width:0}.source-card p{margin:6px 0}.source-card blockquote{margin:10px 0;padding:8px 12px;border-left:2px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto}.source-scope{color:#805b18}.answer-reason{line-height:1.7}.evidence-button{font-size:11px;padding:4px 0}
 .score-comparison{display:grid;gap:4px;margin-top:8px}.score-row{display:grid;grid-template-columns:90px minmax(0,1fr);align-items:center;column-gap:8px;min-height:12px}.score-row-label{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}.score-row .score-track{margin-top:0}.score-row-preview .score-row-label{color:#3975b8}

@@ -39,6 +39,11 @@ public class LabSchemas {
     return json.valueToTree(Map.of("type", "array", "items", node));
   }
 
+  public JsonNode array(JsonNode node, int minItems, int maxItems) {
+    return json.valueToTree(
+        Map.of("type", "array", "items", node, "minItems", minItems, "maxItems", maxItems));
+  }
+
   public JsonNode object(Map<String, JsonNode> props) {
     return json.valueToTree(
         Map.of(
@@ -111,7 +116,18 @@ public class LabSchemas {
             "answer",
             string(),
             "stage",
-            enumeration(List.of("CONTEXT", "MEMORY", "PROFILE", "INSUFFICIENT")),
+            enumeration(
+                List.of(
+                    "CHAT_CONTEXT",
+                    "VIEWER_RAG",
+                    "SUMMARY",
+                    "SESSION_RAG",
+                    "CONTEXT",
+                    "MEMORY",
+                    "PROFILE",
+                    "INSUFFICIENT")),
+            "reason",
+            string(),
             "inferred",
             json.valueToTree(Map.of("type", "boolean")),
             "evidenceIds",

@@ -4,7 +4,7 @@
   const $ = id => document.getElementById(id), owner = document.body.dataset.view === 'owner';
   const state = { catalog:null, user:'', batch:null, profile:null, domain:'emotion', session:null, busy:false, run:{}, timer:null };
   const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const stages = {CONTEXT:'현재 컨텍스트', MEMORY:'장기 기억', PROFILE:'성향에 따른 추정', INSUFFICIENT:'정보 부족'};
+  const stages = {VIEWER_RAG:'\uBCF8\uC778 \uB300\uD654\uBC29 RAG',CHAT_CONTEXT:'현재 대화 컨텍스트', SUMMARY:'이전 대화 요약', SESSION_RAG:'세션 메시지 RAG', CONTEXT:'세션 메시지 RAG', MEMORY:'장기기억 RAG', PROFILE:'성향에 따른 추정', INSUFFICIENT:'정보 부족'};
   const number = value => value === null || value === undefined ? '미확인' : Number(value).toFixed(2).replace(/\.00$/,'');
   async function api(path, method='GET', body) {
     const response=await fetch('/api/lab'+path,{method,headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
@@ -86,12 +86,27 @@
   }
   function metrics(m){return m?` · ${m.inputTokens||0} 입력 / ${m.outputTokens||0} 출력 토큰 · ${(m.elapsedMs/1000).toFixed(1)}초`:'';}
   async function newSession(){state.session=await api(userPath()+'/sessions','POST',{batchId:$('batch').value||null,actorUserId:actorId()});renderHistory();notice('새 클론 대화를 시작했습니다.');controls();}
-  function bubble(question,response){return `<article class="turn user"><div class="turn-label">정보이용자</div><div class="bubble owner">${esc(question)}</div></article><article class="turn assistant"><div class="turn-label">클론</div><div class="bubble">${esc(response.answer)}</div><p class="answer-stage">${esc(stages[response.stage]||response.stage)}${response.inferred?' · 추정한 답변':''}</p></article>`;}
+  function bubble(question,response,index){return `<article class="turn user"><div class="turn-label">정보이용자</div><div class="bubble owner">${esc(question)}</div></article><article class="turn assistant"><div class="turn-label">클론</div><div class="bubble">${esc(response.answer)}</div><p class="answer-stage">${esc(stages[response.stage]||response.stage)}${response.inferred?' · 추정한 답변':''}</p><button class="quiet evidence-button" data-evidence-index="${index}" type="button">출처·판단 근거 보기</button></article>`;}
   function renderHistory(){
-    const messages=state.session?.messages||[];$('chat').innerHTML=messages.length?messages.map(m=>bubble(m.question,m.response)).join(''):'<div class="empty"><h3>질문을 보내 대화를 시작하세요.</h3><p>현재 컨텍스트 → 장기 기억 → 분석 프로필 순서로 확인합니다.</p></div>';
+    const messages=state.session?.messages||[];$('chat').innerHTML=messages.length?messages.map((m,i)=>bubble(m.question,m.response,i)).join(''):'<div class="empty"><h3>질문을 보내 대화를 시작하세요.</h3><p>대화 문맥·요약 → 최근 대화 RAG → 장기기억 RAG → 분석 추정</p></div>';
     if(messages.length)renderEvidence(messages.at(-1).response);else $('evidence').innerHTML='<p class="muted">첫 답변을 기다리고 있습니다.</p>';$('chat').scrollTop=$('chat').scrollHeight;
   }
-  function renderEvidence(response){$('evidence').innerHTML=`<p><strong>${esc(stages[response.stage])}</strong></p><p>${response.inferred?'성향에 따른 추정입니다.':'기록된 근거를 사용하거나 정보 부족을 밝혔습니다.'}</p><p>${esc((response.evidenceIds||[]).join(', ')||'참조 근거 없음')}</p>${(response.trace||[]).map(t=>`<details><summary>${esc(t.tool)}</summary><pre>${esc(JSON.stringify(t,null,2))}</pre></details>`).join('')}<p class="muted">${esc(metrics(response.metrics))}</p>`;}
+  function renderEvidence(response){
+    const provenance=response.provenance, statuses={USED:'답변에 인용',PROVIDED:'전달됨 · 인용 안 함',EMPTY:'결과 없음',NOT_CHECKED:'조회 안 함'};
+    const routeList=provenance?.routes||[];
+    const routeItems=types=>routeList.filter(r=>types.includes(r.type)).map(r=>`<li class="evidence-route ${r.status==='USED'?'used':''}"><strong>${esc(stages[r.type]||r.type)}</strong><span>${esc(statuses[r.status]||r.status)} · ${Number(r.citedCount)||0}/${Number(r.availableCount)||0}개 인용</span></li>`).join('');
+    const routes=routeList.length?[
+      {label:'정보이용자 대화 정보',description:'대화의 문맥을 유지하는 자료입니다.',types:['CHAT_CONTEXT','SUMMARY','VIEWER_RAG']},
+      {label:'대변인 정보',description:'소유자의 기억과 성향을 확인하는 자료입니다.',types:['SESSION_RAG','CONTEXT','MEMORY','PROFILE']}
+    ].map(group=>`<section class="evidence-route-group"><h4>${group.label}</h4><p class="muted">${group.description}</p><ul class="evidence-routes">${routeItems(group.types)}</ul></section>`).join(''):'';
+    const sources=(provenance?.sources||[]).map(s=>{
+      const location=[s.sessionId&&`대화방 ${s.sessionId}`,s.messageId&&`대화 쌍 ${s.messageId}`,s.segment&&`요약 구간 ${s.segment}`,s.startMessageId&&`원문 ${s.startMessageId}~${s.endMessageId}`,s.role&&`발화 ${s.role}`].filter(Boolean).join(' · ');
+      const excerpt=s.content||s.summary||s.value?.reason||'';
+      const value=s.type==='PROFILE'?`<p>요소 ${esc(s.id)} · 점수 ${esc(number(s.value?.score))} · 가중치 ${esc(s.value?.weight??0)}</p>`:'';
+      return `<article class="source-card"><strong>${esc(stages[s.type]||s.type)}</strong><p class="muted">${esc(s.id)}${location?' · '+esc(location):''}</p>${s.scope==='VIEWER_CONVERSATION'?'<p class="source-scope">정보이용자 대화 문맥 · 소유자 사실 확인 자료가 아닙니다.</p>':''}${value}${excerpt?`<blockquote>${esc(excerpt)}</blockquote>`:''}${typeof s.similarity==='number'?`<p class="muted">검색 유사도 ${s.similarity.toFixed(3)} · 사실 신뢰도와 다릅니다.</p>`:''}</article>`;
+    }).join('');
+    $('evidence').innerHTML=`<p><strong>${esc(stages[response.stage]||response.stage)}</strong>${response.inferred?' · 추정':''}</p><h3>판단 근거</h3><p class="answer-reason">${esc(response.reason||'이전 답변에는 판단 근거 요약이 기록되지 않았습니다.')}</p><p class="muted">모델이 작성한 근거 요약입니다. 아래 인용 자료와 함께 확인하세요.</p>${routes?`<h3>자료 확인 현황</h3><ul class="evidence-routes">${routes}</ul>`:'<p class="muted">이전 답변에는 출처 구분이 기록되지 않았습니다.</p>'}<h3>실제 인용 출처</h3>${sources||`<p>${esc((response.evidenceIds||[]).join(', ')||'인용한 자료 없음')}</p>`}${(response.trace||[]).map(t=>`<details><summary>${esc(t.tool)} · 호출 상세</summary><pre>${esc(JSON.stringify(t,null,2))}</pre></details>`).join('')}<p class="muted">${esc(metrics(response.metrics))}</p>`;
+  }
   $('user').addEventListener('change',()=>action('사용자를 불러오는 중…',()=>selectUser($('user').value)));
   if(owner){
     $('owner-message-form').onsubmit=event=>{event.preventDefault();const content=$('owner-message').value;if(!content.trim())return;action('메시지를 보내고 AI의 답변을 기다리는 중…',async()=>{const b=await api(userPath()+'/messages','POST',{batchId:state.batch?.id||null,topic:$('topic').value||null,content});await loadBatches(b.id);$('owner-message').value='';$('conversation').scrollTop=$('conversation').scrollHeight;notice('메시지와 AI 답변을 저장했습니다. 분석 버튼으로 직접 쓴 발언도 분석할 수 있습니다.'+metrics(b.metrics));});};
@@ -109,6 +124,7 @@
     $('resume').onclick=()=>action('자동 테스트를 재개하는 중…',async()=>{state.run=await api(userPath()+'/runs/current/resume','POST');await pollRun();notice('마지막 미완료 배치부터 이어갑니다.');});
     $('export').onclick=()=>action('결과를 내보내는 중…',async()=>{const result=await api(userPath()+'/export');const url=URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='everme-lab-'+state.user+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notice('실험 결과와 평가 지표를 내보냈습니다.');});
   }else{
+    $('chat').addEventListener('click',event=>{const button=event.target.closest('[data-evidence-index]');if(button){const message=state.session?.messages?.[Number(button.dataset.evidenceIndex)];if(message){renderEvidence(message.response);$('evidence').scrollIntoView({block:'nearest',behavior:'smooth'});}}});
     $('actor').onchange=()=>action('정보이용자의 대화를 불러오는 중…',()=>selectUser(state.user));$('new-session').onclick=()=>action('새 대화를 준비하는 중…',newSession);$('batch').onchange=()=>action('컨텍스트를 변경해 새 대화를 준비하는 중…',newSession);
     $('question-form').onsubmit=event=>{event.preventDefault();const question=$('question').value;action('클론이 기억과 근거를 확인하고 있습니다…',async()=>{await api(userPath()+'/questions','POST',{sessionId:state.session.sessionId,question,actorUserId:actorId()});state.session=await api(historyPath());$('question').value='';renderHistory();notice('답변을 받았습니다. 근거와 추정 여부를 확인하세요.');});};
   }

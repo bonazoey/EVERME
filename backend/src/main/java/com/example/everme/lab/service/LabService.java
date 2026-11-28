@@ -69,6 +69,17 @@ public class LabService {
     return json.valueToTree(value);
   }
 
+  // ##### 정보이용자 원문 쌍을 현재 대화방 검색용으로 임베딩하는 메소드 #####
+  List<float[]> embedViewerHistory(List<Map<String, Object>> pairs) {
+    return ai.embed(
+        pairs.stream()
+            .map(
+                pair ->
+                    LabMemoryService.content(
+                        pair.get("user_text").toString(), pair.get("assistant_text").toString()))
+            .toList());
+  }
+
   // ##### 분석 요소 카탈로그를 조회하는 메소드 #####
   public JsonNode catalog() {
     return catalog.document();
@@ -181,10 +192,10 @@ public class LabService {
       Map<String, Object> target = existing == null ? null : dao.requireBatch(user, existing);
       List<Map<String, Object>> original =
           existing == null ? List.<Map<String, Object>>of() : dao.mapper().turns(existing);
-      // Generating test dialogue is not an analysis task: omit all 140 definitions
-      // and target scores.
+      // 인물 설정은 합성 대화 생성에만 전달하며 분석·대변인 답변에는 전달하지 않는다.
       ObjectNode input = object();
       input.put("topic", topic);
+      input.set("persona", dao.parse(row.get("persona")));
       input.put("continuation", existing != null);
       if (existing != null) input.setAll(contexts.prepare(existing));
       timing.mark("load_db_and_prepare_input");

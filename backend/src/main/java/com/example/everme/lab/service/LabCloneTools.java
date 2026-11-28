@@ -46,6 +46,55 @@ public class LabCloneTools {
         String.class);
   }
 
+  // ##### 현재 정보이용자의 대화방 이력 검색 도구를 구성하는 메소드 #####
+  public ToolCallback viewerHistory(Long owner, Long viewer, Long session) {
+    return callback(
+        owner,
+        schemas.tool(
+            "searchViewerHistory",
+            "현재 대화 문맥과 요약에 없는 정보이용자 본인의 이전 대화를 현재 대화방에서 검색",
+            Map.of("query", schemas.string())),
+        String.class,
+        Map.of("ownerId", owner, "viewerId", viewer, "sessionId", session));
+  }
+
+  @Tool(description = "정보이용자 본인의 현재 대화방 이력을 검색합니다. 소유자 사실 근거가 아닙니다.")
+  public JsonNode searchViewerHistory(
+      @ToolParam(description = "이전 대화 검색어") String query, ToolContext toolContext) {
+    LabValidation.text(query, 1000, "검색어");
+    Long owner = owner(toolContext);
+    if (!(toolContext.getContext().get("viewerId") instanceof Long viewer)
+        || !(toolContext.getContext().get("sessionId") instanceof Long session)) {
+      throw LabException.invalid("정보이용자 검색 범위가 필요합니다.");
+    }
+    ArrayNode items = lab.json.createArrayNode();
+    // 과거 viewer 이력의 NULL 임베딩은 검색 시 현재 범위의 원문으로만 보완한다.
+    while (true) {
+      var missing = lab.dao.mapper().viewerMissingEmbeddings(owner, viewer, session);
+      if (missing.isEmpty()) break;
+      var vectors = lab.embedViewerHistory(missing);
+      for (int i = 0; i < missing.size(); i++) {
+        lab.dao
+            .mapper()
+            .embedding(
+                ((Number) missing.get(i).get("id")).longValue(),
+                com.example.everme.lab.dao.LabDao.vector(vectors.get(i)));
+      }
+    }
+    for (var document : retrieval.viewerHistory(owner, viewer, session, query)) {
+      var item =
+          items
+              .addObject()
+              .put("id", "viewer:" + document.getId())
+              .put("messageId", document.getId())
+              .put("sessionId", session.toString())
+              .put("content", document.getText())
+              .put("scope", "VIEWER_CONVERSATION");
+      if (document.getScore() != null) item.put("similarity", document.getScore());
+    }
+    return items;
+  }
+
   // ##### 소유자의 장기 기억을 검색하는 도구 메소드 #####
   @Tool(description = "현재 컨텍스트의 근거가 부족할 때 소유자 장기 기억을 검색합니다.")
   public JsonNode searchLongTermMemory(
@@ -68,6 +117,9 @@ public class LabCloneTools {
       item.set("sourceIds", meta.path("source_ids"));
       item.set("sourceExcerpts", meta.path("source_excerpts"));
       item.set("occurredAt", meta.path("occurred_at"));
+      item.put("sessionId", meta.path("session_id").asText());
+      item.put("scope", "OWNER_FACT");
+      if (document.getScore() != null) item.put("similarity", document.getScore());
     }
     return items;
   }
@@ -79,7 +131,7 @@ public class LabCloneTools {
         schemas.tool(
             "getAnalysisProfile",
             "기억으로 판단 불가능한 성향·선택을 추정할 때 관련 요소 조회",
-            Map.of("codes", schemas.array(schemas.enumeration(catalog.codes())))),
+            Map.of("codes", schemas.array(schemas.enumeration(catalog.codes()), 1, 20))),
         List.class);
   }
 
@@ -124,6 +176,11 @@ public class LabCloneTools {
 
   // ##### 서버가 선택한 소유자와 도구 콜백을 연결하는 메소드 #####
   private ToolCallback callback(Long owner, JsonNode schema, Class<?> argumentType) {
+    return callback(owner, schema, argumentType, Map.of("ownerId", owner));
+  }
+
+  private ToolCallback callback(
+      Long owner, JsonNode schema, Class<?> argumentType, Map<String, Object> scope) {
     ToolDefinition definition =
         ToolDefinition.builder()
             .name(schema.path("name").asText())
@@ -143,7 +200,7 @@ public class LabCloneTools {
     } catch (NoSuchMethodException failure) {
       throw new IllegalStateException("등록된 도구 메소드를 찾을 수 없습니다.", failure);
     }
-    ToolContext toolContext = new ToolContext(Map.of("ownerId", owner));
+    ToolContext toolContext = new ToolContext(scope);
     return new ToolCallback() {
       public ToolDefinition getToolDefinition() {
         return definition;

@@ -9,6 +9,11 @@ const profile = () => ({ userId: user, version, name: '민서', elements: Object
 const observation = { code: 'relations.social_orientation', score: 20, strength: 2, sourceIds: ['source-1'], reason: '낯선 큰 모임보다 조용한 소규모 모임에서 편안함을 느낍니다.' };
 const data = () => ({ id: batch, topic: '주말 자전거 여행', sequence_no: 1, status: saved ? 'saved' : analyzed ? 'analyzed' : 'generated', turns: Array.from({ length: pairCount }, (_, i) => ({ id: 'source-' + (i + 1), ordinal: i + 1, user_text: i === 0 ? '큰 모임보다 가까운 친구 둘과 조용히 여행하는 게 좋아요. 낯선 사람에게 먼저 말을 걸지는 않는 편이에요.' : '여행 전에 자전거 상태와 예산을 확인했어요. 주말에는 강변을 따라 달릴 생각이에요.', assistant_text: '어떤 코스로 떠나고 싶으세요?' })), analysis: pipelineSegments?{segments:pipelineSegments}:analyzed ? { observations: [observation], memories: [] } : null });
 const answer = { answer: '기록을 보면 가까운 친구들과 조용한 여행을 더 편안하게 느끼는 것 같아요. 이번 선택도 소규모 여행 쪽으로 기울 수 있지만, 실제 의사는 확인해야 해요.', stage: 'PROFILE', inferred: true, evidenceIds: ['relations.social_orientation'], trace: [{ tool: 'searchLongTermMemory', arguments: { query: '여행 동행' }, result: [] }, { tool: 'getAnalysisProfile', arguments: { codes: ['relations.social_orientation'] }, result: { 'relations.social_orientation': { score: 20 } } }], metrics: { inputTokens: 250, outputTokens: 100, elapsedMs: 1200 } };
+answer.reason = '사용자 원문과 저장된 성향 수치를 함께 확인해 선택을 추정했습니다.';
+answer.provenance = {
+  sources: [{id:'relations.social_orientation',type:'PROFILE',value:{score:20,weight:2,reason:'소규모 여행을 선호한다고 직접 말했습니다.'}}, {id:'10',type:'SESSION_RAG',sessionId:'2',messageId:'10',scope:'OWNER_FACT',content:'<img src=x onerror=alert(1)> 가까운 친구 둘과 조용히 여행하는 게 좋아요.',similarity:0.85}],
+  routes: [{type:'VIEWER_RAG',status:'NOT_CHECKED',availableCount:0,citedCount:0},{type:'CHAT_CONTEXT',status:'PROVIDED',availableCount:2,citedCount:0},{type:'SUMMARY',status:'EMPTY',availableCount:0,citedCount:0},{type:'SESSION_RAG',status:'USED',availableCount:3,citedCount:1},{type:'MEMORY',status:'EMPTY',availableCount:0,citedCount:0},{type:'PROFILE',status:'USED',availableCount:1,citedCount:1}]
+};
 function mock(route, method, body) {
     if (route === '/catalog') return catalog; if (route === '/config') return { generation: 'gpt-6.1-sol', analysis: 'gpt-6.1-sol', answer: 'gpt-6.1-terra', keyConfigured: true }; if (route === '/users') return [{ id: user, name: '민서' }];
     if (route.endsWith('/profile')) return profile(); if (route.endsWith('/runs/current')) return mockRun;
@@ -92,7 +97,15 @@ function mock(route, method, body) {
         mockRun={};pipelineSegments=null;
         await viewport(1440); await call('Page.navigate', { url: base + '/lab/viewer' }); await wait('document.querySelector("#send") && !document.getElementById("send").disabled');
         await evaluate('document.getElementById("question").value="다음 여행도 소규모로 갈 것 같나요?";document.getElementById("question-form").requestSubmit()'); await wait('document.querySelector("#chat .answer-stage") && !document.getElementById("send").disabled');
-        assert(await evaluate('document.getElementById("chat").textContent.includes("성향에 따른 추정")')); assert.equal(await evaluate('document.querySelectorAll("#evidence details").length'), 2); await shot('viewer-desktop');
+        assert(await evaluate('document.getElementById("chat").textContent.includes("성향에 따른 추정")')); assert.equal(await evaluate('document.querySelectorAll("#evidence details").length'), 2);
+        assert.equal(await evaluate('document.querySelectorAll("#evidence .evidence-route").length'),6);
+        assert.equal(await evaluate('document.querySelectorAll("#evidence .source-card").length'),2);
+        assert.equal(await evaluate('document.querySelectorAll("#evidence .evidence-route-group").length'),2);
+        assert.equal(await evaluate('document.querySelector("#evidence .evidence-route-group").querySelectorAll("li").length'),3);
+        assert(await evaluate('document.querySelector("#evidence .answer-reason").textContent.includes("선택을 추정")'));
+        assert.equal(await evaluate('document.querySelectorAll("#evidence img").length'),0);
+        await evaluate('document.querySelector("[data-evidence-index]").click()');
+        await shot('viewer-desktop');
         for (const width of [390, 320]) { await viewport(width); assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'), 'Viewer overflow ' + width); await shot('viewer-' + width); }
         await evaluate('document.getElementById("new-session").click()'); await wait('!document.getElementById("new-session").disabled && !document.querySelector("#chat .answer-stage")');
         assert.deepEqual(errors, []); console.log('PASS: manual generate/analyze/save separation, 140-element view, viewer question/new session, desktop/390/320px, no JS errors.');

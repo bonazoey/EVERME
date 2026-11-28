@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 @Component
 @Profile("clone-lab")
 public class LabCatalog {
+  
   // ##### 필드 #####
   private final JsonNode document;
   private final Map<String, JsonNode> elements = new LinkedHashMap<>();

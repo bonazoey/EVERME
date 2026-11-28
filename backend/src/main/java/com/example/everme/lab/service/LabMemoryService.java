@@ -63,7 +63,6 @@ public class LabMemoryService {
         || !type.equals(selected.get("conversation_type").toString())) {
       throw LabException.conflict("대화방의 소유자·참여자·종류가 일치하지 않습니다.");
     }
-    if ("viewer".equals(type)) vector = null;
     ObjectNode meta = metadata(owner, actor, session, type);
     meta.put("message_id", id.toString())
         .put("ordinal", ordinal)
