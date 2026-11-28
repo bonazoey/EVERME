@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 @Profile("clone-lab")
 @Slf4j
 public class LabErrorHandler {
+
   @ExceptionHandler(LabException.class)
   ResponseEntity<?> error(LabException e) {
     return ResponseEntity.status(e.status()).body(Map.of("message", e.getMessage()));

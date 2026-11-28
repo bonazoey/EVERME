@@ -3,7 +3,6 @@ package com.example.everme.lab.service;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
@@ -37,7 +36,7 @@ public class LabCloneTools {
     this.retrieval = retrieval;
   }
 
-  public ToolCallback memory(UUID owner) {
+  public ToolCallback memory(Long owner) {
     return callback(
         owner,
         schemas.tool(
@@ -51,16 +50,19 @@ public class LabCloneTools {
   @Tool(description = "현재 컨텍스트의 근거가 부족할 때 소유자 장기 기억을 검색합니다.")
   public JsonNode searchLongTermMemory(
       @ToolParam(description = "질문과 관련된 기억 검색어") String query, ToolContext toolContext) {
-    UUID owner = owner(toolContext);
+    Long owner = owner(toolContext);
     LabValidation.text(query, 1000, "검색어");
     ArrayNode items = lab.json.createArrayNode();
     for (org.springframework.ai.document.Document document : retrieval.memories(owner, query)) {
       JsonNode meta = lab.json.valueToTree(document.getMetadata());
       ObjectNode item =
-          items.addObject().put("id", document.getId()).put("kind", meta.path("kind").asText());
+          items
+              .addObject()
+              .put("id", "memory:" + document.getId())
+              .put("kind", meta.path("kind").asText());
       item.put(
           "content",
-          meta.path("record_type").asText().equals("context_archive")
+          meta.path("record_type").asText().equals("conversation_archive")
               ? meta.path("user_text").asText()
               : document.getText());
       item.set("sourceIds", meta.path("source_ids"));
@@ -71,7 +73,7 @@ public class LabCloneTools {
   }
 
   // ##### 분석 프로필을 조회하는 메소드 #####
-  public ToolCallback profile(UUID owner) {
+  public ToolCallback profile(Long owner) {
     return callback(
         owner,
         schemas.tool(
@@ -86,7 +88,7 @@ public class LabCloneTools {
   public JsonNode getAnalysisProfile(
       @ToolParam(description = "조회할 분석 요소 코드 목록, 1~20개") List<String> codes,
       ToolContext toolContext) {
-    UUID owner = owner(toolContext);
+    Long owner = owner(toolContext);
     if (codes == null || codes.isEmpty() || codes.size() > 20) {
       throw LabException.invalid("관련 프로필 요소는 1~20개만 조회할 수 있습니다.");
     }
@@ -121,7 +123,7 @@ public class LabCloneTools {
   }
 
   // ##### 서버가 선택한 소유자와 도구 콜백을 연결하는 메소드 #####
-  private ToolCallback callback(UUID owner, JsonNode schema, Class<?> argumentType) {
+  private ToolCallback callback(Long owner, JsonNode schema, Class<?> argumentType) {
     ToolDefinition definition =
         ToolDefinition.builder()
             .name(schema.path("name").asText())
@@ -180,8 +182,8 @@ public class LabCloneTools {
   }
 
   // ##### 서버 도구 컨텍스트의 소유자를 확인하는 메소드 #####
-  private UUID owner(ToolContext toolContext) {
-    if (toolContext == null || !(toolContext.getContext().get("ownerId") instanceof UUID ownerId)) {
+  private Long owner(ToolContext toolContext) {
+    if (toolContext == null || !(toolContext.getContext().get("ownerId") instanceof Long ownerId)) {
       throw LabException.invalid("도구 실행에 소유자 정보가 필요합니다.");
     }
     return ownerId;

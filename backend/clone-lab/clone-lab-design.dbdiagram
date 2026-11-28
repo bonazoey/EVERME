@@ -8,70 +8,88 @@
     "relationshipMode": "All",
     "tablePositions": [
       {
-        "name": "lab_users",
-        "schemaName": "clone_lab",
-        "x": 339.29931640625,
-        "y": 12
-      },
-      {
         "name": "sessions",
         "schemaName": "clone_lab",
-        "x": 820.56396484375,
-        "y": 12
+        "x": 349.94799645397757,
+        "y": 30.483817200188923
       },
       {
         "name": "context",
         "schemaName": "clone_lab",
-        "x": 12,
-        "y": 12
+        "x": 793.8661922374979,
+        "y": -234.71513853415064
       },
       {
         "name": "vector_store",
         "schemaName": "clone_lab",
-        "x": 1376.732421875,
-        "y": 12
+        "x": 1133.0563203992533,
+        "y": 206.03134493741692
       },
       {
         "name": "profile_emotion",
         "schemaName": "clone_lab",
-        "x": 820.56396484375,
-        "y": 282
+        "x": 83.68940016708802,
+        "y": 853.9331735988408
       },
       {
         "name": "profile_values",
         "schemaName": "clone_lab",
-        "x": 820.56396484375,
-        "y": 1064
+        "x": 420.25404373275046,
+        "y": 853.9331735988408
       },
       {
         "name": "profile_interests",
         "schemaName": "clone_lab",
-        "x": 820.56396484375,
-        "y": 1846
+        "x": 752.0142914319929,
+        "y": 853.9331735988408
       },
       {
         "name": "profile_decision",
         "schemaName": "clone_lab",
-        "x": 820.56396484375,
-        "y": 2628
+        "x": 1087.108411026126,
+        "y": 853.9331735988408
       },
       {
         "name": "profile_habits",
         "schemaName": "clone_lab",
-        "x": 820.56396484375,
-        "y": 3410
+        "x": 1449.557152627944,
+        "y": 853.9331735988408
       },
       {
         "name": "profile_relations",
         "schemaName": "clone_lab",
-        "x": 820.56396484375,
-        "y": 4192
+        "x": 1775.5330648861827,
+        "y": 853.9331735988408
       },
       {
         "name": "profile_expression",
         "schemaName": "clone_lab",
-        "x": 820.56396484375,
-        "y": 4974
+        "x": 2119.745391816212,
+        "y": 853.9331735988408
+      },
+      {
+        "name": "runs",
+        "schemaName": "clone_lab",
+        "x": -507.2045313081326,
+        "y": -33.96865506258308
+      },
+      {
+        "name": "users",
+        "schemaName": "clone_lab",
+        "x": 6.603120685646786,
+        "y": 516.4725916804209
+      },
+      {
+        "name": "session_messages",
+        "schemaName": "clone_lab",
+        "x": 780.162829115543,
+        "y": 211.68921071520356
+      },
+      {
+        "name": "context_summaries",
+        "schemaName": "clone_lab",
+        "x": 1128.2065745190312,
+        "y": -244.13363127142597
       }
     ],
     "tableGroupCollapseStates": [],
@@ -225,6 +243,396 @@
         "secondTableName": "profile_expression",
         "secondSchemaName": "clone_lab",
         "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "lab_users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "clone_owner_id"
+        ],
+        "secondTableName": "sessions",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "lab_users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "actor_user_id"
+        ],
+        "secondTableName": "sessions",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "session_id"
+        ],
+        "firstTableName": "sessions",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "session_id"
+        ],
+        "secondTableName": "context",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "lab_users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "clone_owner_id"
+        ],
+        "secondTableName": "runs",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "session_id"
+        ],
+        "firstTableName": "sessions",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "session_id"
+        ],
+        "secondTableName": "runs",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "clone_owner_id"
+        ],
+        "secondTableName": "sessions",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "actor_user_id"
+        ],
+        "secondTableName": "sessions",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "clone_owner_id"
+        ],
+        "secondTableName": "runs",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "profile_emotion",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "profile_values",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "profile_interests",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "profile_decision",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "profile_habits",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "profile_relations",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "profile_expression",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "owner_id"
+        ],
+        "secondTableName": "sessions",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "viewer_id"
+        ],
+        "secondTableName": "sessions",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "session_id"
+        ],
+        "firstTableName": "sessions",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "session_id"
+        ],
+        "secondTableName": "session_messages",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "owner_id"
+        ],
+        "secondTableName": "session_messages",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "viewer_id"
+        ],
+        "secondTableName": "session_messages",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "memory_key"
+        ],
+        "firstTableName": "sessions",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "conversation_id"
+        ],
+        "secondTableName": "context",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "session_id"
+        ],
+        "firstTableName": "sessions",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "session_id"
+        ],
+        "secondTableName": "context_summaries",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "session_messages",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "start_message_id"
+        ],
+        "secondTableName": "context_summaries",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "session_messages",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "end_message_id"
+        ],
+        "secondTableName": "context_summaries",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "users",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "owner_id"
+        ],
+        "secondTableName": "vector_store",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "id"
+        ],
+        "firstTableName": "session_messages",
+        "firstSchemaName": "clone_lab",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "source_session_record_id"
+        ],
+        "secondTableName": "vector_store",
+        "secondSchemaName": "clone_lab",
+        "secondRelation": "*",
         "checkPoints": []
       }
     ],

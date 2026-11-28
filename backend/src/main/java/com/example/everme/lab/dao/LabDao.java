@@ -3,9 +3,8 @@ package com.example.everme.lab.dao;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Map.Entry;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
@@ -46,7 +45,7 @@ public class LabDao {
     }
   }
 
-  public Map<String, Object> requireUser(UUID user) {
+  public Map<String, Object> requireUser(Long user) {
     Map<String, Object> row = mapper.user(user);
     if (row == null) {
       throw new LabException(404, "테스트 사용자를 찾을 수 없습니다.");
@@ -54,7 +53,7 @@ public class LabDao {
     return row;
   }
 
-  public Map<String, Object> requireBatch(UUID user, UUID batch) {
+  public Map<String, Object> requireBatch(Long user, Long batch) {
     Map<String, Object> row = mapper.batch(user, batch);
     if (row == null) {
       throw new LabException(404, "대화 배치를 찾을 수 없습니다.");
@@ -63,7 +62,7 @@ public class LabDao {
   }
 
   // ##### 분석 프로필을 조회하는 메소드 #####
-  public ObjectNode profile(UUID user) {
+  public ObjectNode profile(Long user) {
     ObjectNode profile = json.createObjectNode();
     for (Entry<String, List<String>> d : catalog.domains().entrySet()) {
       JsonNode row = parse(mapper.profile(d.getKey(), user));
@@ -82,7 +81,7 @@ public class LabDao {
     return profile;
   }
 
-  public void updateProfile(UUID user, JsonNode profile) {
+  public void updateProfile(Long user, JsonNode profile) {
     for (Entry<String, List<String>> d : catalog.domains().entrySet()) {
       LinkedHashMap<String, Object> scores = new LinkedHashMap<String, Object>();
       ObjectNode metadata = json.createObjectNode();

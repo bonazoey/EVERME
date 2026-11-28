@@ -29,6 +29,7 @@ public class LabConfiguration {
       if (initialize) {
         ResourceDatabasePopulator populator =
             new ResourceDatabasePopulator(new ClassPathResource("clone-lab/schema.sql"));
+        populator.setSqlScriptEncoding("UTF-8");
         // PostgreSQL DO 블록 내부의 세미콜론을 문장 구분자로 해석하지 않는다.
         populator.setSeparator(
             org.springframework.jdbc.datasource.init.ScriptUtils.EOF_STATEMENT_SEPARATOR);

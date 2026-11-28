@@ -19,7 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class LabVectorConfiguration {
   @Bean("labContextStore")
   PgVectorStore contextStore(JdbcTemplate jdbc, LabAi ai) {
-    return store(jdbc, ai, "context");
+    return store(jdbc, ai, "session_messages");
   }
 
   @Bean("labMemoryStore")
@@ -51,6 +51,7 @@ public class LabVectorConfiguration {
     return PgVectorStore.builder(jdbc, embeddings)
         .schemaName("clone_lab")
         .vectorTableName(table)
+        .idType(PgVectorStore.PgIdType.BIGSERIAL)
         .dimensions(1536)
         .initializeSchema(false)
         .vectorTableValidationsEnabled(false)

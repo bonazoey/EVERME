@@ -1,12 +1,10 @@
 package com.example.everme.lab.service;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,20 +54,20 @@ public class LabPipeline {
   }
 
   // ##### 자동 실행 상태를 조회하는 메소드 #####
-  private ObjectNode state(UUID user) {
+  private ObjectNode state(Long user) {
     return (ObjectNode) lab.dao.parse(lab.dao.requireUser(user).get("run_state"));
   }
 
-  private boolean running(UUID user, AtomicReference<String> error) {
+  private boolean running(Long user, AtomicReference<String> error) {
     return error.get() == null && "running".equals(state(user).path("status").asText());
   }
 
   // ##### 대화 배치를 조회하는 메소드 #####
-  private UUID batch(ObjectNode state) {
-    return UUID.fromString(state.path("batchId").asText());
+  private Long batch(ObjectNode state) {
+    return Long.valueOf(state.path("batchId").asText());
   }
 
-  private ObjectNode details(UUID user, UUID batch) {
+  private ObjectNode details(Long user, Long batch) {
     return (ObjectNode) lab.dao.parse(lab.dao.requireBatch(user, batch).get("analysis"));
   }
 
@@ -78,7 +76,7 @@ public class LabPipeline {
   }
 
   // ##### 생성과 분석 작업을 병행 실행하는 메소드 #####
-  public void execute(UUID user) {
+  public void execute(Long user) {
     AtomicReference<String> error = new AtomicReference<String>();
     Object signal = new Object();
     try (ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -118,16 +116,23 @@ public class LabPipeline {
             run.put("error", error.get());
           }
           lab.dao.mapper().runState(user, run.toString());
+          if ("completed".equals(run.path("status").asText())) {
+            var snapshot =
+                lab.object()
+                    .put("profileVersion", ((Number) row.get("profile_version")).longValue());
+            snapshot.set("elements", lab.dao.profile(user));
+            lab.dao.mapper().runResult(user, snapshot.toString());
+          }
         });
   }
 
-  private void worker(UUID user, AtomicReference<String> error, Object signal, boolean producer) {
+  private void worker(Long user, AtomicReference<String> error, Object signal, boolean producer) {
     MDC.put("labRunId", state(user).path("runId").asText());
     try (LabCallContext context =
         new LabCallContext(() -> running(user, error), () -> recordRetry(user))) {
       while (running(user, error)) {
         ObjectNode run = state(user);
-        UUID batch = batch(run);
+        Long batch = batch(run);
         boolean worked = false;
         if (producer) {
           if (run.path("generatedPairs").asInt() >= 1000) {
@@ -187,7 +192,7 @@ public class LabPipeline {
     }
   }
 
-  private boolean reserve(UUID user, AtomicReference<String> error) {
+  private boolean reserve(Long user, AtomicReference<String> error) {
     return Boolean.TRUE.equals(
         lab.tx.execute(
             s -> {
@@ -210,7 +215,7 @@ public class LabPipeline {
             }));
   }
 
-  private boolean admit(UUID user, String phase, AtomicReference<String> error) {
+  private boolean admit(Long user, String phase, AtomicReference<String> error) {
     return Boolean.TRUE.equals(
         lab.tx.execute(
             s -> {
@@ -226,7 +231,7 @@ public class LabPipeline {
             }));
   }
 
-  private void recordRetry(UUID user) {
+  private void recordRetry(Long user) {
     lab.tx.executeWithoutResult(
         s -> {
           Map<String, Object> row = lab.dao.mapper().lockUser(user);
@@ -236,7 +241,7 @@ public class LabPipeline {
         });
   }
 
-  private ArrayNode fresh(UUID user, UUID batch, JsonNode selected) {
+  private ArrayNode fresh(Long user, Long batch, JsonNode selected) {
     HashSet<String> ids = new HashSet<String>();
     for (JsonNode id : selected.path("sourceIds")) {
       ids.add(id.asText());
@@ -256,7 +261,7 @@ public class LabPipeline {
   }
 
   // ##### 고정된 10쌍 구간을 분석하는 메소드 #####
-  void analyzeSegment(UUID user, UUID batch, int number) {
+  void analyzeSegment(Long user, Long batch, int number) {
     try (LabTiming timing = new LabTiming("pipeline.analyze")) {
       ObjectNode selected = segment(details(user, batch), number).deepCopy();
       if (!"generated".equals(selected.path("status").asText())) {
@@ -350,7 +355,7 @@ public class LabPipeline {
             current.set("analysis", analysis);
             current.put("status", "analyzed");
             for (JsonNode id : current.path("sourceIds")) {
-              lab.dao.mapper().contextStatus(UUID.fromString(id.asText()), "analyzed");
+              lab.dao.mapper().contextStatus(Long.valueOf(id.asText()), "analyzed");
             }
             lab.dao.mapper().pipelineDetails(batch, latest.toString(), "generated");
             ObjectNode run = (ObjectNode) lab.dao.parse(row.get("run_state"));
@@ -367,8 +372,9 @@ public class LabPipeline {
   }
 
   // ##### 구간 분석 결과를 원자적으로 저장하는 메소드 #####
-  void saveSegment(UUID user, UUID batch, int number) {
+  void saveSegment(Long user, Long batch, int number) {
     try (LabTiming timing = new LabTiming("pipeline.save")) {
+      lab.repairEmbeddings(user);
       ObjectNode selected = segment(details(user, batch), number).deepCopy();
       if ("saved".equals(selected.path("status").asText())) {
         timing.success();
@@ -379,13 +385,6 @@ public class LabPipeline {
       }
       JsonNode analysis = selected.path("analysis");
       validation.analysis(analysis, lab.sourceIds(fresh(user, batch, selected)));
-      JsonNode memories = analysis.path("memories");
-      ArrayList<String> texts = new ArrayList<String>();
-      for (JsonNode m : memories) {
-        texts.add(m.path("content").asText());
-      }
-      List<float[]> vectors = ai.embed(texts);
-      timing.mark("embed_memories");
       lab.tx.executeWithoutResult(
           s -> {
             Map<String, Object> row = lab.dao.mapper().lockUser(user);
@@ -403,13 +402,7 @@ public class LabPipeline {
             ObjectNode old = lab.dao.profile(user);
             ObjectNode merged = validation.merge(old, analysis.path("observations"));
             lab.dao.updateProfile(user, merged);
-            int index = 0;
             List<Map<String, Object>> currentTurns = lab.dao.mapper().turns(batch);
-            for (JsonNode m : memories) {
-              lab.memory.memory(
-                  user, batch, "segment:" + number, index, m, vectors.get(index), currentTurns);
-              index++;
-            }
             java.util.Set<String> completedIds = new java.util.HashSet<>();
             selected.path("sourceIds").forEach(id -> completedIds.add(id.asText()));
             lab.memory.complete(latest, currentTurns, completedIds);

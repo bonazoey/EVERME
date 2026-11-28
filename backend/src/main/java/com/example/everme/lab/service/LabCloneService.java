@@ -4,7 +4,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.context.annotation.Profile;
@@ -43,15 +42,15 @@ public class LabCloneService {
   }
 
   // ##### 이용자별 클론 대화 세션을 시작하는 메소드 #####
-  public JsonNode start(UUID owner, UUID batch) {
+  public JsonNode start(Long owner, Long batch) {
     return start(owner, owner, batch);
   }
 
-  public JsonNode start(UUID owner, UUID actor, UUID batch) {
+  public JsonNode start(Long owner, Long actor, Long batch) {
     lab.dao.requireUser(owner);
     lab.dao.requireUser(actor);
     if (batch != null) lab.dao.requireBatch(owner, batch);
-    UUID session = UUID.randomUUID();
+    Long session = lab.dao.mapper().nextId("sessions", "session_id");
     ObjectNode details = lab.object().put("version", 0);
     if (batch != null) details.put("batchId", batch.toString());
     lab.tx.executeWithoutResult(
@@ -63,17 +62,17 @@ public class LabCloneService {
   }
 
   // ##### 현재 이용자의 대화만 조회하는 메소드 #####
-  public JsonNode history(UUID owner) {
+  public JsonNode history(Long owner) {
     return history(owner, owner);
   }
 
-  public JsonNode history(UUID owner, UUID actor) {
+  public JsonNode history(Long owner, Long actor) {
     lab.dao.requireUser(owner);
     lab.dao.requireUser(actor);
     Map<String, Object> selected = lab.dao.mapper().currentViewer(owner, actor);
     ObjectNode result = lab.object();
     if (selected == null) return result;
-    UUID session = (UUID) selected.get("session_id");
+    Long session = (Long) selected.get("session_id");
     JsonNode details = lab.dao.parse(selected.get("analysis"));
     result
         .put("sessionId", session.toString())
@@ -90,12 +89,12 @@ public class LabCloneService {
     return result;
   }
 
-  public JsonNode answer(UUID user, UUID sessionId, String question) {
+  public JsonNode answer(Long user, Long sessionId, String question) {
     return answer(user, user, sessionId, question);
   }
 
   // ##### 최근 문맥 검색 후 도구 호출로 클론 답변을 만드는 메소드 #####
-  public JsonNode answer(UUID user, UUID actor, UUID sessionId, String question) {
+  public JsonNode answer(Long user, Long actor, Long sessionId, String question) {
     java.time.Instant receivedAt = java.time.Instant.now();
     LabValidation.text(question, 4000, "질문");
     Map<String, Object> row = lab.dao.requireUser(user);
@@ -106,12 +105,10 @@ public class LabCloneService {
     ArrayNode input = lab.json.createArrayNode();
     ArrayNode sources = lab.json.createArrayNode();
     HashSet<String> allowed = new HashSet<String>();
-    UUID sourceSession =
-        context.path("batchId").isTextual()
-            ? UUID.fromString(context.path("batchId").asText())
-            : null;
+    Long sourceSession =
+        context.path("batchId").isTextual() ? Long.valueOf(context.path("batchId").asText()) : null;
     for (org.springframework.ai.document.Document document :
-        retrieval.context(user, sourceSession, question)) {
+        retrieval.context(user, null, question)) {
       sources
           .addObject()
           .put("id", document.getId())
@@ -121,20 +118,7 @@ public class LabCloneService {
     ObjectNode request = lab.object();
     request.put("cloneName", row.get("name").toString());
     request.set("ownerSources", sources);
-    // Previous viewer text is conversational context only, never evidence about the owner.
-    JsonNode messages = context.path("messages");
-    ArrayNode recent = lab.json.createArrayNode();
-    int begin = Math.max(0, messages.size() - 100);
-    for (int i = begin; i < messages.size(); i++) {
-      JsonNode message = messages.get(i);
-      ObjectNode compact = lab.object();
-      compact.put("question", message.path("question").asText());
-      compact.put("answer", message.path("response").path("answer").asText());
-      compact.put("stage", message.path("response").path("stage").asText());
-      compact.put("inferred", message.path("response").path("inferred").asBoolean());
-      recent.add(compact);
-    }
-    request.set("viewerHistory", recent);
+    request.setAll(lab.contexts.prepare(sessionId));
     request.put("question", question);
     input.add(lab.json.valueToTree(Map.of("role", "user", "content", request.toString())));
     ArrayNode trace = lab.json.createArrayNode();
@@ -278,9 +262,7 @@ public class LabCloneService {
                 "elapsedMs",
                 (System.nanoTime() - start) / 1_000_000)));
     java.time.Instant answeredAt = java.time.Instant.now();
-    float[] vector =
-        ai.embed(List.of(LabMemoryService.content(question, result.path("answer").asText())))
-            .getFirst();
+    float[] vector = null; // 정보이용자 발언은 임베딩·소유자 기억으로 축적하지 않는다.
     lab.tx.executeWithoutResult(
         transaction -> {
           lab.dao.mapper().lockUser(user);
@@ -292,7 +274,7 @@ public class LabCloneService {
           ObjectNode next = (ObjectNode) lab.dao.parse(selected.get("analysis"));
           next.put("version", version + 1);
           lab.memory.turn(
-              UUID.randomUUID(),
+              lab.dao.mapper().nextId("session_messages", "id"),
               user,
               actor,
               sessionId,
@@ -308,6 +290,7 @@ public class LabCloneService {
           lab.dao.mapper().analysis(sessionId, next.toString());
           lab.memory.retain(user, actor, "viewer");
         });
+    lab.contexts.recorded(sessionId);
     return result;
   }
 }

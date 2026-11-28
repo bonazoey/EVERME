@@ -2,7 +2,7 @@
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict'), { spawn } = require('node:child_process');
 const base = process.env.LAB_URL || 'http://127.0.0.1:8087', out = path.resolve(__dirname, '../../build/clone-lab-ui'); fs.mkdirSync(out, { recursive: true });
 const catalog = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../src/main/resources/clone-lab/catalog.json'), 'utf8'));
-const user = '00000000-0000-0000-0000-000000000001', batch = '00000000-0000-0000-0000-000000000002', session = '00000000-0000-0000-0000-000000000003';
+const user = 1, batch = 2, session = 3;
 let mockRun={},pipelineSegments=null;
 let generated = false, analyzed = false, saved = false, profileStored = false, pairCount = 10, questions = [], version = 0;
 const profile = () => ({ userId: user, version, name: '민서', elements: Object.fromEntries(catalog.domains.flatMap(d => d.elements).map(e => [e.code, { score: profileStored && e.code === 'relations.social_orientation' ? 20 : null, weight: profileStored ? 2 : 0, sourceIds: [], reason: profileStored ? '소규모 모임을 선호한다고 직접 설명했습니다.' : '' }])) });

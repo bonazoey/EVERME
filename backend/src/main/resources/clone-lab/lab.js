@@ -30,7 +30,7 @@
     }
   }
   async function action(label,fn){if(state.busy)return;state.busy=true;controls();notice(label);try{await fn();}catch(error){notice(error.message,true);}finally{state.busy=false;controls();}}
-  async function loadUsers(selected){const users=await api('/users');$('user').innerHTML='<option value="">사용자를 선택하세요</option>'+users.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');if(!owner)$('actor').innerHTML='<option value="">자기 클론 테스트</option>'+users.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');if(selected&&users.some(u=>u.id===selected)){$('user').value=selected;await selectUser(selected);}}
+  async function loadUsers(selected){const users=await api('/users');$('user').innerHTML='<option value="">사용자를 선택하세요</option>'+users.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');if(!owner)$('actor').innerHTML='<option value="">자기 클론 테스트</option>'+users.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');if(selected&&users.some(u=>String(u.id)===String(selected))){$('user').value=selected;await selectUser(selected);}}
   async function selectUser(id){
     clearTimeout(state.timer);state.user=id;state.batch=null;state.profile=null;state.session=null;state.run={};
     if(owner){$('owner-message').value='';}
@@ -44,7 +44,7 @@
     const batches=await api(userPath()+'/batches');const available=owner?batches:batches.filter(b=>b.status==='saved');
     const previous=preferred||state.batch?.id||$('batch').value;
     $('batch').innerHTML=(owner?'<option value="">대화 배치를 선택하세요</option>':'<option value="">최근 문맥부터 검색</option>')+available.map(b=>`<option value="${esc(b.id)}">${esc((b.topic||'주제 미정 · 10쌍 후 자동 확정').slice(0,32))} · ${{generated:'생성됨',analyzed:'분석됨',saved:'저장됨'}[b.status]}</option>`).join('');
-    if(previous&&available.some(b=>b.id===previous))$('batch').value=previous;
+    if(previous&&available.some(b=>String(b.id)===String(previous)))$('batch').value=previous;
     else if(owner&&available.length)$('batch').value=available[0].id;
     if(owner&&$('batch').value)await loadBatch($('batch').value);else if(owner){state.batch=null;$('conversation').innerHTML='<div class="empty"><h3>아직 대화가 없습니다.</h3><p>아래에 직접 이야기를 입력하거나 10개 대화를 생성하세요.</p></div>';$('turn-count').textContent='0';}
   }

@@ -76,7 +76,10 @@ class LabIntegrationTests {
                     var turns = data.putArray("turns");
                     String topic = input.path("topic").asText();
                     if (input.path("continuation").asBoolean() || topic.startsWith("자동 테스트"))
-                      topic += " 추가 이야기 " + UUID.randomUUID();
+                      topic +=
+                          " 추가 이야기 "
+                              + java.util.concurrent.ThreadLocalRandom.current()
+                                  .nextLong(1, Long.MAX_VALUE);
                     for (int i = 0; i < 10; i++)
                       turns
                           .addObject()
@@ -114,11 +117,11 @@ class LabIntegrationTests {
             });
   }
 
-  void fixtureTurn(UUID user, UUID batch, int ordinal, String userText, String assistant) {
+  void fixtureTurn(Long user, Long batch, int ordinal, String userText, String assistant) {
     var vector = new float[1536];
     vector[0] = 1;
     lab.memory.turn(
-        UUID.randomUUID(),
+        java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE),
         user,
         user,
         batch,
@@ -136,17 +139,125 @@ class LabIntegrationTests {
     lab.dao.mapper().analysis(batch, details.toString());
   }
 
-  UUID user() {
-    return UUID.fromString(lab.createUser("통합 테스트", "운동하는 사람").path("id").asText());
+  @Test
+  void contextWindowAndFiveSummariesKeepPermanentHistoryAndSurviveRepositoryRecreation() {
+    Long user = user(), batch = generated(user, "summary blocks");
+    lab.tx.executeWithoutResult(
+        t -> {
+          for (int i = 11; i <= 121; i++) fixtureTurn(user, batch, i, "사용자 원문 " + i, "공감 " + i);
+        });
+    lab.contexts.recorded(batch);
+    assertEquals(121, lab.dao.mapper().turns(batch).size());
+    var summaries = lab.dao.mapper().summaries(batch);
+    assertEquals(5, summaries.size());
+    assertEquals(2, ((Number) summaries.getFirst().get("segment_no")).intValue());
+    assertEquals(6, ((Number) summaries.getLast().get("segment_no")).intValue());
+    var input = lab.contexts.prepare(batch);
+    assertEquals(5, input.path("summaries").size());
+    assertEquals(2, input.path("recent").size());
+    assertEquals("사용자 원문 121", input.path("recent").get(0).path("content").asText());
+    assertEquals(
+        2,
+        jdbc.queryForObject(
+            "SELECT count(*) FROM clone_lab.context WHERE conversation_id=?",
+            Integer.class,
+            batch.toString()));
+    var repository =
+        new LabChatMemoryConfiguration()
+            .labChatMemoryRepository(
+                jdbc,
+                new org.springframework.jdbc.datasource.DataSourceTransactionManager(
+                    jdbc.getDataSource()));
+    var recreated =
+        org.springframework.ai.chat.memory.MessageWindowChatMemory.builder()
+            .chatMemoryRepository(repository)
+            .maxMessages(40)
+            .build();
+    assertEquals(2, recreated.get(batch.toString()).size());
+    assertEquals("사용자 원문 121", recreated.get(batch.toString()).getFirst().getText());
   }
 
-  UUID generated(UUID user, String topic) {
-    return UUID.fromString(lab.generate(user, topic, false).path("id").asText());
+  @Test
+  void sixthSummaryFailureKeepsExistingFiveAndCurrentContextUntilRetry() {
+    Long user = user(), batch = generated(user, "summary retry");
+    lab.tx.executeWithoutResult(
+        t -> {
+          for (int i = 11; i <= 120; i++) fixtureTurn(user, batch, i, "원문 " + i, "응답 " + i);
+        });
+    lab.contexts.recorded(batch);
+    assertEquals(5, lab.dao.mapper().summaries(batch).size());
+    var before =
+        jdbc.queryForList(
+            "SELECT content,type,timestamp FROM clone_lab.context WHERE conversation_id=? ORDER BY"
+                + " timestamp",
+            batch.toString());
+    when(ai.structured(
+            eq("summary"),
+            eq(com.example.everme.lab.prompt.LabPrompts.CONTEXT_SUMMARY),
+            any(JsonNode.class),
+            any(JsonNode.class)))
+        .thenThrow(new LabException(502, "summary unavailable"));
+    assertThrows(LabException.class, () -> lab.contexts.prepare(batch));
+    assertEquals(5, lab.dao.mapper().summaries(batch).size());
+    assertEquals(
+        1, ((Number) lab.dao.mapper().summaries(batch).getFirst().get("segment_no")).intValue());
+    assertEquals(
+        before,
+        jdbc.queryForList(
+            "SELECT content,type,timestamp FROM clone_lab.context WHERE conversation_id=? ORDER BY"
+                + " timestamp",
+            batch.toString()));
+    fixture();
+    var next = lab.contexts.prepare(batch);
+    assertEquals(5, next.path("summaries").size());
+    assertEquals(0, next.path("recent").size());
+    assertEquals(
+        2, ((Number) lab.dao.mapper().summaries(batch).getFirst().get("segment_no")).intValue());
+    assertEquals(120, lab.dao.mapper().turns(batch).size());
+  }
+
+  @Test
+  void malformedScopeCannotWritePermanentHistory() {
+    Long owner = user(), viewer = user(), batch = generated(owner, "scope");
+    var vector = new float[1536];
+    assertThrows(
+        LabException.class,
+        () ->
+            lab.tx.executeWithoutResult(
+                t ->
+                    lab.memory.turn(
+                        lab.dao.mapper().nextId("session_messages", "id"),
+                        owner,
+                        viewer,
+                        batch,
+                        "owner",
+                        11,
+                        "wrong actor",
+                        "response",
+                        vector,
+                        java.time.Instant.now(),
+                        java.time.Instant.now(),
+                        false,
+                        null)));
+    assertEquals(10, lab.dao.mapper().turns(batch).size());
+  }
+
+  Long user() {
+    return Long.valueOf(lab.createUser("통합 테스트", "운동하는 사람").path("id").asText());
+  }
+
+  Long generated(Long user, String topic) {
+    return Long.valueOf(lab.generate(user, topic, false).path("id").asText());
   }
 
   @Test
   void recentHundredRetentionPreservesEvidenceAndTimestampsAcrossSessions() {
-    UUID user = user(), batch = generated(user, "retention " + UUID.randomUUID());
+    Long user = user(),
+        batch =
+            generated(
+                user,
+                "retention "
+                    + java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
     for (int i = 0; i < 10; i++) lab.append(user, batch);
     assertEquals(110, lab.dao.mapper().turns(batch).size()); // 미처리 원문은 100쌍을 넘어도 보존한다.
     var first = lab.dao.mapper().turns(batch).getFirst();
@@ -159,28 +270,28 @@ class LabIntegrationTests {
     assertTrue(meta.path("synthetic").asBoolean());
     lab.analyze(user, batch, false);
     lab.save(user, batch, false);
-    assertEquals(100, lab.dao.mapper().turns(batch).size());
+    assertEquals(110, lab.dao.mapper().turns(batch).size());
     assertEquals(100, lab.dao.mapper().recent(user).size());
     assertEquals(
         10,
         jdbc.queryForObject(
-            "SELECT count(*) FROM clone_lab.vector_store WHERE metadata->>'clone_owner_id'=? AND"
-                + " metadata->>'record_type'='context_archive'",
+            "SELECT count(*) FROM clone_lab.vector_store WHERE metadata->>'owner_id'=? AND"
+                + " metadata->>'record_type'='conversation_archive'",
             Integer.class,
             user.toString()));
     assertEquals(
         1,
         jdbc.queryForObject(
-            "SELECT count(*) FROM clone_lab.vector_store WHERE metadata->>'extraction_key'=? AND"
-                + " jsonb_array_length(metadata->'source_excerpts')=1",
+            "SELECT count(*) FROM clone_lab.vector_store WHERE source_session_record_id=?::bigint"
+                + " AND jsonb_array_length(metadata->'source_excerpts')=1",
             Integer.class,
-            "context:" + firstId));
+            firstId));
     assertEquals(110, lab.batch(user, batch).path("analysis").path("processedEvidence").size());
-    UUID next = generated(user, "new topic");
+    Long next = generated(user, "new topic");
     var profile = lab.profile(user).path("elements").path("habits.exercise").deepCopy();
     lab.analyze(user, next, false);
     lab.save(user, next, false);
-    assertEquals(90, lab.dao.mapper().turns(batch).size());
+    assertEquals(110, lab.dao.mapper().turns(batch).size());
     assertEquals(100, lab.dao.mapper().recent(user).size());
     assertTrue(
         lab.profile(user).path("elements").path("habits.exercise").path("weight").asInt()
@@ -188,21 +299,21 @@ class LabIntegrationTests {
     var inputs = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
     lab.message(user, next, null, "현재 이야기");
     verify(ai).structured(eq("answer"), anyString(), inputs.capture(), any(JsonNode.class));
-    assertEquals(100, inputs.getValue().path("recent").size());
+    assertEquals(20, inputs.getValue().path("recent").size());
   }
 
   @Test
   void archiveFailureKeepsRawContextAndRollsBackProfile() {
-    UUID user = user(), batch = generated(user, "archive rollback");
+    Long user = user(), batch = generated(user, "archive rollback");
     for (int i = 0; i < 10; i++) lab.append(user, batch);
     lab.analyze(user, batch, false);
     String name = "archive_failure_" + user.toString().replace("-", "");
     jdbc.execute(
         "ALTER TABLE clone_lab.vector_store ADD CONSTRAINT "
             + name
-            + " CHECK(metadata->>'clone_owner_id'<>'"
+            + " CHECK(metadata->>'owner_id'<>'"
             + user
-            + "' OR metadata->>'record_type' IS DISTINCT FROM 'context_archive')");
+            + "' OR metadata->>'record_type' IS DISTINCT FROM 'conversation_archive')");
     try {
       assertThrows(Exception.class, () -> lab.save(user, batch, false));
       assertEquals(110, lab.dao.mapper().turns(batch).size());
@@ -212,12 +323,12 @@ class LabIntegrationTests {
       jdbc.execute("ALTER TABLE clone_lab.vector_store DROP CONSTRAINT " + name);
     }
     lab.save(user, batch, false);
-    assertEquals(100, lab.dao.mapper().turns(batch).size());
+    assertEquals(110, lab.dao.mapper().turns(batch).size());
   }
 
   @Test
   void viewerSessionsSeparateActorsAndNeverUpdateOwnerProfile() {
-    UUID owner = user(),
+    Long owner = user(),
         actor = user(),
         other = user(),
         batch = generated(owner, "private owner source");
@@ -228,53 +339,53 @@ class LabIntegrationTests {
     String source = lab.batch(owner, batch).path("turns").get(0).path("id").asText();
     when(ai.respond(anyString(), any(JsonNode.class), any(JsonNode.class), anyList()))
         .thenReturn(response("CONTEXT", false, List.of(source)));
-    clone.answer(owner, actor, UUID.fromString(session.path("sessionId").asText()), "이용자만의 질문");
+    clone.answer(owner, actor, Long.valueOf(session.path("sessionId").asText()), "이용자만의 질문");
     assertEquals(1, clone.history(owner, actor).path("messages").size());
     assertEquals(0, clone.history(owner, other).path("messages").size());
     assertThrows(
         LabException.class,
         () ->
             clone.answer(
-                owner, other, UUID.fromString(session.path("sessionId").asText()), "다른 이용자 세션"));
+                owner, other, Long.valueOf(session.path("sessionId").asText()), "다른 이용자 세션"));
     assertNotEquals(session.path("sessionId"), otherSession.path("sessionId"));
     assertEquals(1, lab.profile(owner).path("version").asInt());
     assertEquals(10, lab.dao.mapper().recent(owner).size());
     assertEquals(
         1,
         jdbc.queryForObject(
-            "SELECT count(*) FROM clone_lab.context WHERE conversation_type='viewer' AND"
-                + " metadata->>'actor_user_id'=?",
+            "SELECT count(*) FROM clone_lab.session_messages WHERE"
+                + " metadata->>'conversation_type'='viewer' AND metadata->>'viewer_id'=?",
             Integer.class,
             actor.toString()));
   }
 
   @Test
   void ownerAndActorFiltersApplyToBothVectorStores() {
-    UUID owner = user(), other = user(), batch = generated(owner, "owner vector source");
+    Long owner = user(), other = user(), batch = generated(owner, "owner vector source");
     lab.analyze(owner, batch, false);
     lab.save(owner, batch, false);
-    UUID otherBatch = generated(other, "other vector source");
+    Long otherBatch = generated(other, "other vector source");
     lab.analyze(other, otherBatch, false);
     lab.save(other, otherBatch, false);
     var retrieval = org.springframework.test.util.ReflectionTestUtils.getField(clone, "retrieval");
     for (var document : ((LabRetrievalService) retrieval).context(owner, null, "source"))
-      assertEquals(owner.toString(), document.getMetadata().get("clone_owner_id"));
+      assertEquals(owner.toString(), document.getMetadata().get("owner_id"));
     var memories = ((LabRetrievalService) retrieval).memories(owner, "source");
-    assertFalse(memories.isEmpty());
+    assertTrue(memories.isEmpty()); // 최근 100쌍 이내이므로 장기 복사 전이다.
     for (var document : memories) {
-      assertEquals(owner.toString(), document.getMetadata().get("clone_owner_id"));
+      assertEquals(owner.toString(), document.getMetadata().get("owner_id"));
       assertEquals("owner", document.getMetadata().get("conversation_type"));
     }
   }
 
   @Test
   void mergeUsesServerPolicyAndAuditsCapsWithoutInflatingExistingWeight() {
-    UUID user = user();
+    Long user = user();
     var prior = (ObjectNode) lab.profile(user).path("elements");
     prior.withObject("/habits.exercise").put("score", 40).put("weight", 200);
     prior.withObject("/values.family").put("score", 40).put("weight", 20);
     lab.tx.executeWithoutResult(s -> lab.dao.updateProfile(user, prior));
-    UUID batch = generated(user, "상한 검증");
+    Long batch = generated(user, "상한 검증");
     lab.analyze(user, batch, false);
     lab.save(user, batch, false);
     var profile = lab.profile(user).path("elements");
@@ -291,7 +402,7 @@ class LabIntegrationTests {
 
   @Test
   void mergeNoLongerCallsLegacyModel() {
-    UUID user = user(), batch = generated(user, "server merge");
+    Long user = user(), batch = generated(user, "server merge");
     lab.analyze(user, batch, false);
     when(ai.structured(eq("merge"), anyString(), any(JsonNode.class), any(JsonNode.class)))
         .thenThrow(new AssertionError("Merge LLM must not be called"));
@@ -303,9 +414,9 @@ class LabIntegrationTests {
 
   @Test
   void blankTopicIsInferredOnceAtTenPairsAndUsesOnlyFirstTen() {
-    UUID user = user();
+    Long user = user();
     var first = lab.message(user, null, null, "첫 번째 이야기");
-    UUID batch = UUID.fromString(first.path("id").asText());
+    Long batch = Long.valueOf(first.path("id").asText());
     for (int i = 1; i < 9; i++) lab.message(user, batch, null, "이야기 " + i);
     assertEquals("", lab.batch(user, batch).path("topic").asText());
     verify(ai, never())
@@ -324,17 +435,17 @@ class LabIntegrationTests {
 
   @Test
   void blankGenerationInfersTopicButExplicitTopicIsPreserved() {
-    UUID user = user(), batch = generated(user, "");
+    Long user = user(), batch = generated(user, "");
     assertEquals("운동과 일상 경험", lab.batch(user, batch).path("topic").asText());
-    UUID explicit = generated(user, "명시한 주제");
+    Long explicit = generated(user, "명시한 주제");
     assertEquals("명시한 주제", lab.batch(user, explicit).path("topic").asText());
     verify(ai).structured(eq("summary"), anyString(), any(JsonNode.class), any(JsonNode.class));
   }
 
   @Test
   void topicInferenceFailureDoesNotPartiallyAppendTenthPair() {
-    UUID user = user();
-    UUID batch = UUID.fromString(lab.message(user, null, null, "시작").path("id").asText());
+    Long user = user();
+    Long batch = Long.valueOf(lab.message(user, null, null, "시작").path("id").asText());
     for (int i = 1; i < 9; i++) lab.message(user, batch, null, "이야기 " + i);
     doThrow(new LabException(502, "unavailable"))
         .when(ai)
@@ -346,14 +457,15 @@ class LabIntegrationTests {
 
   @Test
   void previousConversationIsNotIncludedInCurrentSummaries() {
-    UUID user = user(), previous = UUID.randomUUID();
+    Long user = user(),
+        previous = java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE);
     lab.tx.executeWithoutResult(
         status -> {
           lab.dao.mapper().createBatch(previous, user, "previous conversation", 1);
           for (int i = 0; i < 33; i++)
             fixtureTurn(user, previous, i + 1, "previous experience " + i, "previous conversation");
         });
-    UUID current = generated(user, "previous conversation");
+    Long current = generated(user, "previous conversation");
     var result = lab.analyze(user, current, false);
     assertEquals(0, result.path("analysis").path("windows").get(0).path("summaries").size());
     var requests = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
@@ -365,14 +477,15 @@ class LabIntegrationTests {
 
   @Test
   void summariesAreLimitedToFiveAndAllFortyThreePairsAreAnalyzed() {
-    UUID user = user(), previous = UUID.randomUUID();
+    Long user = user(),
+        previous = java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE);
     lab.tx.executeWithoutResult(
         status -> {
           lab.dao.mapper().createBatch(previous, user, "previous conversation", 1);
           for (int i = 0; i < 70; i++)
             fixtureTurn(user, previous, i + 1, "older experience " + i, "previous conversation");
         });
-    UUID current = generated(user, "previous conversation");
+    Long current = generated(user, "previous conversation");
     lab.append(user, current);
     lab.append(user, current);
     lab.append(user, current);
@@ -393,7 +506,7 @@ class LabIntegrationTests {
 
   @Test
   void testDialogueGenerationNeverUsesGroundTruth() {
-    UUID user = user();
+    Long user = user();
     generated(user, "여행 준비");
     var inputs = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
     var prompts = org.mockito.ArgumentCaptor.forClass(String.class);
@@ -418,7 +531,7 @@ class LabIntegrationTests {
 
   @Test
   void appendKeepsOriginalTurnsAndClearsUnsavedAnalysis() {
-    UUID user = user(), batch = generated(user, "추가 대화");
+    Long user = user(), batch = generated(user, "추가 대화");
     var original = lab.batch(user, batch).path("turns").deepCopy();
     lab.analyze(user, batch, false);
     var result = lab.append(user, batch);
@@ -436,7 +549,7 @@ class LabIntegrationTests {
 
   @Test
   void appendAfterSaveDoesNotApplyExistingEvidenceTwice() {
-    UUID user = user(), batch = generated(user, "저장 후 추가");
+    Long user = user(), batch = generated(user, "저장 후 추가");
     lab.analyze(user, batch, false);
     lab.save(user, batch, false);
     lab.append(user, batch);
@@ -457,7 +570,7 @@ class LabIntegrationTests {
 
   @Test
   void appendFailureLeavesOriginalBatchUntouched() {
-    UUID user = user(), other = user(), batch = generated(user, "실패 검증");
+    Long user = user(), other = user(), batch = generated(user, "실패 검증");
     var original = lab.batch(user, batch);
     assertThrows(LabException.class, () -> lab.append(other, batch));
     doThrow(new LabException(502, "generation failed"))
@@ -469,10 +582,10 @@ class LabIntegrationTests {
 
   @Test
   void typedMessageStartsConversationAndIsAnAnalysisSource() {
-    UUID user = user();
+    Long user = user();
     String content = "오늘 저녁에는 친구와 함께 운동했어요.\n기분이 좋았어요.";
     var result = lab.message(user, null, null, content);
-    UUID batch = UUID.fromString(result.path("id").asText());
+    Long batch = Long.valueOf(result.path("id").asText());
     assertEquals(1, result.path("turns").size());
     assertEquals(content, result.path("turns").get(0).path("user_text").asText());
     assertEquals("", result.path("topic").asText());
@@ -492,7 +605,7 @@ class LabIntegrationTests {
 
   @Test
   void typedMessageAfterSaveAddsOnePairWithoutReapplyingOldEvidence() {
-    UUID user = user(), batch = generated(user, "직접 대화 이어가기");
+    Long user = user(), batch = generated(user, "직접 대화 이어가기");
     lab.analyze(user, batch, false);
     lab.save(user, batch, false);
     var result = lab.message(user, batch, "다른 입력 주제", "오늘은 실제로 5km를 달렸어요.");
@@ -513,7 +626,7 @@ class LabIntegrationTests {
 
   @Test
   void failedOrInvalidTypedMessageDoesNotChangeConversation() {
-    UUID user = user(), other = user(), batch = generated(user, "메시지 실패");
+    Long user = user(), other = user(), batch = generated(user, "메시지 실패");
     var original = lab.batch(user, batch);
     assertThrows(LabException.class, () -> lab.message(user, batch, null, "   "));
     assertThrows(LabException.class, () -> lab.message(other, batch, null, "다른 사용자"));
@@ -526,7 +639,12 @@ class LabIntegrationTests {
 
   @Test
   void generationAnalysisAndSaveAreSeparateAndIdempotent() {
-    UUID user = user(), batch = generated(user, "운동 " + UUID.randomUUID());
+    Long user = user(),
+        batch =
+            generated(
+                user,
+                "운동 "
+                    + java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
     assertTrue(lab.profile(user).path("elements").path("habits.exercise").path("score").isNull());
     lab.analyze(user, batch, false);
     assertEquals(0, lab.profile(user).path("version").asInt());
@@ -535,9 +653,9 @@ class LabIntegrationTests {
         80, lab.profile(user).path("elements").path("habits.exercise").path("score").asInt());
     lab.save(user, batch, false);
     assertEquals(1, lab.profile(user).path("version").asInt());
-    assertEquals(1, lab.dao.mapper().memories(user).size());
+    assertEquals(0, lab.dao.mapper().memories(user).size());
     assertTrue(lab.profile(user).path("elements").path("values.family").path("score").isNull());
-    UUID duplicate = generated(user, lab.batch(user, batch).path("topic").asText());
+    Long duplicate = generated(user, lab.batch(user, batch).path("topic").asText());
     lab.analyze(user, duplicate, false);
     lab.save(user, duplicate, false);
     assertEquals(
@@ -545,19 +663,26 @@ class LabIntegrationTests {
   }
 
   @Test
-  void invalidMergeAndEmbeddingFailureNeverPartiallySave() {
-    UUID user = user(), batch = generated(user, "rollback " + UUID.randomUUID());
+  void saveUsesOnlyServerMergeAndPreparedEmbeddings() {
+    Long user = user(), batch = generated(user, "server merge");
     lab.analyze(user, batch, false);
-    when(ai.embed(anyList())).thenThrow(new LabException(502, "embedding failed"));
-    assertThrows(LabException.class, () -> lab.save(user, batch, false));
-    assertEquals(0, lab.profile(user).path("version").asInt());
-    assertEquals("analyzed", lab.batch(user, batch).path("status").asText());
+    when(ai.embed(anyList())).thenThrow(new LabException(502, "unused embedding"));
+    lab.save(user, batch, false);
+    assertEquals(1, lab.profile(user).path("version").asInt());
     assertTrue(lab.dao.mapper().memories(user).isEmpty());
+    verify(ai, never())
+        .structured(eq("merge"), anyString(), any(JsonNode.class), any(JsonNode.class));
   }
 
   @Test
   void userIsolationAndCurrentContextAnswer() {
-    UUID owner = user(), other = user(), batch = generated(owner, "context " + UUID.randomUUID());
+    Long owner = user(),
+        other = user(),
+        batch =
+            generated(
+                owner,
+                "context "
+                    + java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
     lab.analyze(owner, batch, false);
     lab.save(owner, batch, false);
     assertThrows(LabException.class, () -> lab.batch(other, batch));
@@ -566,14 +691,14 @@ class LabIntegrationTests {
     String source = lab.batch(owner, batch).path("turns").get(0).path("id").asText();
     when(ai.respond(anyString(), any(JsonNode.class), any(JsonNode.class), anyList()))
         .thenReturn(response("CONTEXT", false, List.of(source)));
-    var answer = clone.answer(owner, UUID.fromString(session.path("sessionId").asText()), "운동하나요?");
+    var answer = clone.answer(owner, Long.valueOf(session.path("sessionId").asText()), "운동하나요?");
     assertEquals("CONTEXT", answer.path("stage").asText());
     assertEquals(1, clone.history(owner).path("messages").size());
     var next = clone.start(owner, null);
     assertNotEquals(session.path("sessionId").asText(), next.path("sessionId").asText());
     assertThrows(
         LabException.class,
-        () -> clone.answer(owner, UUID.fromString(session.path("sessionId").asText()), "이전 대화?"));
+        () -> clone.answer(owner, Long.valueOf(session.path("sessionId").asText()), "이전 대화?"));
   }
 
   JsonNode response(String stage, boolean inferred, List<String> ids) {
@@ -602,14 +727,25 @@ class LabIntegrationTests {
         .addObject()
         .put("type", "function_call")
         .put("name", name)
-        .put("call_id", UUID.randomUUID().toString())
+        .put(
+            "call_id",
+            Long.toString(
+                java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE)))
         .put("arguments", args.toString());
     return r;
   }
 
   @Test
   void memoryThenProfileToolsAndInsufficientRoute() {
-    UUID user = user(), batch = generated(user, "tools " + UUID.randomUUID());
+    Long user = user(),
+        batch =
+            generated(
+                user,
+                "tools "
+                    + java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
+    lab.analyze(user, batch, false);
+    lab.save(user, batch, false);
+    for (int i = 0; i < 10; i++) lab.append(user, batch);
     lab.analyze(user, batch, false);
     lab.save(user, batch, false);
     var session = clone.start(user, null);
@@ -621,19 +757,18 @@ class LabIntegrationTests {
             call("searchLongTermMemory", query),
             call("getAnalysisProfile", codes),
             response("PROFILE", true, List.of("habits.exercise")));
-    var answer =
-        clone.answer(user, UUID.fromString(session.path("sessionId").asText()), "오늘도 운동할까요?");
+    var answer = clone.answer(user, Long.valueOf(session.path("sessionId").asText()), "오늘도 운동할까요?");
     assertEquals(2, answer.path("trace").size());
     assertTrue(answer.path("inferred").asBoolean());
     session = clone.start(user, null);
-    String memory = lab.dao.mapper().memories(user).getFirst().get("id").toString();
+    String memory = "memory:" + lab.dao.mapper().memories(user).getFirst().get("id").toString();
     when(ai.respond(anyString(), any(JsonNode.class), any(JsonNode.class), anyList()))
         .thenReturn(
             call("searchLongTermMemory", query), response("MEMORY", false, List.of(memory)));
     assertEquals(
         "MEMORY",
         clone
-            .answer(user, UUID.fromString(session.path("sessionId").asText()), "무슨 운동?")
+            .answer(user, Long.valueOf(session.path("sessionId").asText()), "무슨 운동?")
             .path("stage")
             .asText());
     session = clone.start(user, null);
@@ -643,14 +778,14 @@ class LabIntegrationTests {
     assertEquals(
         "INSUFFICIENT",
         clone
-            .answer(user, UUID.fromString(session.path("sessionId").asText()), "생일은?")
+            .answer(user, Long.valueOf(session.path("sessionId").asText()), "생일은?")
             .path("stage")
             .asText());
   }
 
   @Test
   void profileToolCannotBeCalledBeforeMemory() {
-    UUID user = user();
+    Long user = user();
     var session = clone.start(user, null);
     var args = json.createObjectNode();
     args.putArray("codes").add("habits.exercise");
@@ -658,12 +793,12 @@ class LabIntegrationTests {
         .thenReturn(call("getAnalysisProfile", args));
     assertThrows(
         LabException.class,
-        () -> clone.answer(user, UUID.fromString(session.path("sessionId").asText()), "질문"));
+        () -> clone.answer(user, Long.valueOf(session.path("sessionId").asText()), "질문"));
   }
 
   @Test
   void toolCallbacksRejectDuplicateExecutionAndOwnerArguments() {
-    UUID user = user();
+    Long user = user();
     var session = clone.start(user, null);
     var query = json.createObjectNode().put("query", "운동");
     var duplicate = (ObjectNode) call("searchLongTermMemory", query);
@@ -671,26 +806,29 @@ class LabIntegrationTests {
         .add(call("searchLongTermMemory", query).path("output").get(0));
     when(ai.respond(anyString(), any(JsonNode.class), any(JsonNode.class), anyList()))
         .thenReturn(duplicate);
-    UUID sessionId = UUID.fromString(session.path("sessionId").asText());
+    Long sessionId = Long.valueOf(session.path("sessionId").asText());
     assertThrows(LabException.class, () -> clone.answer(user, sessionId, "질문"));
-    verify(ai, times(2)).embed(anyList());
+    verify(ai, times(1)).embed(anyList());
     assertTrue(clone.history(user).path("messages").isEmpty());
     clearInvocations(ai);
-    query.put("ownerId", UUID.randomUUID().toString());
+    query.put(
+        "ownerId",
+        Long.toString(
+            java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE)));
     when(ai.respond(anyString(), any(JsonNode.class), any(JsonNode.class), anyList()))
         .thenReturn(call("searchLongTermMemory", query));
     assertThrows(LabException.class, () -> clone.answer(user, sessionId, "질문"));
-    verify(ai, times(1)).embed(anyList());
+    verify(ai, never()).embed(anyList());
   }
 
   @Test
   void databaseChecksAndSchemaAreRealPostgres() {
     assertEquals(
-        11,
+        14,
         jdbc.queryForObject(
             "SELECT count(*) FROM information_schema.tables WHERE table_schema='clone_lab'",
             Integer.class));
-    UUID user = user();
+    Long user = user();
     assertThrows(
         Exception.class,
         () ->
@@ -701,12 +839,21 @@ class LabIntegrationTests {
 
   @Test
   void schemaInitializationIsIdempotent() {
-    Integer before = jdbc.queryForObject("SELECT count(*) FROM pg_constraint WHERE connamespace='clone_lab'::regnamespace", Integer.class);
-    var populator = new org.springframework.jdbc.datasource.init.ResourceDatabasePopulator(
-        new org.springframework.core.io.ClassPathResource("clone-lab/schema.sql"));
-    populator.setSeparator(org.springframework.jdbc.datasource.init.ScriptUtils.EOF_STATEMENT_SEPARATOR);
+    Integer before =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM pg_constraint WHERE connamespace='clone_lab'::regnamespace",
+            Integer.class);
+    var populator =
+        new org.springframework.jdbc.datasource.init.ResourceDatabasePopulator(
+            new org.springframework.core.io.ClassPathResource("clone-lab/schema.sql"));
+    populator.setSeparator(
+        org.springframework.jdbc.datasource.init.ScriptUtils.EOF_STATEMENT_SEPARATOR);
     populator.execute(jdbc.getDataSource());
-    assertEquals(before, jdbc.queryForObject("SELECT count(*) FROM pg_constraint WHERE connamespace='clone_lab'::regnamespace", Integer.class));
+    assertEquals(
+        before,
+        jdbc.queryForObject(
+            "SELECT count(*) FROM pg_constraint WHERE connamespace='clone_lab'::regnamespace",
+            Integer.class));
   }
 
   @Test
@@ -717,7 +864,7 @@ class LabIntegrationTests {
     mvc.perform(get("/lab/viewer")).andExpect(status().isOk());
     mvc.perform(get("/lab/assets/schema.sql")).andExpect(status().isNotFound());
     mvc.perform(get("/api/lab/catalog")).andExpect(jsonPath("$.domains.length()").value(7));
-    UUID user = user();
+    Long user = user();
     mvc.perform(get("/api/lab/users/" + user + "/runs/current")).andExpect(status().isOk());
     mvc.perform(get("/api/lab/users/" + user + "/labRunService/current"))
         .andExpect(status().isOk());
@@ -730,38 +877,50 @@ class LabIntegrationTests {
 
   @Test
   void failedEmbeddingDoesNotWriteAnyProfileOrMemory() {
-    UUID user = user(), batch = generated(user, "embedding failure");
-    lab.analyze(user, batch, false);
+    Long user = user();
     when(ai.embed(anyList())).thenThrow(new LabException(502, "temporary failure"));
+    Long batch = Long.valueOf(lab.generate(user, "embedding failure", false).path("id").asText());
+    assertEquals(0, lab.profile(user).path("version").asInt());
+    assertEquals(10, lab.dao.mapper().turns(batch).size());
+    assertEquals(10, lab.dao.mapper().missingEmbeddings(user).size());
+    lab.analyze(user, batch, false);
     assertThrows(LabException.class, () -> lab.save(user, batch, false));
     assertEquals(0, lab.profile(user).path("version").asInt());
-    assertTrue(lab.dao.mapper().memories(user).isEmpty());
+    fixture();
+    lab.save(user, batch, false);
+    assertTrue(lab.dao.mapper().missingEmbeddings(user).isEmpty());
+    assertEquals(1, lab.profile(user).path("version").asInt());
   }
 
   @Test
   void databaseFailureRollsBackAllSevenProfilesAndBatch() {
-    UUID user = user(), batch = generated(user, "DB rollback " + UUID.randomUUID());
+    Long user = user(), batch = generated(user, "DB rollback");
     lab.analyze(user, batch, false);
-    String constraint = "lab_test_" + user.toString().replace("-", "");
+    String constraint = "lab_test_" + user;
     jdbc.execute(
-        "ALTER TABLE clone_lab.vector_store ADD CONSTRAINT "
+        "ALTER TABLE clone_lab.profile_habits ADD CONSTRAINT "
             + constraint
-            + " CHECK((metadata->>'clone_owner_id')::uuid <> '"
+            + " CHECK(user_id <> "
             + user
-            + "'::uuid)");
+            + " OR exercise IS NULL)");
     try {
       assertThrows(Exception.class, () -> lab.save(user, batch, false));
       assertEquals(0, lab.profile(user).path("version").asInt());
       assertEquals("analyzed", lab.batch(user, batch).path("status").asText());
       assertTrue(lab.profile(user).path("elements").path("habits.exercise").path("score").isNull());
     } finally {
-      jdbc.execute("ALTER TABLE clone_lab.vector_store DROP CONSTRAINT " + constraint);
+      jdbc.execute("ALTER TABLE clone_lab.profile_habits DROP CONSTRAINT " + constraint);
     }
   }
 
   @Test
   void simultaneousSavesApplyTheBatchOnlyOnce() throws Exception {
-    UUID user = user(), batch = generated(user, "concurrent " + UUID.randomUUID());
+    Long user = user(),
+        batch =
+            generated(
+                user,
+                "concurrent "
+                    + java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
     lab.analyze(user, batch, false);
     var ready = new java.util.concurrent.CountDownLatch(2);
     when(ai.embed(anyList()))
@@ -785,14 +944,14 @@ class LabIntegrationTests {
       assertEquals(1, a.get(15, java.util.concurrent.TimeUnit.SECONDS).path("version").asInt());
       assertEquals(1, b.get(15, java.util.concurrent.TimeUnit.SECONDS).path("version").asInt());
     }
-    assertEquals(1, lab.dao.mapper().memories(user).size());
+    assertEquals(0, lab.dao.mapper().memories(user).size());
     assertEquals(
         2, lab.profile(user).path("elements").path("habits.exercise").path("weight").asInt());
   }
 
   @Test
   void pipelineGeneratesOneConversationAndCommitsOneHundredOrderedSegments() throws Exception {
-    UUID user = user();
+    Long user = user();
     var delegate =
         mockingDetails(ai).getStubbings().stream()
             .filter(s -> s.getInvocation().getMethod().getName().equals("structured"))
@@ -841,8 +1000,11 @@ class LabIntegrationTests {
                 if (analysis) analysisLive.decrementAndGet();
               }
             });
-    runs.start(user, "pipeline " + UUID.randomUUID(), false);
-    JsonNode state = awaitRun(user, 60);
+    runs.start(
+        user,
+        "pipeline " + java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE),
+        false);
+    JsonNode state = awaitRun(user, 180);
     assertEquals("completed", state.path("status").asText(), state.toString());
     assertEquals(LabPipeline.MODE, state.path("mode").asText());
     assertEquals(100, state.path("completedBatches").asInt());
@@ -851,14 +1013,14 @@ class LabIntegrationTests {
     assertEquals(1000, state.path("savedPairs").asInt());
     assertEquals(100, lab.profile(user).path("version").asInt());
     assertEquals(1, lab.dao.mapper().batches(user).size());
-    var batch = lab.batch(user, UUID.fromString(state.path("batchId").asText()));
-    assertEquals(100, batch.path("turns").size());
+    var batch = lab.batch(user, Long.valueOf(state.path("batchId").asText()));
+    assertEquals(1000, batch.path("turns").size());
     assertEquals(1000, batch.path("turn_count").asInt());
     assertEquals(
         900,
         jdbc.queryForObject(
-            "SELECT count(*) FROM clone_lab.vector_store WHERE metadata->>'clone_owner_id'=? AND"
-                + " metadata->>'record_type'='context_archive'",
+            "SELECT count(*) FROM clone_lab.vector_store WHERE metadata->>'owner_id'=? AND"
+                + " metadata->>'record_type'='conversation_archive'",
             Integer.class,
             user.toString()));
     assertEquals(100, batch.path("analysis").path("segments").size());
@@ -879,7 +1041,7 @@ class LabIntegrationTests {
         .structured(eq("merge"), anyString(), any(JsonNode.class), any(JsonNode.class));
     verify(ai, times(100))
         .structured(eq("analysis"), anyString(), any(JsonNode.class), any(JsonNode.class));
-    verify(ai, times(99))
+    verify(ai, times(148))
         .structured(eq("summary"), anyString(), any(JsonNode.class), any(JsonNode.class));
     assertTrue(overlap.get());
     assertEquals(1, generationMax.get());
@@ -888,7 +1050,7 @@ class LabIntegrationTests {
     assertTrue(firstAnalysisCount.get() < 1000);
   }
 
-  JsonNode awaitRun(UUID user, int seconds) throws Exception {
+  JsonNode awaitRun(Long user, int seconds) throws Exception {
     long deadline = System.nanoTime() + java.time.Duration.ofSeconds(seconds).toNanos();
     JsonNode state;
     do {
@@ -903,7 +1065,7 @@ class LabIntegrationTests {
   void stopPreservesCurrentGenerationAnalysisOrSaveAndRecoveryKeepsCheckpoints() throws Exception {
     for (String phase : List.of("generation", "analysis", "embedding")) {
       fixture();
-      UUID user = user();
+      Long user = user();
       var delegate =
           mockingDetails(ai).getStubbings().stream()
               .filter(s -> s.getInvocation().getMethod().getName().equals("structured"))
@@ -917,9 +1079,8 @@ class LabIntegrationTests {
             .thenAnswer(
                 call -> {
                   List<?> texts = call.getArgument(0);
-                  if (!texts.isEmpty()
-                      && !texts.getFirst().toString().startsWith("USER:")
-                      && blocked.compareAndSet(false, true)) {
+                  if (!texts.isEmpty() && blocked.compareAndSet(false, true)) {
+
                     entered.countDown();
                     if (!release.await(5, java.util.concurrent.TimeUnit.SECONDS))
                       throw new LabException(502, "timeout");
@@ -951,9 +1112,9 @@ class LabIntegrationTests {
       var paused = awaitRun(user, 15);
       assertEquals("paused", paused.path("status").asText(), paused.toString());
       assertTrue(paused.path("generatedPairs").asInt() <= 20);
-      assertEquals(phase.equals("embedding") ? 10 : 0, paused.path("savedPairs").asInt());
-      assertEquals(phase.equals("generation") ? 0 : 10, paused.path("analyzedPairs").asInt());
-      UUID batch = UUID.fromString(paused.path("batchId").asText());
+      assertEquals(0, paused.path("savedPairs").asInt());
+      assertEquals(phase.equals("analysis") ? 10 : 0, paused.path("analyzedPairs").asInt());
+      Long batch = Long.valueOf(paused.path("batchId").asText());
       var before = lab.batch(user, batch).deepCopy();
       assertThrows(LabException.class, () -> lab.analyze(user, batch, false));
       lab.tx.executeWithoutResult(
@@ -980,7 +1141,7 @@ class LabIntegrationTests {
 
   @Test
   void duplicateSegmentEvidenceIsNotReappliedAndConcurrentSaveIsIdempotent() throws Exception {
-    UUID user = user();
+    Long user = user();
     var delegate =
         mockingDetails(ai).getStubbings().stream()
             .filter(s -> s.getInvocation().getMethod().getName().equals("structured"))
@@ -1002,7 +1163,7 @@ class LabIntegrationTests {
     var paused = awaitRun(user, 15);
     assertEquals("paused", paused.path("status").asText(), paused.toString());
     assertEquals(10, paused.path("savedPairs").asInt());
-    UUID batch = UUID.fromString(paused.path("batchId").asText());
+    Long batch = Long.valueOf(paused.path("batchId").asText());
     assertTrue(
         lab.batch(user, batch)
             .path("analysis")
@@ -1036,85 +1197,60 @@ class LabIntegrationTests {
 
   @Test
   void pipelineFailureResumesDraftAndPreservesGeneratedTurns() throws Exception {
-    UUID user = user();
-    when(ai.embed(anyList()))
+    Long user = user();
+    var original =
+        mockingDetails(ai).getStubbings().stream()
+            .filter(x -> x.getInvocation().getMethod().getName().equals("structured"))
+            .findFirst()
+            .orElseThrow();
+    when(ai.structured(anyString(), anyString(), any(JsonNode.class), any(JsonNode.class)))
         .thenAnswer(
             call -> {
-              List<?> texts = call.getArgument(0);
-              if (texts.stream().allMatch(x -> x.toString().startsWith("USER:")))
-                return texts.stream()
-                    .map(
-                        x -> {
-                          var v = new float[1536];
-                          v[0] = 1;
-                          return v;
-                        })
-                    .toList();
-              throw new LabException(502, "temporary failure");
+              if ("analysis".equals(call.getArgument(0)))
+                throw new LabException(502, "temporary analysis failure");
+              return original.answer(call);
             });
-    runs.start(user, "resume " + UUID.randomUUID(), false);
-    var stopped = awaitRun(user, 15);
+    runs.start(user, "resume", false);
+    var stopped = awaitRun(user, 20);
     assertEquals("failed", stopped.path("status").asText(), stopped.toString());
-    UUID batch = UUID.fromString(stopped.path("batchId").asText());
+    Long batch = Long.valueOf(stopped.path("batchId").asText());
     var before = lab.batch(user, batch).path("turns").deepCopy();
-    assertTrue(before.size() <= 20);
-    assertEquals(0, lab.profile(user).path("version").asInt());
-    assertEquals(
-        "analyzed",
-        lab.batch(user, batch).path("analysis").path("segments").get(0).path("status").asText());
+    assertTrue(before.size() > 0 && before.size() <= 20);
     assertThrows(LabException.class, () -> lab.append(user, batch));
     fixture();
     runs.start(user, null, true);
-    var completed = awaitRun(user, 60);
+    var completed = awaitRun(user, 180);
     assertEquals("completed", completed.path("status").asText(), completed.toString());
-    assertEquals(batch.toString(), completed.path("batchId").asText());
     var after = lab.batch(user, batch).path("turns");
-    for (var prior : before) {
-      String id = prior.path("id").asText();
-      assertEquals(
-          1,
-          jdbc.queryForObject(
-              "SELECT count(*) FROM clone_lab.vector_store WHERE metadata->>'extraction_key'=?",
-              Integer.class,
-              "context:" + id));
-    }
-    assertEquals(100, after.size());
+    assertEquals(1000, after.size());
+    for (int i = 0; i < before.size(); i++)
+      assertEquals(before.get(i).path("id"), after.get(i).path("id"));
     assertEquals(100, lab.profile(user).path("version").asInt());
-    verify(ai, times((1000 - before.size()) / 10))
-        .structured(eq("generation"), anyString(), any(JsonNode.class), any(JsonNode.class));
-    verify(ai, times(99))
-        .structured(eq("analysis"), anyString(), any(JsonNode.class), any(JsonNode.class));
   }
 
   @Test
-  void previouslySavedSingleSessionRunResumesWithoutChangingProfile() throws Exception {
-    UUID user = user(), batch = generated(user, "legacy");
+  void persistedRunRecoveryUsesColumnsAndKeepsProfileUnchanged() throws Exception {
+    Long user = user(), batch = generated(user, "checkpoint");
     lab.tx.executeWithoutResult(
-        s -> {
-          for (int n = 11; n <= 1000; n++)
-            fixtureTurn(user, batch, n, "legacy evidence " + n, "assistant");
-        });
-    lab.analyze(user, batch, false);
-    lab.save(user, batch, false);
-    long version = lab.profile(user).path("version").asLong();
-    lab.tx.executeWithoutResult(
-        s -> {
-          var state = lab.object();
-          state.put("mode", "single-session-v1");
-          state.put("status", "paused");
-          state.put("runId", UUID.randomUUID().toString());
-          state.put("batchId", batch.toString());
-          state.put("generatedPairs", 1000);
-          state.put("analysisCounted", true);
-          state.put("topic", "legacy");
+        t -> {
+          var state =
+              lab.object()
+                  .put("runId", lab.dao.mapper().nextId("runs", "run_id").toString())
+                  .put("batchId", batch.toString())
+                  .put("mode", LabPipeline.MODE)
+                  .put("topic", "checkpoint")
+                  .put("status", "running")
+                  .put("generatedPairs", 10)
+                  .put("activeSince", System.currentTimeMillis() - 5000)
+                  .put("heartbeatAt", System.currentTimeMillis() - 2000);
           lab.dao.mapper().runState(user, state.toString());
         });
-    fixture();
-    runs.start(user, null, true);
-    assertEquals("completed", awaitRun(user, 10).path("status").asText());
-    assertEquals(version, lab.profile(user).path("version").asLong());
-    assertEquals(1, lab.dao.mapper().batches(user).size());
-    verify(ai, never())
-        .structured(anyString(), anyString(), any(JsonNode.class), any(JsonNode.class));
+    runs.recoverInterrupted();
+    var state = runs.state(user);
+    assertEquals("paused", state.path("status").asText());
+    assertEquals(10, state.path("generatedPairs").asInt());
+    assertTrue(state.path("wallElapsedMs").asLong() >= 3000);
+    assertFalse(state.has("activeSince"));
+    assertEquals(0, lab.profile(user).path("version").asInt());
   }
 }

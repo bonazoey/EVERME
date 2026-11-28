@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
+// 페이지 라우팅 컨트롤러임. 나중에 migration할 때 HomeController.java에 넣으면 됨
 @RestController
 @Profile("clone-lab")
 public class LabPageController {

@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -38,6 +37,7 @@ public class LabService {
   private final LabAi ai;
   private final LabValidation validation;
   final LabMemoryService memory;
+  final LabContextService contexts;
 
   // ##### 생성자 #####
   public LabService(
@@ -48,7 +48,8 @@ public class LabService {
       LabSchemas schemas,
       LabAi ai,
       LabValidation validation,
-      LabMemoryService memory) {
+      LabMemoryService memory,
+      LabContextService contexts) {
     this.dao = dao;
     this.json = json;
     this.tx = tx;
@@ -57,6 +58,7 @@ public class LabService {
     this.ai = ai;
     this.validation = validation;
     this.memory = memory;
+    this.contexts = contexts;
   }
 
   ObjectNode object() {
@@ -83,7 +85,7 @@ public class LabService {
   }
 
   // ##### 분석 프로필을 조회하는 메소드 #####
-  public JsonNode profile(UUID user) {
+  public JsonNode profile(Long user) {
     return tx.execute(
         s -> {
           Map<String, Object> row = dao.mapper().lockUser(user);
@@ -115,7 +117,7 @@ public class LabService {
     for (String code : catalog.codes()) {
       LabValidation.score(persona.path("scores").path(code));
     }
-    UUID id = UUID.randomUUID();
+    Long id = dao.mapper().nextId("users", "id");
     tx.executeWithoutResult(
         s -> {
           dao.mapper().createUser(id, name, persona.toString());
@@ -152,22 +154,22 @@ public class LabService {
   }
 
   // ##### 테스트 대화 10쌍을 생성하는 메소드 #####
-  public JsonNode generate(UUID user, String topic, boolean automatic) {
+  public JsonNode generate(Long user, String topic, boolean automatic) {
     return generate(user, topic, automatic, null);
   }
 
   // ##### 같은 주제의 대화를 추가하는 메소드 #####
-  public JsonNode append(UUID user, UUID batch) {
+  public JsonNode append(Long user, Long batch) {
     return generate(user, dao.requireBatch(user, batch).get("topic").toString(), false, batch);
   }
 
   // ##### 자동 실행 대화를 추가하는 메소드 #####
-  JsonNode appendAutomatic(UUID user, UUID batch) {
+  JsonNode appendAutomatic(Long user, Long batch) {
     return generate(user, dao.requireBatch(user, batch).get("topic").toString(), true, batch);
   }
 
   // ##### 테스트 대화 10쌍을 생성하는 메소드 #####
-  private JsonNode generate(UUID user, String topic, boolean automatic, UUID existing) {
+  private JsonNode generate(Long user, String topic, boolean automatic, Long existing) {
     try (LabTiming timing = new LabTiming("dialogue.generate")) {
       java.time.Instant receivedAt = java.time.Instant.now();
       topic = topic == null ? "" : topic.strip();
@@ -184,14 +186,7 @@ public class LabService {
       ObjectNode input = object();
       input.put("topic", topic);
       input.put("continuation", existing != null);
-      ArrayNode recent = json.createArrayNode();
-      if (existing != null) {
-        for (Map<String, Object> t : dao.mapper().recent(user)) {
-          recent.add(
-              tree(Map.of("user", t.get("user_text"), "assistant", t.get("assistant_text"))));
-        }
-      }
-      input.set("recent", recent);
+      if (existing != null) input.setAll(contexts.prepare(existing));
       timing.mark("load_db_and_prepare_input");
       Result result = ai.structured("generation", LabPrompts.GENERATION, input, schemas.turns());
       timing.mark("generate_llm");
@@ -204,7 +199,7 @@ public class LabService {
         LabValidation.text(t.path("assistant").asText(), 8000, "AI 응답");
       }
       timing.mark("validate_turns");
-      UUID batch =
+      Long batch =
           storeTurns(
               user,
               topic,
@@ -227,7 +222,7 @@ public class LabService {
   }
 
   // ##### 사용자 직접 입력을 처리하는 메소드 #####
-  public JsonNode message(UUID user, UUID existing, String requestedTopic, String content) {
+  public JsonNode message(Long user, Long existing, String requestedTopic, String content) {
     try (LabTiming timing = new LabTiming("dialogue.message")) {
       java.time.Instant receivedAt = java.time.Instant.now();
       LabValidation.text(content, 8000, "메시지");
@@ -245,10 +240,7 @@ public class LabService {
       ObjectNode input = object();
       input.put("topic", topic);
       input.put("content", content);
-      ArrayNode recent = input.putArray("recent");
-      for (Map<String, Object> t : dao.mapper().recent(user)) {
-        recent.add(tree(Map.of("user", t.get("user_text"), "assistant", t.get("assistant_text"))));
-      }
+      if (existing != null) input.setAll(contexts.prepare(existing));
       timing.mark("load_db_and_prepare_input");
       Result result =
           ai.structured(
@@ -262,7 +254,7 @@ public class LabService {
       ArrayNode turns = json.createArrayNode();
       turns.addObject().put("user", content).put("assistant", reply);
       timing.mark("validate_turns");
-      UUID batch =
+      Long batch =
           storeTurns(
               user,
               topic,
@@ -284,11 +276,11 @@ public class LabService {
     }
   }
 
-  private UUID storeTurns(
-      UUID user,
+  private Long storeTurns(
+      Long user,
       String topic,
       boolean automatic,
-      UUID existing,
+      Long existing,
       Map<String, Object> target,
       List<Map<String, Object>> original,
       JsonNode turns,
@@ -324,17 +316,26 @@ public class LabService {
         LabValidation.text(resolvedTopic, 80, "자동 확정 주제");
       }
       timing.mark("infer_topic_if_required");
-      List<float[]> turnVectors =
-          ai.embed(
-              java.util.stream.StreamSupport.stream(turns.spliterator(), false)
-                  .map(
-                      t ->
-                          LabMemoryService.content(
-                              t.path("user").asText(), t.path("assistant").asText()))
-                  .toList());
+      List<float[]> preparedVectors;
+      try {
+        preparedVectors =
+            ai.embed(
+                java.util.stream.StreamSupport.stream(turns.spliterator(), false)
+                    .map(t -> t.path("user").asText())
+                    .toList());
+      } catch (LabException failure) {
+        org.slf4j.LoggerFactory.getLogger(LabService.class)
+            .warn(
+                "lab_embedding_deferred ownerId={} pairCount={} reason={}",
+                user,
+                turns.size(),
+                failure.getMessage());
+        preparedVectors = new ArrayList<>(java.util.Collections.nCopies(turns.size(), null));
+      }
+      final List<float[]> turnVectors = preparedVectors;
       if (turnVectors.size() != turns.size()) throw LabException.invalid("대화 임베딩 개수가 다릅니다.");
       final String storedTopic = resolvedTopic;
-      UUID batch = existing == null ? UUID.randomUUID() : existing;
+      Long batch = existing == null ? dao.mapper().nextId("sessions", "session_id") : existing;
       tx.executeWithoutResult(
           s -> {
             Map<String, Object> current = dao.mapper().lockUser(user);
@@ -385,7 +386,7 @@ public class LabService {
             int from = n + 1;
             int vectorIndex = 0;
             for (JsonNode turn : turns) {
-              UUID id = UUID.randomUUID();
+              Long id = dao.mapper().nextId("session_messages", "id");
               memory.turn(
                   id,
                   user,
@@ -446,13 +447,14 @@ public class LabService {
             }
           });
       timing.mark("db_transaction");
+      contexts.recorded(batch);
       timing.success();
       return batch;
     }
   }
 
   // ##### 대화 배치 목록을 조회하는 메소드 #####
-  public JsonNode batches(UUID user) {
+  public JsonNode batches(Long user) {
     dao.requireUser(user);
     ArrayNode rows = json.createArrayNode();
     for (Map<String, Object> b : dao.mapper().batches(user)) {
@@ -464,7 +466,7 @@ public class LabService {
   }
 
   // ##### 대화 배치를 조회하는 메소드 #####
-  public JsonNode batch(UUID user, UUID batch) {
+  public JsonNode batch(Long user, Long batch) {
     Map<String, Object> row = dao.requireBatch(user, batch);
     ObjectNode r = (ObjectNode) tree(row);
     r.set("analysis", dao.parse(row.get("analysis")));
@@ -476,7 +478,7 @@ public class LabService {
     return text.strip().replaceAll("\\s+", " ");
   }
 
-  Set<String> duplicateTexts(UUID user) {
+  Set<String> duplicateTexts(Long user) {
     HashSet<String> set = new HashSet<String>();
     for (Map<String, Object> row : dao.mapper().savedSources(user)) {
       set.add(normalized(row.get("user_text").toString()));
@@ -484,7 +486,7 @@ public class LabService {
     return set;
   }
 
-  private ArrayNode freshSources(UUID user, UUID batch) {
+  private ArrayNode freshSources(Long user, Long batch) {
     Set<String> seen = duplicateTexts(user);
     ArrayNode source = json.createArrayNode();
     for (Map<String, Object> t : dao.mapper().turns(batch)) {
@@ -507,7 +509,7 @@ public class LabService {
   }
 
   // ##### 대화 분석을 실행하는 메소드 #####
-  public JsonNode analyze(UUID user, UUID batch, boolean automatic) {
+  public JsonNode analyze(Long user, Long batch, boolean automatic) {
     try (LabTiming timing = new LabTiming("analysis.batch")) {
       manualAllowed(dao.requireUser(user), automatic);
       Map<String, Object> row = dao.requireBatch(user, batch);
@@ -552,7 +554,26 @@ public class LabService {
     }
   }
 
-  private ObjectNode analyzeWindows(UUID user, UUID batch, ArrayNode sources) {
+  // ##### 임베딩 실패로 보류된 원문을 외부 호출 후 짧은 트랜잭션으로 보완하는 메소드 #####
+  void repairEmbeddings(Long user) {
+    List<Map<String, Object>> missing = dao.mapper().missingEmbeddings(user);
+    for (int offset = 0; offset < missing.size(); offset += 100) {
+      var group = missing.subList(offset, Math.min(offset + 100, missing.size()));
+      var vectors = ai.embed(group.stream().map(row -> row.get("user_text").toString()).toList());
+      if (vectors.size() != group.size()) throw LabException.invalid("대화 임베딩 개수가 다릅니다.");
+      tx.executeWithoutResult(
+          status -> {
+            dao.mapper().lockUser(user);
+            for (int i = 0; i < group.size(); i++)
+              dao.mapper()
+                  .embedding(
+                      ((Number) group.get(i).get("id")).longValue(), LabDao.vector(vectors.get(i)));
+            memory.retain(user, user, "owner");
+          });
+    }
+  }
+
+  private ObjectNode analyzeWindows(Long user, Long batch, ArrayNode sources) {
     ArrayList<Map<String, Object>> history = new ArrayList<>(dao.mapper().turns(batch));
     ObjectNode output = object();
     ArrayNode observations = output.putArray("observations");
@@ -683,10 +704,11 @@ public class LabService {
   }
 
   // ##### 분석 결과를 저장하는 메소드 #####
-  public JsonNode save(UUID user, UUID batch, boolean automatic) {
+  public JsonNode save(Long user, Long batch, boolean automatic) {
     try (LabTiming timing = new LabTiming("profile.save")) {
       Map<String, Object> row = dao.requireUser(user);
       manualAllowed(row, automatic);
+      repairEmbeddings(user);
       Map<String, Object> b = dao.requireBatch(user, batch);
       if ("saved".equals(b.get("status"))) {
         JsonNode response = profile(user);
@@ -718,16 +740,6 @@ public class LabService {
       timing.mark("load_profile_validate_and_prepare_merge");
       ObjectNode merged = validation.merge(old, analysis.path("observations"));
       timing.mark("merge_server");
-      JsonNode memories = analysis.path("memories");
-      ArrayList<String> texts = new ArrayList<String>();
-      for (JsonNode m : memories) {
-        texts.add(m.path("content").asText());
-      }
-      ArrayList<float[]> vectors = new ArrayList<float[]>();
-      for (int offset = 0; offset < texts.size(); offset += 256) {
-        vectors.addAll(ai.embed(texts.subList(offset, Math.min(offset + 256, texts.size()))));
-      }
-      timing.mark("embed_memories");
       tx.executeWithoutResult(
           s -> {
             Map<String, Object> current = dao.mapper().lockUser(user);
@@ -747,12 +759,7 @@ public class LabService {
                 sourceIds(freshSources(user, batch)),
                 Math.max(40, ((sources.size() + 9) / 10) * 40));
             dao.updateProfile(user, merged);
-            int i = 0;
             List<Map<String, Object>> currentTurns = dao.mapper().turns(batch);
-            for (JsonNode m : memories) {
-              memory.memory(user, batch, "manual:" + version, i, m, vectors.get(i), currentTurns);
-              i++;
-            }
             ObjectNode persisted = (ObjectNode) analysis.deepCopy();
             persisted.put("updatePolicyVersion", catalog.policyVersion());
             persisted.set("maxWeights", input.path("maxWeights"));
@@ -780,7 +787,7 @@ public class LabService {
                 persisted,
                 currentTurns,
                 currentTurns.stream()
-                    .filter(t -> !"saved".equals(t.get("status").toString()))
+                    .filter(t -> Set.of("pending", "analyzed").contains(t.get("status").toString()))
                     .map(t -> t.get("id").toString())
                     .collect(java.util.stream.Collectors.toSet()));
             if (dao.mapper().saveDetails(batch, persisted.toString()) != 1
@@ -808,13 +815,13 @@ public class LabService {
   }
 
   // ##### 실험 결과를 내보내는 메소드 #####
-  public JsonNode export(UUID user) {
+  public JsonNode export(Long user) {
     ObjectNode r = object();
     r.set("profile", profile(user));
     r.set("catalog", catalog.document());
     ArrayNode all = json.createArrayNode();
     for (Map<String, Object> b : dao.mapper().batches(user)) {
-      all.add(batch(user, (UUID) b.get("id")));
+      all.add(batch(user, (Long) b.get("id")));
     }
     r.set("batches", all);
     r.set("memories", tree(dao.mapper().memories(user)));

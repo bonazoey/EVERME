@@ -76,23 +76,23 @@ cd backend
 6. 정보이용자 화면에서 클론과 저장된 컨텍스트 배치를 선택한다. 배치 없이 장기 기억부터 찾을 수도 있다. 클론 변경 시 사용자별 대화 컨텍스트를 분리하며 새 대화는 이전 컨텍스트를 교체한다.
 7. 결과 JSON에는 현재 프로필·원문·분석·기억·자동 실행 상태와 관찰된 요소의 합성 정답 대비 오차가 들어 있다. 원본 생성 설정은 일반 프로필·답변 API에 반환하지 않는다.
 
-## 새 DB 구조와 최근 기억 (2026-11-28)
+## DB 구조와 문맥·기억 (2026-11-28)
 
-- 물리 테이블은 lab_users / sessions / context / vector_store / profile_* 7개다. 기존 실험 데이터는 사용자 승인으로 초기화했다. 과거 스키마의 데이터도 비웠으며 재이관하지 않는다.
-- context와 vector_store는 각각 Spring AI PgVectorStore로 검색한다. 저장은 외부 임베딩 호출을 먼저 완료하고, MyBatis로 준비된 벡터·metadata를 프로필·처리 완료 기록과 같은 트랜잭션에 반영한다. PgVectorStore.add()로 트랜잭션 안에서 임베딩 API를 호출하지 않는다.
-- owner 원문은 사용자별 최근 100쌍, viewer 원문은 clone_owner_id+actor_user_id별 최근 100쌍을 보관한다. pending/analyzed는 100쌍 초과 시에도 삭제하지 않는다.
-- 저장 완료 원문은 범위를 초과하면 원래 content·embedding과 source_ids·source_excerpts를 vector_store에 원자적으로 이관한 뒤 삭제한다. 이관 실패 시 프로필·기억·완료 표시도 함께 롤백된다. 원문 이관 기록은 metadata.record_type=context_archive다.
-- 질문 수신 시각 user_received_at과 AI 응답 수신 시각 assistant_received_at은 metadata의 UTC ISO 시각이다. created_at은 DB 저장 시각이다. 합성 10쌍은 생성 요청·응답 시각을 공유하고 synthetic=true로 표시한다. 대화 순서는 sequence_no로 판단한다.
-- 세션 전체 status 컬럼은 없다. 기존 화면 응답의 status는 개별 context 상태에서 계산하는 호환 필드다. batchId/id/ordinal도 기존 화면 호환 이름이며 실제 DB에서는 session_id와 sequence_no를 사용한다. metadata.ordinal은 세션 안의 논리 순번이며 원문 배열 위치를 구간 식별자로 사용하지 않는다.
-- 세션 JSON에는 turnCount, 고정 구간 sourceIds, 요약 캐시, processedEvidence를 보존한다. 원문이 삭제된 뒤에도 같은 발언을 프로필에 다시 반영하지 않는다.
-- 정보이용자 화면에서 이용자를 별도 선택할 수 있다. 세션 생성·질문 요청에 actorUserId, 현재 이력 조회에 actorUserId 쿼리를 사용한다. 생략하면 자기 클론 테스트로 처리한다. 이용자 기록은 owner 기억·프로필 근거로 사용하지 않는다. 실험용 선택 기능이며 인증 기능을 구현한 것은 아니다.
-- 클론은 owner 범위의 context 벡터 검색 후 부족하면 searchLongTermMemory, 그 다음 getAnalysisProfile을 사용한다. viewer 대화 컨텍스트는 별도로 분리한다.
-- 새 DB 초기화 기준은 src/main/resources/clone-lab/schema.sql이다. 카탈로그 생성기는 DDL/DBML을 다시 생성하지 않는다. 기존 구형 DB의 자동 업그레이드는 하지 않으며 이관 SQL은 migrations 폴더에서 수동 관리한다.
-- 잔액 소진(credit_balance_exhausted) 및 insufficient_quota 유형은 재시도하지 않는다. 실제 호출에는 API 크레딧 충전이 필요하다.
+- 현재 스키마는 users / sessions / session_messages / context / context_summaries / vector_store / runs / profile_* 7개, 총 14개 테이블이다. 모든 엔티티 ID는 bigint 시퀀스이며 Java·요청 DTO는 Long이다.
+- sessions는 대화방이며 소유자·참여자·종류를 관리한다. session_messages는 session_id FK로 연결한 전체 이력으로 원문을 삭제하지 않는다. /batches 경로와 batchId·ordinal 응답 이름은 화면 호환을 위해 유지한다.
+- context는 임베딩 없는 JdbcChatMemoryRepository 저장소다. MessageWindowChatMemory의 상한은 40개 메시지이며 실제로는 현재 고정 블록 최대 20쌍을 유지한다. 사용자 정의 JDBC dialect가 실험 스키마를 사용하고 자동 DDL은 비활성화한다.
+- 21·41번째 질문 전에 완료 20쌍을 요약한다. 요약 성공 후 해당 블록을 비운다. context_summaries는 대화방별 최근 5개만 남기며 새 요약·초과분 삭제·블록 전환은 원자적으로 처리한다. 실패 시 이전 원문·요약을 유지한다.
+- 프롬프트는 이전 요약 최대 5개와 현재 블록을 사용한다. 43쌍이면 요약 1~20·21~40과 원문 41~43, 121쌍이면 요약 21~40부터 101~120까지와 원문 121을 사용한다. 재시작 후 JDBC·영구 원문에서 복구한다.
+- 최근 RAG는 sessions JOIN으로 owner의 전체 주제에서 최신 100쌍을 먼저 선정하고, 그 후보만 PgVectorStore로 검색한다. 사용자 발언만 임베딩한다. viewer는 이력·자신의 문맥에만 쓰며 임베딩·소유자 분석·장기 저장에서 제외한다.
+- 최근 100쌍 밖에서 분석 저장과 임베딩 준비가 끝난 원문은 vector_store로 content·embedding을 그대로 복사하고 session_messages.status를 archived로 변경한다. source_session_record_id UNIQUE로 중복 저장을 막고 원문은 유지한다. record_type은 conversation_archive다.
+- 분석의 memories는 검토용 초안이며 별도로 임베딩·INSERT하지 않는다. 프로필은 서버 가중평균으로 갱신하고 장기기억은 위 원문 복사 정책만 사용한다. 임베딩 오류 시 원문은 NULL 벡터로 보존하고 저장 전에 보완한다.
+- 실제 수신 시각은 session_messages의 user_received_at·assistant_received_at에 보존한다. context.timestamp는 JDBC 정렬용이며 실제 사건 날짜로 사용하지 않는다.
+- runs는 실행 상태·진행 수·사용량 컬럼과 단계별 state JSON을 보존한다. 사용자 테이블에는 run_state가 없다. 완료 시 result에 프로필 스냅샷을 남기며 미완료 소유자 실행은 부분 UNIQUE 인덱스로 제한한다.
+- DB 교체는 migrations/20261128-replace-current-design.sql로 clone_lab 스키마만 트랜잭션 안에서 삭제·재생성한다. legacy 스키마·테이블을 만들지 않는다. schema.sql은 재실행 가능한 초기화 SQL이며 기존 구형 스키마를 자동 마이그레이션하지 않는다.
 
 ## 요소·수치·저장 규칙
 
-새 주제의 대화 10쌍 생성에는 주제만 전달하고 이전 주제의 원문은 섞지 않는다. 이어 생성과 사용자 직접 입력 응답에는 소유자 기준 최근 100쌍을 전달한다. 인물 배경·사실·140개 정답 점수는 비교 전용이며 대화 생성·분석·클론 답변에 전달하지 않는다. AI는 공감·경청·맞장구로 반응하며 사용자가 대화를 주도한다. 분석에는 140개 요소 명세를 사용한다.
+새 주제의 대화 10쌍 생성에는 주제만 전달하고 이전 주제의 원문은 섞지 않는다. 이어 생성과 사용자 직접 입력에는 같은 대화방의 이전 요약 최대 5개와 현재 20쌍 블록을 전달한다. 인물 배경·사실·140개 정답 점수는 비교 전용이며 대화 생성·분석·클론 답변에 전달하지 않는다. AI는 공감·경청·맞장구로 반응하며 사용자가 대화를 주도한다. 분석에는 140개 요소 명세를 사용한다.
 
 수동 대화의 주제는 선택 사항이다. 빈 주제로 시작하면 9쌍까지 주제 미정으로 표시하고, 10번째 쌍이 저장될 때 최초 10쌍을 분석 모델로 읽어 주제를 한 번 확정한다. 10쌍 생성 버튼도 빈 주제를 허용한다. 확정한 주제는 이후 대화에 적용하고 직접 지정한 주제는 유지한다. 주제 추출은 성향 분석·프로필 저장과 별개다. 추출 오류 시 해당 요청의 대화와 주제는 함께 저장되지 않아 재시도할 수 있다. 1000쌍 자동 실행은 시작 주제가 필요하다.
 
@@ -103,8 +103,6 @@ cd backend
 프로필 저장은 정책 `element-cap-v1`의 요소별 상한 `C=10·20·40`을 적용한다. 빠름 38개·중간 48개·느림 54개이며, 초기 실험 가설이다. 기존 점수가 NULL이면 기존 가중치를 0으로, 아니면 `min(기존 가중치, C)`로 계산한다. 새 점수는 `(기존 점수 × 인정 가중치 + 관찰 점수 × 근거 강도) / (인정 가중치 + 근거 강도)`이며 소수 둘째 자리 HALF_UP 반올림한다. 저장할 가중치는 `min(인정 가중치 + 근거 강도, C)`이다. 분모에는 상한 적용 전 합을 사용한다. 기존 40·가중치 200에 관찰 60·강도 2를 반영하면 상한 10은 43.33·가중치 10, 상한 20은 41.82·가중치 20, 상한 40은 40.95·가중치 40이다. 서버가 직접 계산하고 검증하며 관찰이 없는 요소는 유지한다. 기존 데이터는 일괄 수정하지 않고 해당 요소를 다음 저장할 때 상한을 적용한다. 새 상한이 40이더라도 기존 가중치 20을 부풀리지 않는다. 요소별 배정과 이유는 ELEMENTS.md에 명시한다. 저장 결과의 updatePolicyVersion·maxWeights로 적용 정책을 확인할 수 있다.
 
 - [ELEMENTS.md](ELEMENTS.md): 7개 영역 × 20개 요소의 코드·수치 기준·근거 예·오판 예·경계.
-- [clone-lab-design.dbml](clone-lab-design.dbml): 현재 Clone Lab의 기준 DBML. 11개 테이블이며 운영 DBML과 독립적이다.
-- [clone-lab-design.dbml](clone-lab-design.dbml): 합의한 DB 설계. sessions.status만 제거하고 analysis·profile_version은 유지한다. context는 created_at·status·sequence_no 컬럼을 사용한다. context/vector_store는 owner·viewer가 공유하되 클론 소유자와 실제 참여자를 구분한다. 사용자·세션·기억 종류·출처·사건 시점은 metadata에 보존하며 conversation_type은 metadata에서 계산하는 생성 컬럼이다. 최근 100쌍을 초과한 원문은 분석·장기 기억·출처 보존을 완료한 뒤 삭제한다. 카탈로그 생성기가 덮어쓰지 않는다. 2026-11-28 기준 Java와 로컬 DB에 반영했다.
 - [clone-lab-design.sql](clone-lab-design.sql): DBML을 PostgreSQL로 변환하고 생성 컬럼·범위 검색·멱등성·벡터 인덱스를 보완한 검토용 DDL. 현재 DB에 실행하는 마이그레이션이 아니다. 반복 초기화용 schema.sql과 별개인 최초 생성 검토본이다. PgVectorStore의 자동 스키마 생성은 꺼 두었다.
 - 기준 생성기: `node backend/clone-lab/tools/generate-catalog.cjs` (저장소 루트에서 실행).
 - 기준 JSON: `backend/src/main/resources/clone-lab/catalog.json`. 생성기는 카탈로그 JSON과 요소 설명 문서를 만든다. SQL·DBML은 별도 관리해 구형 구조로 덮어쓰지 않는다.
