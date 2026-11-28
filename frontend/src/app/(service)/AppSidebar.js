@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -10,10 +10,12 @@ import Modal from "@/components/Modal";
 import Field from "@/components/Field";
 import Button from "@/components/Button";
 import { getInitialConversations, useChatSessions } from "@/app/context/ChatSessions";
+import { AuthContext } from "@/app/context/AuthContext";
 const historyItemClasses =
   "h-[32px] flex items-center justify-between relative gap-1 rounded-md px-[5px] text-[14px] text-green-light [&.ui-appsidebar-selected]:bg-sidebar-selected [&.ui-appsidebar-selected]:font-bold [&_>_a]:overflow-hidden [&_>_a]:text-ellipsis [&_>_a]:whitespace-nowrap [&_.ui-history-menu-trigger]:opacity-0 [&:hover_.ui-history-menu-trigger]:opacity-100 [&:focus-within_.ui-history-menu-trigger]:opacity-100 [&_.ui-history-menu-trigger[aria-expanded=true]]:opacity-100 [@media(hover:_none)]:[&_.ui-history-menu-trigger]:opacity-100";
 
 export default function AppSidebar({ viewer, active, chat }) {
+  const { logout } = useContext(AuthContext);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -382,15 +384,18 @@ export default function AppSidebar({ viewer, active, chat }) {
                   <Icon name="settings" size={18} />
                   계정 설정
                 </Link>
-                <Link
-                  href="/"
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2.5 rounded-md p-[10px_12px] text-left text-[13px] text-green hover:bg-sidebar-hover hover:text-green-light focus-visible:bg-sidebar-selected focus-visible:text-green-light"
                   onClick={() => {
+                    logout();
                     setProfileOpen(false);
+                    router.replace("/");
                   }}
                 >
                   <Icon name="logout" size={18} />
                   로그아웃
-                </Link>
+                </button>
               </div>
             )}
             <button

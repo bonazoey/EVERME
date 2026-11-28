@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -38,7 +39,12 @@ public class MemberController {
         member.setNationality(request.getNationality());
         member.setPhone(request.getPhone());
 
-        memberService.signup(member);
+        try {
+            memberService.signup(member);
+        } catch (DuplicateKeyException exception) {
+            return ResponseEntity.status(409)
+                    .body(Map.<String, Object>of("message", "이미 가입된 이메일입니다. 로그인해 주세요."));
+        }
 
         Member dbMember = memberService.getMember(member.getEmail());
 
@@ -50,13 +56,18 @@ public class MemberController {
 
     /** FR-002: 로그인. */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
         Member member = new Member();
         member.setEmail(request.getEmail());
         member.setPassword(request.getPassword());
         String result = memberService.login(member);
 
-        return null;
+        if (!"success".equals(result)) {
+            return ResponseEntity.status(401)
+                    .body(Map.<String, Object>of("message", "이메일 또는 비밀번호가 올바르지 않습니다."));
+        }
+        String token = jwtService.createToken(member);
+        return ResponseEntity.ok(Map.<String, Object>of("token", token));
     }
 
     /** FR-003: 로그아웃. */

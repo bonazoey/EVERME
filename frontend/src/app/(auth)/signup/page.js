@@ -260,7 +260,7 @@ const countries = [
   "홍콩(중국 특별행정구)"
 ];
 
-function formatPhone(value) {
+const formatPhone = (value) => {
   const international = value.startsWith("+");
   const digits = value.replace(/\D/g, "").slice(0, 15);
   if (international) return `+${digits}`;
@@ -271,14 +271,16 @@ function formatPhone(value) {
   if (rest.length <= 4) return `${digits.slice(0, areaLength)}-${rest}`;
   const middleLength = rest.length > 7 ? 4 : 3;
   return `${digits.slice(0, areaLength)}-${rest.slice(0, middleLength)}-${rest.slice(middleLength)}`;
-}
+};
 
-export default function SignupPage() {
+const SignupPage = () => {
   const { login } = useContext(AuthContext);
   const [step, setStep] = useState("account");
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [consentErrors, setConsentErrors] = useState([]);
+  const [signupError, setSignupError] = useState("");
+  const [isSigningUp, setIsSigningUp] = useState(false);
   const [signupForm, setSignupForm] = useState({
     name: "", email: "", birthDate: "", nationality: "", phone: "",
     gender: "", password: "", confirmation: "",
@@ -288,18 +290,19 @@ export default function SignupPage() {
   const headingRef = useRef(null);
   const accountRef = useRef(null);
   const previousPhoneRef = useRef("");
-  function goToStep(step) {
+  const goToStep = (step) => {
     setStep(step);
     headingRef.current?.focus();
-  }
-  function returnToAccount() {
+  };
+  const returnToAccount = () => {
     goToStep("account");
-  }
-  function handleAccountChange(event) {
+  };
+  const handleAccountChange = (event) => {
     const { name, value } = event.currentTarget;
+    if (name === "email") setSignupError("");
     setSignupForm((current) => ({ ...current, [name]: value }));
-  }
-  function validateAccount(container) {
+  };
+  const validateAccount = (container) => {
     const fields = Object.fromEntries(
       [...container.querySelectorAll("[name]")].map((field) => [field.name, field])
     );
@@ -320,8 +323,8 @@ export default function SignupPage() {
     if (!fields.confirmation.value) result.confirmation = "비밀번호를 다시 입력해 주세요.";
     else if (fields.password.value !== fields.confirmation.value) result.confirmation = "비밀번호가 일치하지 않습니다.";
     return result;
-  }
-  function confirmAccount() {
+  };
+  const confirmAccount = () => {
     const container = accountRef.current;
     const nextErrors = validateAccount(container);
     setSubmitted(true);
@@ -332,26 +335,33 @@ export default function SignupPage() {
       return;
     }
     goToStep("consent");
-  }
+  };
   // 가입완료 
-  async function confirmConsent() {
+  const confirmConsent = async () => {
+    if (isSigningUp) return;
     const missingConsent = consents.flatMap((checked, index) => checked ? [] : [`consent-${index}`]);
     setConsentErrors(missingConsent);
 
     if (missingConsent.length) return;
 
+    setSignupError("");
+    setIsSigningUp(true);
     try {
       const resp = await memberSignUp(signupForm);
       const token = resp.data.token;
 
-      login(signupForm.email, token);
+      login(token);
       router.push("/owner/chat");
     } catch (error) {
-      console.log(error);
+      setSignupError(error.response?.status === 409
+        ? "이미 가입된 이메일입니다. 로그인하거나 이전 단계에서 이메일을 변경해 주세요."
+        : "회원가입에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setIsSigningUp(false);
     }
 
 
-  }
+  };
   return (
     <>
       <h2 ref={headingRef} tabIndex={-1} className="signup-page">
@@ -536,8 +546,11 @@ export default function SignupPage() {
             </span>
           </label>
         ))}
-        <Button onClick={confirmConsent}>동의하고 시작하기</Button>
-        <Button variant="secondary" onClick={returnToAccount}>
+        {signupError && <p role="alert" className="text-sm text-red-600">{signupError}</p>}
+        <Button onClick={confirmConsent} disabled={isSigningUp}>
+          {isSigningUp ? "가입 처리 중…" : "동의하고 시작하기"}
+        </Button>
+        <Button variant="secondary" onClick={returnToAccount} disabled={isSigningUp}>
           이전 · 가입 정보 수정
         </Button>
         <p className="ui-muted text-muted">
@@ -546,4 +559,6 @@ export default function SignupPage() {
       </div>
     </>
   );
-}
+};
+
+export default SignupPage;

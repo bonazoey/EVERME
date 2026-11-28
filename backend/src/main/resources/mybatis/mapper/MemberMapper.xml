@@ -13,6 +13,7 @@
         SELECT name, email, password, birth_date, nationality, phone, gender, active, created_at
         FROM member
         WHERE email = #{email}
+        and active  = true
     </select>
 
    
