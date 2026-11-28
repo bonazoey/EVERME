@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.everme.lab.service.LabCloneService;
@@ -48,10 +49,10 @@ public class LabController {
 
   public record TopicRequest(@Size(max = 1000) String topic) {}
 
-  public record SessionRequest(UUID batchId) {}
+  public record SessionRequest(UUID batchId, UUID actorUserId) {}
 
   public record QuestionRequest(
-      @NotNull UUID sessionId, @NotBlank @Size(max = 4000) String question) {}
+      @NotNull UUID sessionId, @NotBlank @Size(max = 4000) String question, UUID actorUserId) {}
 
   public record OwnerMessageRequest(
       UUID batchId, @Size(max = 1000) String topic, @NotBlank @Size(max = 8000) String content) {}
@@ -142,25 +143,25 @@ public class LabController {
   }
 
   // ##### 자동 실행 시작 요청 메소드 #####
-  @PostMapping("/users/{user}/labRunService")
+  @PostMapping({"/users/{user}/runs", "/users/{user}/labRunService"})
   public JsonNode run(@PathVariable UUID user, @Valid @RequestBody TopicRequest request) {
     return labRunService.start(user, request.topic(), false);
   }
 
   // ##### 자동 실행 상태 조회 요청 메소드 #####
-  @GetMapping("/users/{user}/labRunService/current")
+  @GetMapping({"/users/{user}/runs/current", "/users/{user}/labRunService/current"})
   public JsonNode runState(@PathVariable UUID user) {
     return labRunService.state(user);
   }
 
   // ##### 현재 작업 후 중단을 요청하는 메소드 #####
-  @PostMapping("/users/{user}/labRunService/current/stop")
+  @PostMapping({"/users/{user}/runs/current/stop", "/users/{user}/labRunService/current/stop"})
   public JsonNode stop(@PathVariable UUID user) {
     return labRunService.stop(user);
   }
 
   // ##### 자동 실행 재개 요청 메소드 #####
-  @PostMapping("/users/{user}/labRunService/current/resume")
+  @PostMapping({"/users/{user}/runs/current/resume", "/users/{user}/labRunService/current/resume"})
   public JsonNode resume(@PathVariable UUID user) {
     return labRunService.start(user, null, true);
   }
@@ -168,18 +169,24 @@ public class LabController {
   // ##### 클론 대화 시작 요청 메소드 #####
   @PostMapping("/users/{user}/sessions")
   public JsonNode session(@PathVariable UUID user, @RequestBody SessionRequest request) {
-    return labCloneService.start(user, request.batchId());
+    return labCloneService.start(
+        user, request.actorUserId() == null ? user : request.actorUserId(), request.batchId());
   }
 
   // ##### 정보이용자 대화 이력을 조회하는 메소드 #####
   @GetMapping("/users/{user}/sessions/current")
-  public JsonNode history(@PathVariable UUID user) {
-    return labCloneService.history(user);
+  public JsonNode history(
+      @PathVariable UUID user, @RequestParam(required = false) UUID actorUserId) {
+    return labCloneService.history(user, actorUserId == null ? user : actorUserId);
   }
 
   // ##### 클론 질문 요청 메소드 #####
   @PostMapping("/users/{user}/questions")
   public JsonNode question(@PathVariable UUID user, @Valid @RequestBody QuestionRequest request) {
-    return labCloneService.answer(user, request.sessionId(), request.question());
+    return labCloneService.answer(
+        user,
+        request.actorUserId() == null ? user : request.actorUserId(),
+        request.sessionId(),
+        request.question());
   }
 }

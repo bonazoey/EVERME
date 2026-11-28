@@ -1,0 +1,368 @@
+// Clone Lab DB 재설계 검토본 — 2026-11-27, 확정 요청 반영
+// 2026-11-28: 실행 DB와 Java에 반영한 구조. schema.sql은 반복 초기화용 DDL이다.
+// conversation_type 생성 컬럼과 JSON 검색 인덱스는 clone-lab-design.sql에 보완한다.
+
+Project CloneLabDesign {
+  database_type: 'PostgreSQL'
+  Note: '''
+    11개 테이블: lab_users / sessions / context / vector_store / profile_* 7개.
+    sessions.status는 제거하고 sessions.analysis는 유지한다.
+    profile_version은 복구한다. viewer_context는 공용 대화 테이블로 대체한다.
+    최근 기억과 장기 기억은 Spring AI PgVectorStore의 id/content/metadata/embedding을 공통으로 사용한다.
+    사용자·세션·기억 분류·출처·사건 시점은 metadata에 보존한다.
+    context.created_at/status/sequence_no는 일반 컬럼으로 관리한다.
+    context와 vector_store는 owner/viewer를 공유하며 conversation_type을 생성 컬럼으로 노출한다.
+    생성 컬럼은 metadata 값에서 자동 계산하므로 기본 PgVectorStore INSERT에 추가 인자를 요구하지 않는다.
+    owner 원문만 소유자 프로필과 사실 기억의 근거다. viewer 대화는 이용자별 문맥으로 분리한다.
+    최근 100쌍 유지·안전 이관·중복 반영 방지를 실행 코드에서 처리한다.
+  '''
+}
+
+Enum clone_lab.conversation_type {
+  owner [note: '사용자가 자기 클론을 만들기 위해 나누는 대화']
+  viewer [note: '정보이용자가 선택한 클론에게 질문하는 대화']
+}
+
+Enum clone_lab.context_status {
+  pending [note: '아직 분석하지 않은 원문']
+  analyzed [note: '분석 초안 보존 완료. 프로필·장기 기억 반영 전']
+  saved [note: '처리 결과 저장 완료. owner는 프로필 반영, viewer는 이용자 문맥 처리이며 소유자 프로필을 갱신하지 않음']
+  archived [note: '필요한 장기 기억·출처 보존·처리 완료 기록까지 확정. 보관 범위를 초과한 경우에만 원문 삭제 가능']
+}
+
+// JSON metadata.kind에서 허용하는 분류. 실제 독립 enum 컬럼은 없고 SQL CHECK로 검사한다.
+Enum clone_lab.memory_kind {
+  FACT [note: '직업·거주지 등 확인된 속성이나 사실']
+  EXPERIENCE [note: '특정 시점의 사건·경험']
+  PREFERENCE [note: '조건이 없는 대상·활동의 선호·기피']
+  CONDITIONAL_PREFERENCE [note: '상황·상대 등 조건이 명시된 선호']
+  VALUE [note: '중요하게 여기는 원칙·가치']
+  HABIT [note: '실제로 반복하는 행동. 계획·희망과 구분']
+  GOAL [note: '앞으로의 목표·의도·계획. 실현된 사실과 구분']
+  RELATIONSHIP [note: '특정 인물과의 관계 정보']
+}
+
+Table clone_lab.lab_users {
+  id uuid [pk, note: '실험 사용자 ID. 같은 사람도 대화에 따라 owner 또는 viewer가 될 수 있음']
+  name text [not null, note: '표시 이름']
+  persona jsonb [note: '가상 인물 평가용 배경·정답. viewer에게는 없어도 되며 모델 입력에 전달하지 않음']
+  profile_version bigint [not null, default: 0, note: '소유자 프로필 반영 시 증가. 낙관적 충돌 검사와 사용자 행 잠금을 함께 사용']
+  run_state jsonb [not null, default: `'{}'::jsonb`, note: '소유자 자동 실행의 예약·진행 위치·복구·사용량. 원문 삭제 후에도 진행 위치를 보존']
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: '''
+    profile_version을 유지한다. viewer 대화 처리로 다른 사람의 프로필 버전을 올리지 않는다.
+    viewer_context는 제거한다. 정보이용자 채팅도 sessions/context/vector_store를 사용한다.
+    사용자 프로필 7개 영역의 행은 소유자 분석이 필요한 사용자에게 생성한다.
+  '''
+}
+
+Table clone_lab.sessions {
+  session_id uuid [pk, note: '주제별 대화 ID. 기존 batches.id를 변경한 이름이며 대화 순번이 아니다']
+  clone_owner_id uuid [not null, ref: > clone_lab.lab_users.id, note: '현재 대화가 대상으로 하는 클론의 소유자']
+  actor_user_id uuid [not null, ref: > clone_lab.lab_users.id, note: '실제 대화 참여자. viewer이면 정보이용자의 ID']
+  conversation_type clone_lab.conversation_type [not null, note: '계정의 고정 역할이 아니라 이 세션의 대화 종류']
+  topic text [not null, default: '', note: '주제 미입력 시 첫 10쌍으로 확정']
+  analysis jsonb [not null, default: `'{}'::jsonb`, note: '고정 구간 ID·contextIds·분석 초안·요약·구간 상태·저장 결과·멱등성 기록. 원문 삭제 후에도 보존']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (clone_owner_id, actor_user_id, conversation_type)
+  }
+  checks {
+    `conversation_type <> 'owner' OR clone_owner_id = actor_user_id` [name: 'owner_session_actor_matches']
+  }
+
+  Note: '''
+    세션 전체의 status는 없다. 구간 상태는 analysis에, 개별 원문 상태는 context.status에 기록한다.
+    sequence_no는 세션의 표시 순번으로 두지 않는다. 발화 순번은 context.sequence_no다.
+    owner 분석·기억 저장·구간 처리 완료·profile_version 증가는 같은 트랜잭션으로 반영한다.
+    분석 완료 구간 ID와 처리 원문 ID를 영구 기록해 삭제·재개 후에도 같은 근거를 다시 반영하지 않는다.
+    viewer 세션은 해당 clone_owner_id와 actor_user_id 조합으로 검색·이력 조회를 제한한다.
+    JSON 요약과 근거 발췌는 VectorStore 의미 검색 후보에 자동 포함되지 않는다. 필요 시 vector_store에도 기록한다.
+  '''
+}
+
+Table clone_lab.context {
+  id uuid [pk, note: '대화 1쌍의 Document ID. 생성 예약의 고정 ID를 사용해 요청 재시도 시 같은 문서를 재사용']
+  content text [not null, note: '사용자 발언과 AI 응답 1쌍의 검색용 원문. 소유자 사실 분석은 metadata.user_text만 사용']
+  embedding vector(1536) [not null, note: '최근 대화 검색 벡터']
+  metadata jsonb [not null, note: '필수: clone_owner_id, actor_user_id, session_id, conversation_type, user_text, assistant_text, user_received_at, assistant_received_at, synthetic. 모두 서버에서 검증·설정']
+  conversation_type text [not null, note: 'metadata.conversation_type에서 계산되는 STORED 생성 컬럼. 보완 SQL 참조. 별도로 INSERT하지 않음']
+  created_at timestamptz [not null, default: `clock_timestamp()`, note: '최초 원문 저장 시각. 문서 재시도·임베딩 갱신 시 변경하지 않음']
+  status clone_lab.context_status [not null, default: 'pending', note: 'pending → analyzed → saved → archived. 실패하면 마지막 성공 상태와 분석 초안을 보존']
+  sequence_no bigint [not null, increment, unique, note: 'DB가 발급하는 전역 증가 순번. 세션을 넘어 최근 100쌍·구간·복구 순서를 판단하며 번호의 공백은 허용']
+
+  indexes {
+    (conversation_type, sequence_no)
+    (status, sequence_no)
+  }
+  checks {
+    `jsonb_typeof(metadata->'clone_owner_id') = 'string' AND length(metadata->>'clone_owner_id') > 0 AND jsonb_typeof(metadata->'actor_user_id') = 'string' AND length(metadata->>'actor_user_id') > 0 AND jsonb_typeof(metadata->'session_id') = 'string' AND length(metadata->>'session_id') > 0`
+    `conversation_type <> 'owner' OR metadata->>'clone_owner_id' = metadata->>'actor_user_id'`
+    `conversation_type IN ('owner', 'viewer')` [name: 'context_type_allowed']
+    `metadata ? 'clone_owner_id' AND metadata ? 'actor_user_id' AND metadata ? 'session_id' AND metadata ? 'user_text' AND metadata ? 'assistant_text'` [name: 'context_required_metadata']
+  }
+
+  Note: '''
+    PgVectorStore는 id/content/metadata/embedding만 INSERT한다. 일반 운영 컬럼은 기본값·DB 순번·별도 상태 UPDATE로 관리한다.
+    conversation_type은 생성 컬럼이므로 metadata와 별도로 갱신할 필요가 없다. DBML의 생성 표현식은 보완 SQL에 있다.
+    metadata 안의 사용자·세션 ID는 FK가 아니다. 서버에서 실제 세션의 소유자·참여자·종류와 일치하는지 검증한다.
+    owner는 소유자별 최근 100쌍을 세션 구분 없이 유지한다. viewer는 클론 소유자+정보이용자 조합별 최근 100쌍으로 격리한다.
+    최근 범위 밖 원문이라도 archived 전에는 삭제하지 않는다. 처리 지연·실패 중에는 일시적으로 100쌍을 초과할 수 있다.
+    archived는 장기 기억·필요한 원문 발췌·구간 완료가 안전하게 보존된 상태다. 보존할 정보가 없는 경우도 결과를 명시적으로 기록한다.
+    외부 LLM·임베딩 호출은 트랜잭션 밖에서 수행한다. 이관 완료 확정과 조건부 원문 삭제는 짧은 트랜잭션에서 처리한다.
+    기본 PgVectorStore upsert가 status·sequence_no·created_at을 바꾸지는 않는다. metadata 전체 교체로 범위·출처를 잃지 않게 한다.
+    처리한 원문을 같은 ID로 수정하지 않는다. 정정 시 새로운 ID와 재분석 정책을 사용한다.
+  '''
+}
+
+Table clone_lab.vector_store {
+  id uuid [pk, note: '동결한 분석 초안의 기억 항목 식별자로 만든 고정 Document ID. 재시도에서 새 UUID를 매번 만들지 않음']
+  content text [not null, note: '추출한 장기 기억 또는 viewer 대화의 회상 정보']
+  embedding vector(1536) [not null, note: '장기 기억 검색 벡터']
+  metadata jsonb [not null, note: '필수: clone_owner_id, actor_user_id, session_id, conversation_type, kind, source_ids, source_excerpts, extraction_key. 선택: occurred_at']
+  conversation_type text [not null, note: 'metadata.conversation_type에서 계산되는 STORED 생성 컬럼. 보완 SQL 참조']
+  created_at timestamptz [not null, default: `clock_timestamp()`, note: '장기 기억의 최초 저장 시각. metadata.occurred_at의 실제 사건 시점과 구분']
+
+  indexes {
+    (conversation_type, created_at)
+  }
+  checks {
+    `jsonb_typeof(metadata->'clone_owner_id') = 'string' AND length(metadata->>'clone_owner_id') > 0 AND jsonb_typeof(metadata->'actor_user_id') = 'string' AND length(metadata->>'actor_user_id') > 0 AND jsonb_typeof(metadata->'session_id') = 'string' AND length(metadata->>'session_id') > 0`
+    `conversation_type <> 'owner' OR metadata->>'clone_owner_id' = metadata->>'actor_user_id'`
+    `conversation_type IN ('owner', 'viewer')` [name: 'memory_type_allowed']
+    `metadata ? 'clone_owner_id' AND metadata ? 'actor_user_id' AND metadata ? 'session_id' AND metadata ? 'kind' AND metadata ? 'extraction_key' AND metadata ? 'source_ids' AND metadata ? 'source_excerpts'` [name: 'memory_required_metadata']
+    `jsonb_typeof(metadata->'extraction_key') = 'string' AND length(metadata->>'extraction_key') > 0`
+    `metadata->>'kind' IN ('FACT','EXPERIENCE','PREFERENCE','CONDITIONAL_PREFERENCE','VALUE','HABIT','GOAL','RELATIONSHIP')` [name: 'memory_kind_allowed']
+    `jsonb_typeof(metadata->'source_ids') = 'array' AND jsonb_array_length(metadata->'source_ids') > 0` [name: 'memory_source_ids_nonempty']
+    `jsonb_typeof(metadata->'source_excerpts') = 'array' AND jsonb_array_length(metadata->'source_excerpts') > 0` [name: 'memory_source_excerpts_nonempty']
+  }
+
+  Note: '''
+    사용자 ID/session_id/kind는 독립 컬럼 대신 metadata로 관리해 두 VectorStore의 기본 구조를 통일한다.
+    소유자·이용자·세션·분류·출처·실제 사건 시점은 metadata에 보존한다.
+    source_ids는 원문 삭제 후에도 보존하고 source_excerpts에는 필요한 사용자 원문 발췌와 해당 원문 ID를 함께 저장한다.
+    occurred_at은 날짜 또는 원래의 상대 시점 표현과 정밀도를 보존할 수 있다. created_at으로 대체하지 않는다.
+    extraction_key와 고정 문서 ID로 동일 작업의 중복 INSERT를 방지한다. 해당 키의 범위별 UNIQUE 인덱스는 보완 SQL에 정의한다.
+    다른 작업에서 의미가 비슷한 기억이 추출되는 문제는 별도 중복 판정 대상이며 멱등성 키만으로 해결된다고 가정하지 않는다.
+    viewer 기억은 해당 이용자의 질문·발언 문맥이다. 클론 소유자의 사실이나 소유자 프로필 근거로 사용하지 않는다.
+    owner 프로필 분석은 owner 사용자 발언만 허용한다. AI 답변·viewer 발언으로 소유자 사실을 새로 만들지 않는다.
+    검색은 owner 기억 범위와 현재 viewer 조합의 범위를 따로 지정한다. viewer 문맥을 owner 사실 근거와 합쳐 취급하지 않는다.
+    source_ids와 JSON의 세션 ID는 실제 FK가 아니다. 출처 발췌는 원문 삭제 후의 검증을 위한 최소 보존 자료다.
+  '''
+}
+
+// 프로필 7개 × 요소 20개는 유지한다. metadata의 근거 원문 ID와 필수 발췌도 원문 삭제 전에 보존한다.
+// 프로필 저장은 사용자 행 잠금·profile_version 검사·고정 구간 ID의 중복 반영 검사를 함께 사용한다.
+
+Table clone_lab.profile_emotion {
+  user_id uuid [pk, ref: - clone_lab.lab_users.id]
+  uncertainty_anxiety decimal(5,2) [check: `uncertainty_anxiety BETWEEN 0 AND 100`, note: '불확실한 상황에서의 불안; 0~100 / NULL=미확인']
+  threat_fear decimal(5,2) [check: `threat_fear BETWEEN 0 AND 100`, note: '위협·위험에 대한 두려움; 0~100 / NULL=미확인']
+  blocked_frustration decimal(5,2) [check: `blocked_frustration BETWEEN 0 AND 100`, note: '목표가 막혔을 때의 좌절 반응; 0~100 / NULL=미확인']
+  injustice_anger decimal(5,2) [check: `injustice_anger BETWEEN 0 AND 100`, note: '부당한 대우에 대한 분노 반응; 0~100 / NULL=미확인']
+  loss_sadness decimal(5,2) [check: `loss_sadness BETWEEN 0 AND 100`, note: '상실 상황에서의 슬픔 반응; 0~100 / NULL=미확인']
+  positive_joy decimal(5,2) [check: `positive_joy BETWEEN 0 AND 100`, note: '긍정적 사건에 대한 기쁨 반응; 0~100 / NULL=미확인']
+  anticipation decimal(5,2) [check: `anticipation BETWEEN 0 AND 100`, note: '결과를 기다릴 때의 기대·흥분; 0~100 / NULL=미확인']
+  public_embarrassment decimal(5,2) [check: `public_embarrassment BETWEEN 0 AND 100`, note: '공개적인 실수에 대한 당혹감; 0~100 / NULL=미확인']
+  evaluation_sensitivity decimal(5,2) [check: `evaluation_sensitivity BETWEEN 0 AND 100`, note: '타인의 평가에 대한 정서적 민감성; 0~100 / NULL=미확인']
+  emotional_contagion decimal(5,2) [check: `emotional_contagion BETWEEN 0 AND 100`, note: '타인의 감정에 영향받는 정도; 0~100 / NULL=미확인']
+  emotion_duration decimal(5,2) [check: `emotion_duration BETWEEN 0 AND 100`, note: '감정의 지속 시간; 0~100 / NULL=미확인']
+  mood_amplitude decimal(5,2) [check: `mood_amplitude BETWEEN 0 AND 100`, note: '감정 변화의 폭; 0~100 / NULL=미확인']
+  recovery_speed decimal(5,2) [check: `recovery_speed BETWEEN 0 AND 100`, note: '스트레스 후 회복 속도; 0~100 / NULL=미확인']
+  monotony_boredom decimal(5,2) [check: `monotony_boredom BETWEEN 0 AND 100`, note: '반복되는 단조로움에 대한 지루함; 0~100 / NULL=미확인']
+  novelty_stimulation decimal(5,2) [check: `novelty_stimulation BETWEEN 0 AND 100`, note: '낯선 경험에서의 자극 추구; 0~100 / NULL=미확인']
+  noise_sensitivity decimal(5,2) [check: `noise_sensitivity BETWEEN 0 AND 100`, note: '소음에 대한 민감성; 0~100 / NULL=미확인']
+  visual_sensitivity decimal(5,2) [check: `visual_sensitivity BETWEEN 0 AND 100`, note: '빛·시각적 복잡성에 대한 민감성; 0~100 / NULL=미확인']
+  smell_sensitivity decimal(5,2) [check: `smell_sensitivity BETWEEN 0 AND 100`, note: '냄새에 대한 민감성; 0~100 / NULL=미확인']
+  touch_sensitivity decimal(5,2) [check: `touch_sensitivity BETWEEN 0 AND 100`, note: '신체 접촉·촉감에 대한 민감성; 0~100 / NULL=미확인']
+  crowding_overload decimal(5,2) [check: `crowding_overload BETWEEN 0 AND 100`, note: '군중·밀집 환경에서의 과부하; 0~100 / NULL=미확인']
+  metadata jsonb [not null, default: `'{}'::jsonb`, note: 'weight / sourceIds / reason']
+
+  Note: '정서·자극 반응: 상황을 접했을 때의 감정·감각 반응. 제외: 선택 과정·실행 습관·표현 방식.'
+}
+
+Table clone_lab.profile_values {
+  user_id uuid [pk, ref: - clone_lab.lab_users.id]
+  autonomy decimal(5,2) [check: `autonomy BETWEEN 0 AND 100`, note: '자율성; 0~100 / NULL=미확인']
+  security decimal(5,2) [check: `security BETWEEN 0 AND 100`, note: '안전·안정; 0~100 / NULL=미확인']
+  achievement decimal(5,2) [check: `achievement BETWEEN 0 AND 100`, note: '성취; 0~100 / NULL=미확인']
+  fairness decimal(5,2) [check: `fairness BETWEEN 0 AND 100`, note: '공정; 0~100 / NULL=미확인']
+  care decimal(5,2) [check: `care BETWEEN 0 AND 100`, note: '타인 배려; 0~100 / NULL=미확인']
+  family decimal(5,2) [check: `family BETWEEN 0 AND 100`, note: '가족 유대; 0~100 / NULL=미확인']
+  financial_comfort decimal(5,2) [check: `financial_comfort BETWEEN 0 AND 100`, note: '경제적 여유; 0~100 / NULL=미확인']
+  growth decimal(5,2) [check: `growth BETWEEN 0 AND 100`, note: '학습·성장; 0~100 / NULL=미확인']
+  tradition decimal(5,2) [check: `tradition BETWEEN 0 AND 100`, note: '전통; 0~100 / NULL=미확인']
+  contribution decimal(5,2) [check: `contribution BETWEEN 0 AND 100`, note: '사회적 기여; 0~100 / NULL=미확인']
+  honesty decimal(5,2) [check: `honesty BETWEEN 0 AND 100`, note: '정직; 0~100 / NULL=미확인']
+  loyalty decimal(5,2) [check: `loyalty BETWEEN 0 AND 100`, note: '충성·의리; 0~100 / NULL=미확인']
+  privacy decimal(5,2) [check: `privacy BETWEEN 0 AND 100`, note: '사생활; 0~100 / NULL=미확인']
+  health decimal(5,2) [check: `health BETWEEN 0 AND 100`, note: '건강; 0~100 / NULL=미확인']
+  pleasure decimal(5,2) [check: `pleasure BETWEEN 0 AND 100`, note: '즐거움; 0~100 / NULL=미확인']
+  creativity decimal(5,2) [check: `creativity BETWEEN 0 AND 100`, note: '창의성; 0~100 / NULL=미확인']
+  expertise decimal(5,2) [check: `expertise BETWEEN 0 AND 100`, note: '전문성; 0~100 / NULL=미확인']
+  recognition decimal(5,2) [check: `recognition BETWEEN 0 AND 100`, note: '사회적 인정; 0~100 / NULL=미확인']
+  environment decimal(5,2) [check: `environment BETWEEN 0 AND 100`, note: '환경 보전; 0~100 / NULL=미확인']
+  spirituality decimal(5,2) [check: `spirituality BETWEEN 0 AND 100`, note: '종교·영성; 0~100 / NULL=미확인']
+  metadata jsonb [not null, default: `'{}'::jsonb`, note: 'weight / sourceIds / reason']
+
+  Note: '가치관: 어떤 원칙과 삶의 목표를 중요하게 여기는지. 제외: 좋아하는 대상·실제 실천 빈도.'
+}
+
+Table clone_lab.profile_interests {
+  user_id uuid [pk, ref: - clone_lab.lab_users.id]
+  technology decimal(5,2) [check: `technology BETWEEN 0 AND 100`, note: '기술·디지털; 0~100 / NULL=미확인']
+  science decimal(5,2) [check: `science BETWEEN 0 AND 100`, note: '과학; 0~100 / NULL=미확인']
+  history decimal(5,2) [check: `history BETWEEN 0 AND 100`, note: '역사; 0~100 / NULL=미확인']
+  philosophy decimal(5,2) [check: `philosophy BETWEEN 0 AND 100`, note: '철학; 0~100 / NULL=미확인']
+  society decimal(5,2) [check: `society BETWEEN 0 AND 100`, note: '사회·정치; 0~100 / NULL=미확인']
+  finance decimal(5,2) [check: `finance BETWEEN 0 AND 100`, note: '경제·투자; 0~100 / NULL=미확인']
+  literature decimal(5,2) [check: `literature BETWEEN 0 AND 100`, note: '문학; 0~100 / NULL=미확인']
+  visual_art decimal(5,2) [check: `visual_art BETWEEN 0 AND 100`, note: '시각예술; 0~100 / NULL=미확인']
+  music decimal(5,2) [check: `music BETWEEN 0 AND 100`, note: '음악; 0~100 / NULL=미확인']
+  film_performance decimal(5,2) [check: `film_performance BETWEEN 0 AND 100`, note: '영화·공연; 0~100 / NULL=미확인']
+  gaming decimal(5,2) [check: `gaming BETWEEN 0 AND 100`, note: '게임; 0~100 / NULL=미확인']
+  sports decimal(5,2) [check: `sports BETWEEN 0 AND 100`, note: '운동·스포츠; 0~100 / NULL=미확인']
+  travel decimal(5,2) [check: `travel BETWEEN 0 AND 100`, note: '여행; 0~100 / NULL=미확인']
+  outdoors decimal(5,2) [check: `outdoors BETWEEN 0 AND 100`, note: '자연·야외활동; 0~100 / NULL=미확인']
+  cooking_food decimal(5,2) [check: `cooking_food BETWEEN 0 AND 100`, note: '요리·음식; 0~100 / NULL=미확인']
+  fashion decimal(5,2) [check: `fashion BETWEEN 0 AND 100`, note: '패션·미용; 0~100 / NULL=미확인']
+  craft decimal(5,2) [check: `craft BETWEEN 0 AND 100`, note: '만들기·수공예; 0~100 / NULL=미확인']
+  animals decimal(5,2) [check: `animals BETWEEN 0 AND 100`, note: '동물·반려생활; 0~100 / NULL=미확인']
+  social_gatherings decimal(5,2) [check: `social_gatherings BETWEEN 0 AND 100`, note: '사교 모임; 0~100 / NULL=미확인']
+  collecting decimal(5,2) [check: `collecting BETWEEN 0 AND 100`, note: '수집; 0~100 / NULL=미확인']
+  metadata jsonb [not null, default: `'{}'::jsonb`, note: 'weight / sourceIds / reason']
+
+  Note: '관심·선호: 특정 대상·활동에 대한 호불호. 제외: 가치의 중요도·실제 실행 빈도.'
+}
+
+Table clone_lab.profile_decision {
+  user_id uuid [pk, ref: - clone_lab.lab_users.id]
+  research_depth decimal(5,2) [check: `research_depth BETWEEN 0 AND 100`, note: '정보 탐색의 깊이; 0~100 / NULL=미확인']
+  source_verification decimal(5,2) [check: `source_verification BETWEEN 0 AND 100`, note: '근거 출처 검증; 0~100 / NULL=미확인']
+  alternative_breadth decimal(5,2) [check: `alternative_breadth BETWEEN 0 AND 100`, note: '대안 비교의 폭; 0~100 / NULL=미확인']
+  quantitative_reasoning decimal(5,2) [check: `quantitative_reasoning BETWEEN 0 AND 100`, note: '수량·통계 활용; 0~100 / NULL=미확인']
+  intuition decimal(5,2) [check: `intuition BETWEEN 0 AND 100`, note: '직관 활용; 0~100 / NULL=미확인']
+  consultation decimal(5,2) [check: `consultation BETWEEN 0 AND 100`, note: '타인 의견 참고; 0~100 / NULL=미확인']
+  deliberation_time decimal(5,2) [check: `deliberation_time BETWEEN 0 AND 100`, note: '결정 전 숙고 시간; 0~100 / NULL=미확인']
+  risk_taking decimal(5,2) [check: `risk_taking BETWEEN 0 AND 100`, note: '위험 감수; 0~100 / NULL=미확인']
+  loss_aversion decimal(5,2) [check: `loss_aversion BETWEEN 0 AND 100`, note: '손실 회피; 0~100 / NULL=미확인']
+  long_term decimal(5,2) [check: `long_term BETWEEN 0 AND 100`, note: '장기 결과 고려; 0~100 / NULL=미확인']
+  reversibility decimal(5,2) [check: `reversibility BETWEEN 0 AND 100`, note: '되돌릴 수 있는 선택 선호; 0~100 / NULL=미확인']
+  small_experiments decimal(5,2) [check: `small_experiments BETWEEN 0 AND 100`, note: '작은 실험 후 결정; 0~100 / NULL=미확인']
+  explicit_criteria decimal(5,2) [check: `explicit_criteria BETWEEN 0 AND 100`, note: '결정 기준의 사전 명시; 0~100 / NULL=미확인']
+  context_adaptation decimal(5,2) [check: `context_adaptation BETWEEN 0 AND 100`, note: '상황에 따른 기준 조정; 0~100 / NULL=미확인']
+  belief_revision decimal(5,2) [check: `belief_revision BETWEEN 0 AND 100`, note: '새 근거에 따른 결정 수정; 0~100 / NULL=미확인']
+  satisficing decimal(5,2) [check: `satisficing BETWEEN 0 AND 100`, note: '충분한 대안에서 탐색 종료; 0~100 / NULL=미확인']
+  default_retention decimal(5,2) [check: `default_retention BETWEEN 0 AND 100`, note: '기본 선택지 유지; 0~100 / NULL=미확인']
+  opportunity_cost decimal(5,2) [check: `opportunity_cost BETWEEN 0 AND 100`, note: '기회비용 고려; 0~100 / NULL=미확인']
+  tradeoffs decimal(5,2) [check: `tradeoffs BETWEEN 0 AND 100`, note: '여러 목표 간 절충; 0~100 / NULL=미확인']
+  contingency decimal(5,2) [check: `contingency BETWEEN 0 AND 100`, note: '최악의 상황 대비; 0~100 / NULL=미확인']
+  metadata jsonb [not null, default: `'{}'::jsonb`, note: 'weight / sourceIds / reason']
+
+  Note: '의사결정 방식: 선택하기 전 정보를 처리하고 대안을 고르는 방식. 제외: 선택 후 실제 이행·감정 강도.'
+}
+
+Table clone_lab.profile_habits {
+  user_id uuid [pk, ref: - clone_lab.lab_users.id]
+  wake_regularity decimal(5,2) [check: `wake_regularity BETWEEN 0 AND 100`, note: '기상 시각 규칙성; 0~100 / NULL=미확인']
+  sleep_regularity decimal(5,2) [check: `sleep_regularity BETWEEN 0 AND 100`, note: '취침 시각 규칙성; 0~100 / NULL=미확인']
+  meal_regularity decimal(5,2) [check: `meal_regularity BETWEEN 0 AND 100`, note: '식사 시각 규칙성; 0~100 / NULL=미확인']
+  exercise decimal(5,2) [check: `exercise BETWEEN 0 AND 100`, note: '운동 실천; 0~100 / NULL=미확인']
+  health_checks decimal(5,2) [check: `health_checks BETWEEN 0 AND 100`, note: '건강 상태 점검; 0~100 / NULL=미확인']
+  plan_recording decimal(5,2) [check: `plan_recording BETWEEN 0 AND 100`, note: '계획 기록; 0~100 / NULL=미확인']
+  plan_execution decimal(5,2) [check: `plan_execution BETWEEN 0 AND 100`, note: '계획 이행; 0~100 / NULL=미확인']
+  deadline decimal(5,2) [check: `deadline BETWEEN 0 AND 100`, note: '마감 준수; 0~100 / NULL=미확인']
+  punctuality decimal(5,2) [check: `punctuality BETWEEN 0 AND 100`, note: '약속 시간 준수; 0~100 / NULL=미확인']
+  physical_order decimal(5,2) [check: `physical_order BETWEEN 0 AND 100`, note: '물리적 정리; 0~100 / NULL=미확인']
+  digital_order decimal(5,2) [check: `digital_order BETWEEN 0 AND 100`, note: '디지털 자료 정리; 0~100 / NULL=미확인']
+  expense_tracking decimal(5,2) [check: `expense_tracking BETWEEN 0 AND 100`, note: '지출 기록; 0~100 / NULL=미확인']
+  budget_adherence decimal(5,2) [check: `budget_adherence BETWEEN 0 AND 100`, note: '예산 준수; 0~100 / NULL=미확인']
+  saving decimal(5,2) [check: `saving BETWEEN 0 AND 100`, note: '저축 실행; 0~100 / NULL=미확인']
+  learning decimal(5,2) [check: `learning BETWEEN 0 AND 100`, note: '꾸준한 학습; 0~100 / NULL=미확인']
+  reading decimal(5,2) [check: `reading BETWEEN 0 AND 100`, note: '독서 실행; 0~100 / NULL=미확인']
+  procrastination decimal(5,2) [check: `procrastination BETWEEN 0 AND 100`, note: '할 일 미루기; 0~100 / NULL=미확인']
+  multitasking decimal(5,2) [check: `multitasking BETWEEN 0 AND 100`, note: '동시 작업; 0~100 / NULL=미확인']
+  rest decimal(5,2) [check: `rest BETWEEN 0 AND 100`, note: '휴식 확보; 0~100 / NULL=미확인']
+  review decimal(5,2) [check: `review BETWEEN 0 AND 100`, note: '완료 후 검토; 0~100 / NULL=미확인']
+  metadata jsonb [not null, default: `'{}'::jsonb`, note: 'weight / sourceIds / reason']
+
+  Note: '생활·실행 습관: 구체적으로 반복해서 실행한 행동. 제외: 희망·계획·선호만으로 추정한 행동.'
+}
+
+Table clone_lab.profile_relations {
+  user_id uuid [pk, ref: - clone_lab.lab_users.id]
+  social_orientation decimal(5,2) [check: `social_orientation BETWEEN 0 AND 100`, note: '사회적 교류 지향; 0~100 / NULL=미확인']
+  stranger_approach decimal(5,2) [check: `stranger_approach BETWEEN 0 AND 100`, note: '낯선 사람에게 먼저 접근; 0~100 / NULL=미확인']
+  contact_initiation decimal(5,2) [check: `contact_initiation BETWEEN 0 AND 100`, note: '관계 유지 연락 주도; 0~100 / NULL=미확인']
+  self_disclosure decimal(5,2) [check: `self_disclosure BETWEEN 0 AND 100`, note: '개인적 정보 공개; 0~100 / NULL=미확인']
+  intimacy_speed decimal(5,2) [check: `intimacy_speed BETWEEN 0 AND 100`, note: '친밀감 형성 속도; 0~100 / NULL=미확인']
+  personal_space decimal(5,2) [check: `personal_space BETWEEN 0 AND 100`, note: '관계에서 필요한 개인 공간; 0~100 / NULL=미확인']
+  respect_boundaries decimal(5,2) [check: `respect_boundaries BETWEEN 0 AND 100`, note: '상대의 경계 존중; 0~100 / NULL=미확인']
+  assert_boundaries decimal(5,2) [check: `assert_boundaries BETWEEN 0 AND 100`, note: '자신의 경계 명시; 0~100 / NULL=미확인']
+  ask_help decimal(5,2) [check: `ask_help BETWEEN 0 AND 100`, note: '도움 요청; 0~100 / NULL=미확인']
+  give_help decimal(5,2) [check: `give_help BETWEEN 0 AND 100`, note: '도움 제공; 0~100 / NULL=미확인']
+  role_coordination decimal(5,2) [check: `role_coordination BETWEEN 0 AND 100`, note: '협업 역할 조율; 0~100 / NULL=미확인']
+  leadership decimal(5,2) [check: `leadership BETWEEN 0 AND 100`, note: '집단에서의 주도권 행사; 0~100 / NULL=미확인']
+  trust_speed decimal(5,2) [check: `trust_speed BETWEEN 0 AND 100`, note: '타인 신뢰 형성 속도; 0~100 / NULL=미확인']
+  conflict_facing decimal(5,2) [check: `conflict_facing BETWEEN 0 AND 100`, note: '갈등 상황 직접 대면; 0~100 / NULL=미확인']
+  compromise decimal(5,2) [check: `compromise BETWEEN 0 AND 100`, note: '갈등에서 타협안 탐색; 0~100 / NULL=미확인']
+  assert_position decimal(5,2) [check: `assert_position BETWEEN 0 AND 100`, note: '갈등에서 자기 입장 관철; 0~100 / NULL=미확인']
+  apology decimal(5,2) [check: `apology BETWEEN 0 AND 100`, note: '잘못 인정·사과; 0~100 / NULL=미확인']
+  repair decimal(5,2) [check: `repair BETWEEN 0 AND 100`, note: '관계 회복 시도; 0~100 / NULL=미확인']
+  perspective_check decimal(5,2) [check: `perspective_check BETWEEN 0 AND 100`, note: '상대 관점 확인; 0~100 / NULL=미확인']
+  reciprocity decimal(5,2) [check: `reciprocity BETWEEN 0 AND 100`, note: '관계의 상호성 기대; 0~100 / NULL=미확인']
+  metadata jsonb [not null, default: `'{}'::jsonb`, note: 'weight / sourceIds / reason']
+
+  Note: '대인관계 방식: 관계를 형성·조율·유지할 때의 행동 경향. 제외: 단순 감정 반응·문장 형식.'
+}
+
+Table clone_lab.profile_expression {
+  user_id uuid [pk, ref: - clone_lab.lab_users.id]
+  formality decimal(5,2) [check: `formality BETWEEN 0 AND 100`, note: '격식; 0~100 / NULL=미확인']
+  directness decimal(5,2) [check: `directness BETWEEN 0 AND 100`, note: '직설성; 0~100 / NULL=미확인']
+  certainty decimal(5,2) [check: `certainty BETWEEN 0 AND 100`, note: '단정성; 0~100 / NULL=미확인']
+  sentence_length decimal(5,2) [check: `sentence_length BETWEEN 0 AND 100`, note: '문장 길이; 0~100 / NULL=미확인']
+  detail decimal(5,2) [check: `detail BETWEEN 0 AND 100`, note: '설명 상세도; 0~100 / NULL=미확인']
+  point_first decimal(5,2) [check: `point_first BETWEEN 0 AND 100`, note: '핵심 선제시; 0~100 / NULL=미확인']
+  examples decimal(5,2) [check: `examples BETWEEN 0 AND 100`, note: '예시 사용; 0~100 / NULL=미확인']
+  metaphors decimal(5,2) [check: `metaphors BETWEEN 0 AND 100`, note: '비유 사용; 0~100 / NULL=미확인']
+  humor decimal(5,2) [check: `humor BETWEEN 0 AND 100`, note: '유머 사용; 0~100 / NULL=미확인']
+  irony decimal(5,2) [check: `irony BETWEEN 0 AND 100`, note: '반어·풍자 사용; 0~100 / NULL=미확인']
+  emotion_words decimal(5,2) [check: `emotion_words BETWEEN 0 AND 100`, note: '감정어 사용; 0~100 / NULL=미확인']
+  emphasis decimal(5,2) [check: `emphasis BETWEEN 0 AND 100`, note: '강조 표현; 0~100 / NULL=미확인']
+  hedging decimal(5,2) [check: `hedging BETWEEN 0 AND 100`, note: '완곡 표현; 0~100 / NULL=미확인']
+  questions decimal(5,2) [check: `questions BETWEEN 0 AND 100`, note: '질문 사용; 0~100 / NULL=미확인']
+  clarification decimal(5,2) [check: `clarification BETWEEN 0 AND 100`, note: '되묻기·요약 확인; 0~100 / NULL=미확인']
+  terminology decimal(5,2) [check: `terminology BETWEEN 0 AND 100`, note: '전문용어 사용; 0~100 / NULL=미확인']
+  slang decimal(5,2) [check: `slang BETWEEN 0 AND 100`, note: '구어·속어 사용; 0~100 / NULL=미확인']
+  emoji decimal(5,2) [check: `emoji BETWEEN 0 AND 100`, note: '이모지 사용; 0~100 / NULL=미확인']
+  structure decimal(5,2) [check: `structure BETWEEN 0 AND 100`, note: '목록·구조화 사용; 0~100 / NULL=미확인']
+  personal_examples decimal(5,2) [check: `personal_examples BETWEEN 0 AND 100`, note: '개인 경험 인용; 0~100 / NULL=미확인']
+  metadata jsonb [not null, default: `'{}'::jsonb`, note: 'weight / sourceIds / reason']
+
+  Note: '언어·표현 방식: 사용자 원문의 발화·서술 형식. 제외: AI 답변의 말투·내용의 가치관·실제 행동.'
+}
+
+
+
+TableGroup conversation {
+  clone_lab.lab_users
+  clone_lab.sessions
+  clone_lab.context
+}
+
+TableGroup long_term_memory {
+  clone_lab.vector_store
+}
+
+TableGroup analysis_profiles {
+  clone_lab.profile_emotion
+  clone_lab.profile_values
+  clone_lab.profile_interests
+  clone_lab.profile_decision
+  clone_lab.profile_habits
+  clone_lab.profile_relations
+  clone_lab.profile_expression
+}

@@ -80,7 +80,15 @@ public class LabValidation {
       }
     }
     for (JsonNode memory : data.path("memories")) {
-      if (!Set.of("FACT", "EXPERIENCE", "CONDITIONAL_PREFERENCE")
+      if (!Set.of(
+              "FACT",
+              "EXPERIENCE",
+              "PREFERENCE",
+              "CONDITIONAL_PREFERENCE",
+              "VALUE",
+              "HABIT",
+              "GOAL",
+              "RELATIONSHIP")
           .contains(memory.path("kind").asText())) {
         throw LabException.invalid("기억 유형 오류입니다.");
       }

@@ -27,8 +27,12 @@ public class LabConfiguration {
       @Value("${lab.initialize-schema:false}") boolean initialize) {
     return args -> {
       if (initialize) {
-        new ResourceDatabasePopulator(new ClassPathResource("clone-lab/schema.sql"))
-            .execute(dataSource);
+        ResourceDatabasePopulator populator =
+            new ResourceDatabasePopulator(new ClassPathResource("clone-lab/schema.sql"));
+        // PostgreSQL DO 블록 내부의 세미콜론을 문장 구분자로 해석하지 않는다.
+        populator.setSeparator(
+            org.springframework.jdbc.datasource.init.ScriptUtils.EOF_STATEMENT_SEPARATOR);
+        populator.execute(dataSource);
       }
       runs.recoverInterrupted();
     };

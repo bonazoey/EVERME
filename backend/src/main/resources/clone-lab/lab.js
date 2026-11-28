@@ -12,6 +12,8 @@
     if(!response.ok)throw new Error(data.message || `요청 실패 (${response.status})`);return data;
   }
   const userPath=()=>'/users/'+state.user;
+  const actorId=()=>owner?state.user:($('actor').value||state.user);
+  const historyPath=()=>userPath()+'/sessions/current?actorUserId='+encodeURIComponent(actorId());
   function notice(text,error=false){$('notice').textContent=text;$('notice').classList.toggle('error',error);}
   function controls(){
     const running=['running','stopping'].includes(state.run.status), unfinished=state.run.mode==='single-session-pipeline-v1'&&['paused','failed'].includes(state.run.status),locked=state.busy||running||unfinished, exists=!!state.user;
@@ -24,24 +26,24 @@
       $('stop').disabled=state.busy||state.run.status!=='running';$('resume').disabled=state.busy||!['paused','failed'].includes(state.run.status);
       $('export').disabled=state.busy||!exists;$('open-create').disabled=state.busy;$('batch').disabled=state.busy;$('topic').disabled=locked;
     } else {
-      $('new-session').disabled=state.busy||!exists;$('batch').disabled=state.busy||!exists;$('question').disabled=state.busy||!state.session;$('send').disabled=state.busy||!state.session;
+      $('actor').disabled=state.busy;$('new-session').disabled=state.busy||!exists;$('batch').disabled=state.busy||!exists;$('question').disabled=state.busy||!state.session;$('send').disabled=state.busy||!state.session;
     }
   }
   async function action(label,fn){if(state.busy)return;state.busy=true;controls();notice(label);try{await fn();}catch(error){notice(error.message,true);}finally{state.busy=false;controls();}}
-  async function loadUsers(selected){const users=await api('/users');$('user').innerHTML='<option value="">사용자를 선택하세요</option>'+users.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');if(selected&&users.some(u=>u.id===selected)){$('user').value=selected;await selectUser(selected);}}
+  async function loadUsers(selected){const users=await api('/users');$('user').innerHTML='<option value="">사용자를 선택하세요</option>'+users.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');if(!owner)$('actor').innerHTML='<option value="">자기 클론 테스트</option>'+users.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');if(selected&&users.some(u=>u.id===selected)){$('user').value=selected;await selectUser(selected);}}
   async function selectUser(id){
     clearTimeout(state.timer);state.user=id;state.batch=null;state.profile=null;state.session=null;state.run={};
     if(owner){$('owner-message').value='';}
     if(!id){if(owner){$('conversation').innerHTML='';renderElements();}else{$('chat').innerHTML='';$('evidence').innerHTML='';}controls();return;}
     localStorage.setItem('everme-lab-user',id);
     if(owner){state.profile=await api(userPath()+'/profile');await loadBatches();await pollRun();renderElements();notice('주제를 입력해 대화를 생성하거나 기존 배치를 선택하세요.');}
-    else {await loadBatches();const history=await api(userPath()+'/sessions/current');if(history.sessionId){state.session=history;$('batch').value=history.batchId||'';renderHistory();notice('이전 클론 대화를 불러왔습니다.');}else await newSession();$('clone-title').textContent=$('user').selectedOptions[0].textContent+'의 클론';}
+    else {await loadBatches();const history=await api(historyPath());if(history.sessionId){state.session=history;$('batch').value=history.batchId||'';renderHistory();notice('이전 클론 대화를 불러왔습니다.');}else await newSession();$('clone-title').textContent=$('user').selectedOptions[0].textContent+'의 클론';}
     controls();
   }
   async function loadBatches(preferred){
     const batches=await api(userPath()+'/batches');const available=owner?batches:batches.filter(b=>b.status==='saved');
     const previous=preferred||state.batch?.id||$('batch').value;
-    $('batch').innerHTML=(owner?'<option value="">대화 배치를 선택하세요</option>':'<option value="">배치 없이 장기 기억에서 찾기</option>')+available.map(b=>`<option value="${esc(b.id)}">#${b.sequence_no} ${esc((b.topic||'주제 미정 · 10쌍 후 자동 확정').slice(0,32))} · ${{generated:'생성됨',analyzed:'분석됨',saved:'저장됨'}[b.status]}</option>`).join('');
+    $('batch').innerHTML=(owner?'<option value="">대화 배치를 선택하세요</option>':'<option value="">최근 문맥부터 검색</option>')+available.map(b=>`<option value="${esc(b.id)}">${esc((b.topic||'주제 미정 · 10쌍 후 자동 확정').slice(0,32))} · ${{generated:'생성됨',analyzed:'분석됨',saved:'저장됨'}[b.status]}</option>`).join('');
     if(previous&&available.some(b=>b.id===previous))$('batch').value=previous;
     else if(owner&&available.length)$('batch').value=available[0].id;
     if(owner&&$('batch').value)await loadBatch($('batch').value);else if(owner){state.batch=null;$('conversation').innerHTML='<div class="empty"><h3>아직 대화가 없습니다.</h3><p>아래에 직접 이야기를 입력하거나 10개 대화를 생성하세요.</p></div>';$('turn-count').textContent='0';}
@@ -83,7 +85,7 @@
     else if(run.status==='completed'||run.status==='paused'||run.status==='failed'){state.profile=await api(userPath()+'/profile');await loadBatches(run.batchId);renderElements();}
   }
   function metrics(m){return m?` · ${m.inputTokens||0} 입력 / ${m.outputTokens||0} 출력 토큰 · ${(m.elapsedMs/1000).toFixed(1)}초`:'';}
-  async function newSession(){state.session=await api(userPath()+'/sessions','POST',{batchId:$('batch').value||null});renderHistory();notice('새 클론 대화를 시작했습니다.');controls();}
+  async function newSession(){state.session=await api(userPath()+'/sessions','POST',{batchId:$('batch').value||null,actorUserId:actorId()});renderHistory();notice('새 클론 대화를 시작했습니다.');controls();}
   function bubble(question,response){return `<article class="turn user"><div class="turn-label">정보이용자</div><div class="bubble owner">${esc(question)}</div></article><article class="turn assistant"><div class="turn-label">클론</div><div class="bubble">${esc(response.answer)}</div><p class="answer-stage">${esc(stages[response.stage]||response.stage)}${response.inferred?' · 추정한 답변':''}</p></article>`;}
   function renderHistory(){
     const messages=state.session?.messages||[];$('chat').innerHTML=messages.length?messages.map(m=>bubble(m.question,m.response)).join(''):'<div class="empty"><h3>질문을 보내 대화를 시작하세요.</h3><p>현재 컨텍스트 → 장기 기억 → 분석 프로필 순서로 확인합니다.</p></div>';
@@ -107,8 +109,8 @@
     $('resume').onclick=()=>action('자동 테스트를 재개하는 중…',async()=>{state.run=await api(userPath()+'/runs/current/resume','POST');await pollRun();notice('마지막 미완료 배치부터 이어갑니다.');});
     $('export').onclick=()=>action('결과를 내보내는 중…',async()=>{const result=await api(userPath()+'/export');const url=URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='everme-lab-'+state.user+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notice('실험 결과와 평가 지표를 내보냈습니다.');});
   }else{
-    $('new-session').onclick=()=>action('새 대화를 준비하는 중…',newSession);$('batch').onchange=()=>action('컨텍스트를 변경해 새 대화를 준비하는 중…',newSession);
-    $('question-form').onsubmit=event=>{event.preventDefault();const question=$('question').value;action('클론이 기억과 근거를 확인하고 있습니다…',async()=>{await api(userPath()+'/questions','POST',{sessionId:state.session.sessionId,question});state.session=await api(userPath()+'/sessions/current');$('question').value='';renderHistory();notice('답변을 받았습니다. 근거와 추정 여부를 확인하세요.');});};
+    $('actor').onchange=()=>action('정보이용자의 대화를 불러오는 중…',()=>selectUser(state.user));$('new-session').onclick=()=>action('새 대화를 준비하는 중…',newSession);$('batch').onchange=()=>action('컨텍스트를 변경해 새 대화를 준비하는 중…',newSession);
+    $('question-form').onsubmit=event=>{event.preventDefault();const question=$('question').value;action('클론이 기억과 근거를 확인하고 있습니다…',async()=>{await api(userPath()+'/questions','POST',{sessionId:state.session.sessionId,question,actorUserId:actorId()});state.session=await api(historyPath());$('question').value='';renderHistory();notice('답변을 받았습니다. 근거와 추정 여부를 확인하세요.');});};
   }
   action('실험 환경을 불러오는 중…',async()=>{const [catalog,config]=await Promise.all([api('/catalog'),api('/config')]);state.catalog=catalog;$('model-info').textContent=owner?`생성 ${config.generation} · 분석 ${config.analysis}`:`답변 ${config.answer}`;if(owner)renderElements();await loadUsers(localStorage.getItem('everme-lab-user'));if(!config.keyConfigured)notice('OPENAI_API_KEY를 설정한 뒤 서버를 다시 시작해 주세요.',true);else if(!state.user)notice('새 가상 인물을 만들거나 기존 사용자를 선택하세요.');});
 })();

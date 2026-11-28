@@ -85,7 +85,16 @@ public class LabSchemas {
         object(
             Map.of(
                 "kind",
-                enumeration(List.of("FACT", "EXPERIENCE", "CONDITIONAL_PREFERENCE")),
+                enumeration(
+                    List.of(
+                        "FACT",
+                        "EXPERIENCE",
+                        "PREFERENCE",
+                        "CONDITIONAL_PREFERENCE",
+                        "VALUE",
+                        "HABIT",
+                        "GOAL",
+                        "RELATIONSHIP")),
                 "content",
                 string(),
                 "sourceIds",

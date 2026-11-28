@@ -114,6 +114,9 @@ public final class LabAiTransport {
           continue;
         }
         int status = response.status.value();
+        if (status >= 400) {
+          logProviderError(request, response, attempt + 1);
+        }
         boolean retry =
             status >= 500 && status <= 599 || status == 429 && !quotaError(response.bytes);
         if (retry && attempt < 4) {
@@ -136,10 +139,52 @@ public final class LabAiTransport {
     }
   }
 
+  // ##### 재시도 전 OpenAI 오류 원인과 요청 식별자를 기록하는 메소드 #####
+  private void logProviderError(HttpRequest request, BufferedResponse response, int attempt) {
+    JsonNode error = json.createObjectNode();
+    try {
+      JsonNode body = json.readTree(response.bytes);
+      if (body != null) {
+        error = body.path("error");
+      }
+    } catch (IOException ignored) {
+      // JSON이 아닌 오류 응답은 본문 대신 상태 코드와 요청 ID로 추적한다.
+    }
+    log.warn(
+        "lab_http_error requestId={} runId={} segment={} route={} status={} attempt={}"
+            + " providerRequestId={} errorCode={} errorType={} errorMessage={}",
+        org.slf4j.MDC.get("labRequestId"),
+        org.slf4j.MDC.get("labRunId"),
+        org.slf4j.MDC.get("labSegment"),
+        request.getURI().getPath(),
+        response.status.value(),
+        attempt,
+        logValue(response.headers.getFirst("x-request-id")),
+        logValue(error.path("code").asText("unavailable")),
+        logValue(error.path("type").asText("unavailable")),
+        logValue(error.path("message").asText("unavailable")));
+  }
+
+  private String logValue(String value) {
+    if (value == null) {
+      return "unavailable";
+    }
+    String safe = key.isBlank() ? value : value.replace(key, "[REDACTED]");
+    safe = safe.replaceAll("[\\p{Cntrl}\\u2028\\u2029]", " ");
+    return safe.substring(0, Math.min(safe.length(), 2000));
+  }
+
   private boolean quotaError(byte[] body) {
     try {
-      return Set.of("insufficient_quota", "billing_hard_limit_reached", "billing_not_active")
-          .contains(json.readTree(body).path("error").path("code").asText());
+      JsonNode error = json.readTree(body).path("error");
+      return "insufficient_quota".equals(error.path("type").asText())
+          || Set.of(
+                  "insufficient_quota",
+                  "credit_balance_exhausted",
+                  "organization_usage_limit_exceeded",
+                  "billing_hard_limit_reached",
+                  "billing_not_active")
+              .contains(error.path("code").asText());
     } catch (IOException ignored) {
       return false;
     }

@@ -1,7 +1,6 @@
 package com.example.everme.lab.service;
 
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -15,7 +14,6 @@ import org.springframework.ai.tool.method.MethodToolCallback;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import com.example.everme.lab.dao.LabDao;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -26,16 +24,17 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class LabCloneTools {
   // ##### 필드 #####
   private final LabService lab;
-  private final LabAi ai;
   private final LabCatalog catalog;
   private final LabSchemas schemas;
+  private final LabRetrievalService retrieval;
 
   // ##### 생성자 #####
-  public LabCloneTools(LabService lab, LabAi ai, LabCatalog catalog, LabSchemas schemas) {
+  public LabCloneTools(
+      LabService lab, LabCatalog catalog, LabSchemas schemas, LabRetrievalService retrieval) {
     this.lab = lab;
-    this.ai = ai;
     this.catalog = catalog;
     this.schemas = schemas;
+    this.retrieval = retrieval;
   }
 
   public ToolCallback memory(UUID owner) {
@@ -54,28 +53,19 @@ public class LabCloneTools {
       @ToolParam(description = "질문과 관련된 기억 검색어") String query, ToolContext toolContext) {
     UUID owner = owner(toolContext);
     LabValidation.text(query, 1000, "검색어");
-    float[] vector = ai.embed(List.of(query)).getFirst();
-    LinkedHashMap<String, Map<String, Object>> found =
-        new LinkedHashMap<String, Map<String, Object>>();
-    for (Map<String, Object> item : lab.dao.mapper().search(owner, LabDao.vector(vector))) {
-      found.put(item.get("id").toString(), item);
-    }
-    for (Map<String, Object> item : lab.dao.mapper().keyword(owner, query)) {
-      found.putIfAbsent(item.get("id").toString(), item);
-    }
     ArrayNode items = lab.json.createArrayNode();
-    for (Map<String, Object> memory : found.values()) {
-      ObjectNode item = lab.object();
-      item.put("id", memory.get("id").toString());
-      item.put("kind", memory.get("kind").toString());
-      item.put("content", memory.get("content").toString());
-      item.set("sourceIds", lab.dao.parse(memory.get("source_ids")));
-      if (memory.get("occurred_at") == null) {
-        item.putNull("occurredAt");
-      } else {
-        item.put("occurredAt", memory.get("occurred_at").toString());
-      }
-      items.add(item);
+    for (org.springframework.ai.document.Document document : retrieval.memories(owner, query)) {
+      JsonNode meta = lab.json.valueToTree(document.getMetadata());
+      ObjectNode item =
+          items.addObject().put("id", document.getId()).put("kind", meta.path("kind").asText());
+      item.put(
+          "content",
+          meta.path("record_type").asText().equals("context_archive")
+              ? meta.path("user_text").asText()
+              : document.getText());
+      item.set("sourceIds", meta.path("source_ids"));
+      item.set("sourceExcerpts", meta.path("source_excerpts"));
+      item.set("occurredAt", meta.path("occurred_at"));
     }
     return items;
   }
@@ -181,7 +171,9 @@ public class LabCloneTools {
               throw labException;
             }
           }
-          throw LabException.invalid("도구 인자가 올바르지 않습니다.");
+          LabException wrapped = LabException.invalid("도구 실행에 실패했습니다.");
+          wrapped.initCause(failure);
+          throw wrapped;
         }
       }
     };

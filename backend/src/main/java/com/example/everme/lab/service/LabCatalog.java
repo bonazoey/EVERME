@@ -77,6 +77,9 @@ public class LabCatalog {
 
   public JsonNode analysisDocument() {
     ObjectNode result = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+    result.put("anchorRule", "각 요소의 anchorRef가 가리키는 anchorDefinitions의 점수 해석을 적용한다.");
+    ObjectNode anchorDefinitions = result.putObject("anchorDefinitions");
+    Map<JsonNode, String> anchorRefs = new LinkedHashMap<>();
     result.put(
         "defaultBoundary",
         "요소 이름에 직접 해당하는 근거만 사용한다. 영역의 exclude를 이 점수로 대신 측정하지 않는다. 요소에 boundary 또는 counterExample이"
@@ -94,9 +97,17 @@ public class LabCatalog {
       ArrayNode items = target.putArray("elements");
       for (JsonNode element : domain.path("elements")) {
         ObjectNode item = items.addObject();
-        for (String field : List.of("code", "label", "anchors", "positiveExample")) {
+        for (String field : List.of("code", "label", "positiveExample")) {
           item.set(field, element.path(field));
         }
+        JsonNode anchors = element.path("anchors");
+        String anchorRef = anchorRefs.get(anchors);
+        if (anchorRef == null) {
+          anchorRef = "scale_" + (anchorRefs.size() + 1);
+          anchorRefs.put(anchors, anchorRef);
+          anchorDefinitions.set(anchorRef, anchors.deepCopy());
+        }
+        item.put("anchorRef", anchorRef);
         if (!element
             .path("boundary")
             .asText()

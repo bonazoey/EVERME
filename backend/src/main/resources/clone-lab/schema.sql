@@ -1,160 +1,720 @@
-CREATE SCHEMA IF NOT EXISTS clone_lab;
+-- Clone Lab confirmed schema; no destructive DDL.
 CREATE EXTENSION IF NOT EXISTS vector;
-CREATE TABLE IF NOT EXISTS clone_lab.lab_users (id uuid PRIMARY KEY, name text NOT NULL, persona jsonb NOT NULL, profile_version bigint NOT NULL DEFAULT 0, run_state jsonb NOT NULL DEFAULT '{}', viewer_context jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now());
-CREATE TABLE IF NOT EXISTS clone_lab.batches (id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES clone_lab.lab_users(id), topic text NOT NULL, sequence_no int NOT NULL, status text NOT NULL DEFAULT 'generated' CHECK(status IN ('generated','analyzed','saved')), analysis jsonb, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(user_id,sequence_no));
-CREATE TABLE IF NOT EXISTS clone_lab.turns (id uuid PRIMARY KEY, batch_id uuid NOT NULL REFERENCES clone_lab.batches(id), ordinal int NOT NULL, user_text text NOT NULL, assistant_text text NOT NULL, UNIQUE(batch_id,ordinal));
-CREATE TABLE IF NOT EXISTS clone_lab.memories (id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES clone_lab.lab_users(id), batch_id uuid NOT NULL REFERENCES clone_lab.batches(id), kind text NOT NULL CHECK(kind IN ('FACT','EXPERIENCE','CONDITIONAL_PREFERENCE')), content text NOT NULL, source_ids jsonb NOT NULL, occurred_at text, fingerprint text NOT NULL, embedding vector(1536) NOT NULL, UNIQUE(user_id,fingerprint));
-CREATE TABLE IF NOT EXISTS clone_lab.profile_emotion (user_id uuid PRIMARY KEY REFERENCES clone_lab.lab_users(id),
- uncertainty_anxiety numeric(5,2) CHECK (uncertainty_anxiety BETWEEN 0 AND 100),
- threat_fear numeric(5,2) CHECK (threat_fear BETWEEN 0 AND 100),
- blocked_frustration numeric(5,2) CHECK (blocked_frustration BETWEEN 0 AND 100),
- injustice_anger numeric(5,2) CHECK (injustice_anger BETWEEN 0 AND 100),
- loss_sadness numeric(5,2) CHECK (loss_sadness BETWEEN 0 AND 100),
- positive_joy numeric(5,2) CHECK (positive_joy BETWEEN 0 AND 100),
- anticipation numeric(5,2) CHECK (anticipation BETWEEN 0 AND 100),
- public_embarrassment numeric(5,2) CHECK (public_embarrassment BETWEEN 0 AND 100),
- evaluation_sensitivity numeric(5,2) CHECK (evaluation_sensitivity BETWEEN 0 AND 100),
- emotional_contagion numeric(5,2) CHECK (emotional_contagion BETWEEN 0 AND 100),
- emotion_duration numeric(5,2) CHECK (emotion_duration BETWEEN 0 AND 100),
- mood_amplitude numeric(5,2) CHECK (mood_amplitude BETWEEN 0 AND 100),
- recovery_speed numeric(5,2) CHECK (recovery_speed BETWEEN 0 AND 100),
- monotony_boredom numeric(5,2) CHECK (monotony_boredom BETWEEN 0 AND 100),
- novelty_stimulation numeric(5,2) CHECK (novelty_stimulation BETWEEN 0 AND 100),
- noise_sensitivity numeric(5,2) CHECK (noise_sensitivity BETWEEN 0 AND 100),
- visual_sensitivity numeric(5,2) CHECK (visual_sensitivity BETWEEN 0 AND 100),
- smell_sensitivity numeric(5,2) CHECK (smell_sensitivity BETWEEN 0 AND 100),
- touch_sensitivity numeric(5,2) CHECK (touch_sensitivity BETWEEN 0 AND 100),
- crowding_overload numeric(5,2) CHECK (crowding_overload BETWEEN 0 AND 100),
- metadata jsonb NOT NULL DEFAULT '{}');
-CREATE TABLE IF NOT EXISTS clone_lab.profile_values (user_id uuid PRIMARY KEY REFERENCES clone_lab.lab_users(id),
- autonomy numeric(5,2) CHECK (autonomy BETWEEN 0 AND 100),
- security numeric(5,2) CHECK (security BETWEEN 0 AND 100),
- achievement numeric(5,2) CHECK (achievement BETWEEN 0 AND 100),
- fairness numeric(5,2) CHECK (fairness BETWEEN 0 AND 100),
- care numeric(5,2) CHECK (care BETWEEN 0 AND 100),
- family numeric(5,2) CHECK (family BETWEEN 0 AND 100),
- financial_comfort numeric(5,2) CHECK (financial_comfort BETWEEN 0 AND 100),
- growth numeric(5,2) CHECK (growth BETWEEN 0 AND 100),
- tradition numeric(5,2) CHECK (tradition BETWEEN 0 AND 100),
- contribution numeric(5,2) CHECK (contribution BETWEEN 0 AND 100),
- honesty numeric(5,2) CHECK (honesty BETWEEN 0 AND 100),
- loyalty numeric(5,2) CHECK (loyalty BETWEEN 0 AND 100),
- privacy numeric(5,2) CHECK (privacy BETWEEN 0 AND 100),
- health numeric(5,2) CHECK (health BETWEEN 0 AND 100),
- pleasure numeric(5,2) CHECK (pleasure BETWEEN 0 AND 100),
- creativity numeric(5,2) CHECK (creativity BETWEEN 0 AND 100),
- expertise numeric(5,2) CHECK (expertise BETWEEN 0 AND 100),
- recognition numeric(5,2) CHECK (recognition BETWEEN 0 AND 100),
- environment numeric(5,2) CHECK (environment BETWEEN 0 AND 100),
- spirituality numeric(5,2) CHECK (spirituality BETWEEN 0 AND 100),
- metadata jsonb NOT NULL DEFAULT '{}');
-CREATE TABLE IF NOT EXISTS clone_lab.profile_interests (user_id uuid PRIMARY KEY REFERENCES clone_lab.lab_users(id),
- technology numeric(5,2) CHECK (technology BETWEEN 0 AND 100),
- science numeric(5,2) CHECK (science BETWEEN 0 AND 100),
- history numeric(5,2) CHECK (history BETWEEN 0 AND 100),
- philosophy numeric(5,2) CHECK (philosophy BETWEEN 0 AND 100),
- society numeric(5,2) CHECK (society BETWEEN 0 AND 100),
- finance numeric(5,2) CHECK (finance BETWEEN 0 AND 100),
- literature numeric(5,2) CHECK (literature BETWEEN 0 AND 100),
- visual_art numeric(5,2) CHECK (visual_art BETWEEN 0 AND 100),
- music numeric(5,2) CHECK (music BETWEEN 0 AND 100),
- film_performance numeric(5,2) CHECK (film_performance BETWEEN 0 AND 100),
- gaming numeric(5,2) CHECK (gaming BETWEEN 0 AND 100),
- sports numeric(5,2) CHECK (sports BETWEEN 0 AND 100),
- travel numeric(5,2) CHECK (travel BETWEEN 0 AND 100),
- outdoors numeric(5,2) CHECK (outdoors BETWEEN 0 AND 100),
- cooking_food numeric(5,2) CHECK (cooking_food BETWEEN 0 AND 100),
- fashion numeric(5,2) CHECK (fashion BETWEEN 0 AND 100),
- craft numeric(5,2) CHECK (craft BETWEEN 0 AND 100),
- animals numeric(5,2) CHECK (animals BETWEEN 0 AND 100),
- social_gatherings numeric(5,2) CHECK (social_gatherings BETWEEN 0 AND 100),
- collecting numeric(5,2) CHECK (collecting BETWEEN 0 AND 100),
- metadata jsonb NOT NULL DEFAULT '{}');
-CREATE TABLE IF NOT EXISTS clone_lab.profile_decision (user_id uuid PRIMARY KEY REFERENCES clone_lab.lab_users(id),
- research_depth numeric(5,2) CHECK (research_depth BETWEEN 0 AND 100),
- source_verification numeric(5,2) CHECK (source_verification BETWEEN 0 AND 100),
- alternative_breadth numeric(5,2) CHECK (alternative_breadth BETWEEN 0 AND 100),
- quantitative_reasoning numeric(5,2) CHECK (quantitative_reasoning BETWEEN 0 AND 100),
- intuition numeric(5,2) CHECK (intuition BETWEEN 0 AND 100),
- consultation numeric(5,2) CHECK (consultation BETWEEN 0 AND 100),
- deliberation_time numeric(5,2) CHECK (deliberation_time BETWEEN 0 AND 100),
- risk_taking numeric(5,2) CHECK (risk_taking BETWEEN 0 AND 100),
- loss_aversion numeric(5,2) CHECK (loss_aversion BETWEEN 0 AND 100),
- long_term numeric(5,2) CHECK (long_term BETWEEN 0 AND 100),
- reversibility numeric(5,2) CHECK (reversibility BETWEEN 0 AND 100),
- small_experiments numeric(5,2) CHECK (small_experiments BETWEEN 0 AND 100),
- explicit_criteria numeric(5,2) CHECK (explicit_criteria BETWEEN 0 AND 100),
- context_adaptation numeric(5,2) CHECK (context_adaptation BETWEEN 0 AND 100),
- belief_revision numeric(5,2) CHECK (belief_revision BETWEEN 0 AND 100),
- satisficing numeric(5,2) CHECK (satisficing BETWEEN 0 AND 100),
- default_retention numeric(5,2) CHECK (default_retention BETWEEN 0 AND 100),
- opportunity_cost numeric(5,2) CHECK (opportunity_cost BETWEEN 0 AND 100),
- tradeoffs numeric(5,2) CHECK (tradeoffs BETWEEN 0 AND 100),
- contingency numeric(5,2) CHECK (contingency BETWEEN 0 AND 100),
- metadata jsonb NOT NULL DEFAULT '{}');
-CREATE TABLE IF NOT EXISTS clone_lab.profile_habits (user_id uuid PRIMARY KEY REFERENCES clone_lab.lab_users(id),
- wake_regularity numeric(5,2) CHECK (wake_regularity BETWEEN 0 AND 100),
- sleep_regularity numeric(5,2) CHECK (sleep_regularity BETWEEN 0 AND 100),
- meal_regularity numeric(5,2) CHECK (meal_regularity BETWEEN 0 AND 100),
- exercise numeric(5,2) CHECK (exercise BETWEEN 0 AND 100),
- health_checks numeric(5,2) CHECK (health_checks BETWEEN 0 AND 100),
- plan_recording numeric(5,2) CHECK (plan_recording BETWEEN 0 AND 100),
- plan_execution numeric(5,2) CHECK (plan_execution BETWEEN 0 AND 100),
- deadline numeric(5,2) CHECK (deadline BETWEEN 0 AND 100),
- punctuality numeric(5,2) CHECK (punctuality BETWEEN 0 AND 100),
- physical_order numeric(5,2) CHECK (physical_order BETWEEN 0 AND 100),
- digital_order numeric(5,2) CHECK (digital_order BETWEEN 0 AND 100),
- expense_tracking numeric(5,2) CHECK (expense_tracking BETWEEN 0 AND 100),
- budget_adherence numeric(5,2) CHECK (budget_adherence BETWEEN 0 AND 100),
- saving numeric(5,2) CHECK (saving BETWEEN 0 AND 100),
- learning numeric(5,2) CHECK (learning BETWEEN 0 AND 100),
- reading numeric(5,2) CHECK (reading BETWEEN 0 AND 100),
- procrastination numeric(5,2) CHECK (procrastination BETWEEN 0 AND 100),
- multitasking numeric(5,2) CHECK (multitasking BETWEEN 0 AND 100),
- rest numeric(5,2) CHECK (rest BETWEEN 0 AND 100),
- review numeric(5,2) CHECK (review BETWEEN 0 AND 100),
- metadata jsonb NOT NULL DEFAULT '{}');
-CREATE TABLE IF NOT EXISTS clone_lab.profile_relations (user_id uuid PRIMARY KEY REFERENCES clone_lab.lab_users(id),
- social_orientation numeric(5,2) CHECK (social_orientation BETWEEN 0 AND 100),
- stranger_approach numeric(5,2) CHECK (stranger_approach BETWEEN 0 AND 100),
- contact_initiation numeric(5,2) CHECK (contact_initiation BETWEEN 0 AND 100),
- self_disclosure numeric(5,2) CHECK (self_disclosure BETWEEN 0 AND 100),
- intimacy_speed numeric(5,2) CHECK (intimacy_speed BETWEEN 0 AND 100),
- personal_space numeric(5,2) CHECK (personal_space BETWEEN 0 AND 100),
- respect_boundaries numeric(5,2) CHECK (respect_boundaries BETWEEN 0 AND 100),
- assert_boundaries numeric(5,2) CHECK (assert_boundaries BETWEEN 0 AND 100),
- ask_help numeric(5,2) CHECK (ask_help BETWEEN 0 AND 100),
- give_help numeric(5,2) CHECK (give_help BETWEEN 0 AND 100),
- role_coordination numeric(5,2) CHECK (role_coordination BETWEEN 0 AND 100),
- leadership numeric(5,2) CHECK (leadership BETWEEN 0 AND 100),
- trust_speed numeric(5,2) CHECK (trust_speed BETWEEN 0 AND 100),
- conflict_facing numeric(5,2) CHECK (conflict_facing BETWEEN 0 AND 100),
- compromise numeric(5,2) CHECK (compromise BETWEEN 0 AND 100),
- assert_position numeric(5,2) CHECK (assert_position BETWEEN 0 AND 100),
- apology numeric(5,2) CHECK (apology BETWEEN 0 AND 100),
- repair numeric(5,2) CHECK (repair BETWEEN 0 AND 100),
- perspective_check numeric(5,2) CHECK (perspective_check BETWEEN 0 AND 100),
- reciprocity numeric(5,2) CHECK (reciprocity BETWEEN 0 AND 100),
- metadata jsonb NOT NULL DEFAULT '{}');
-CREATE TABLE IF NOT EXISTS clone_lab.profile_expression (user_id uuid PRIMARY KEY REFERENCES clone_lab.lab_users(id),
- formality numeric(5,2) CHECK (formality BETWEEN 0 AND 100),
- directness numeric(5,2) CHECK (directness BETWEEN 0 AND 100),
- certainty numeric(5,2) CHECK (certainty BETWEEN 0 AND 100),
- sentence_length numeric(5,2) CHECK (sentence_length BETWEEN 0 AND 100),
- detail numeric(5,2) CHECK (detail BETWEEN 0 AND 100),
- point_first numeric(5,2) CHECK (point_first BETWEEN 0 AND 100),
- examples numeric(5,2) CHECK (examples BETWEEN 0 AND 100),
- metaphors numeric(5,2) CHECK (metaphors BETWEEN 0 AND 100),
- humor numeric(5,2) CHECK (humor BETWEEN 0 AND 100),
- irony numeric(5,2) CHECK (irony BETWEEN 0 AND 100),
- emotion_words numeric(5,2) CHECK (emotion_words BETWEEN 0 AND 100),
- emphasis numeric(5,2) CHECK (emphasis BETWEEN 0 AND 100),
- hedging numeric(5,2) CHECK (hedging BETWEEN 0 AND 100),
- questions numeric(5,2) CHECK (questions BETWEEN 0 AND 100),
- clarification numeric(5,2) CHECK (clarification BETWEEN 0 AND 100),
- terminology numeric(5,2) CHECK (terminology BETWEEN 0 AND 100),
- slang numeric(5,2) CHECK (slang BETWEEN 0 AND 100),
- emoji numeric(5,2) CHECK (emoji BETWEEN 0 AND 100),
- structure numeric(5,2) CHECK (structure BETWEEN 0 AND 100),
- personal_examples numeric(5,2) CHECK (personal_examples BETWEEN 0 AND 100),
- metadata jsonb NOT NULL DEFAULT '{}');
+
+CREATE SCHEMA IF NOT EXISTS "clone_lab";
+
+DO $$ BEGIN CREATE TYPE "clone_lab"."conversation_type" AS ENUM (
+  'owner',
+  'viewer'
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TYPE "clone_lab"."context_status" AS ENUM (
+  'pending',
+  'analyzed',
+  'saved',
+  'archived'
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TYPE "clone_lab"."memory_kind" AS ENUM (
+  'FACT',
+  'EXPERIENCE',
+  'PREFERENCE',
+  'CONDITIONAL_PREFERENCE',
+  'VALUE',
+  'HABIT',
+  'GOAL',
+  'RELATIONSHIP'
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."lab_users" (
+  "id" uuid PRIMARY KEY,
+  "name" text NOT NULL,
+  "persona" jsonb,
+  "profile_version" bigint NOT NULL DEFAULT 0,
+  "run_state" jsonb NOT NULL DEFAULT ('{}'::jsonb),
+  "created_at" timestamptz NOT NULL DEFAULT (now())
+);
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."sessions" (
+  "session_id" uuid PRIMARY KEY,
+  "clone_owner_id" uuid NOT NULL,
+  "actor_user_id" uuid NOT NULL,
+  "conversation_type" clone_lab.conversation_type NOT NULL,
+  "topic" text NOT NULL DEFAULT '',
+  "analysis" jsonb NOT NULL DEFAULT ('{}'::jsonb),
+  "created_at" timestamptz NOT NULL DEFAULT (now()),
+  CONSTRAINT "owner_session_actor_matches" CHECK (conversation_type <> 'owner' OR clone_owner_id = actor_user_id)
+);
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."context" (
+  "id" uuid PRIMARY KEY,
+  "content" text NOT NULL,
+  "embedding" vector(1536) NOT NULL,
+  "metadata" jsonb NOT NULL,
+  "conversation_type" text GENERATED ALWAYS AS (metadata->>'conversation_type') STORED NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT (clock_timestamp()),
+  "status" clone_lab.context_status NOT NULL DEFAULT 'pending',
+  "sequence_no" BIGINT GENERATED BY DEFAULT AS IDENTITY UNIQUE NOT NULL,
+  CHECK (jsonb_typeof(metadata->'clone_owner_id') = 'string' AND length(metadata->>'clone_owner_id') > 0 AND jsonb_typeof(metadata->'actor_user_id') = 'string' AND length(metadata->>'actor_user_id') > 0 AND jsonb_typeof(metadata->'session_id') = 'string' AND length(metadata->>'session_id') > 0),
+  CHECK (conversation_type <> 'owner' OR metadata->>'clone_owner_id' = metadata->>'actor_user_id'),
+  CONSTRAINT "context_type_allowed" CHECK (conversation_type IN ('owner', 'viewer')),
+  CONSTRAINT "context_required_metadata" CHECK (metadata ? 'clone_owner_id' AND metadata ? 'actor_user_id' AND metadata ? 'session_id' AND metadata ? 'user_text' AND metadata ? 'assistant_text')
+);
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."vector_store" (
+  "id" uuid PRIMARY KEY,
+  "content" text NOT NULL,
+  "embedding" vector(1536) NOT NULL,
+  "metadata" jsonb NOT NULL,
+  "conversation_type" text GENERATED ALWAYS AS (metadata->>'conversation_type') STORED NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT (clock_timestamp()),
+  CHECK (jsonb_typeof(metadata->'clone_owner_id') = 'string' AND length(metadata->>'clone_owner_id') > 0 AND jsonb_typeof(metadata->'actor_user_id') = 'string' AND length(metadata->>'actor_user_id') > 0 AND jsonb_typeof(metadata->'session_id') = 'string' AND length(metadata->>'session_id') > 0),
+  CHECK (conversation_type <> 'owner' OR metadata->>'clone_owner_id' = metadata->>'actor_user_id'),
+  CONSTRAINT "memory_type_allowed" CHECK (conversation_type IN ('owner', 'viewer')),
+  CONSTRAINT "memory_required_metadata" CHECK (metadata ? 'clone_owner_id' AND metadata ? 'actor_user_id' AND metadata ? 'session_id' AND metadata ? 'kind' AND metadata ? 'extraction_key' AND metadata ? 'source_ids' AND metadata ? 'source_excerpts'),
+  CHECK (jsonb_typeof(metadata->'extraction_key') = 'string' AND length(metadata->>'extraction_key') > 0),
+  CONSTRAINT "memory_kind_allowed" CHECK (metadata->>'kind' IN ('FACT','EXPERIENCE','PREFERENCE','CONDITIONAL_PREFERENCE','VALUE','HABIT','GOAL','RELATIONSHIP')),
+  CONSTRAINT "memory_source_ids_nonempty" CHECK (jsonb_typeof(metadata->'source_ids') = 'array' AND jsonb_array_length(metadata->'source_ids') > 0),
+  CONSTRAINT "memory_source_excerpts_nonempty" CHECK (jsonb_typeof(metadata->'source_excerpts') = 'array' AND jsonb_array_length(metadata->'source_excerpts') > 0)
+);
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."profile_emotion" (
+  "user_id" uuid PRIMARY KEY,
+  "uncertainty_anxiety" decimal(5,2) CHECK (uncertainty_anxiety BETWEEN 0 AND 100),
+  "threat_fear" decimal(5,2) CHECK (threat_fear BETWEEN 0 AND 100),
+  "blocked_frustration" decimal(5,2) CHECK (blocked_frustration BETWEEN 0 AND 100),
+  "injustice_anger" decimal(5,2) CHECK (injustice_anger BETWEEN 0 AND 100),
+  "loss_sadness" decimal(5,2) CHECK (loss_sadness BETWEEN 0 AND 100),
+  "positive_joy" decimal(5,2) CHECK (positive_joy BETWEEN 0 AND 100),
+  "anticipation" decimal(5,2) CHECK (anticipation BETWEEN 0 AND 100),
+  "public_embarrassment" decimal(5,2) CHECK (public_embarrassment BETWEEN 0 AND 100),
+  "evaluation_sensitivity" decimal(5,2) CHECK (evaluation_sensitivity BETWEEN 0 AND 100),
+  "emotional_contagion" decimal(5,2) CHECK (emotional_contagion BETWEEN 0 AND 100),
+  "emotion_duration" decimal(5,2) CHECK (emotion_duration BETWEEN 0 AND 100),
+  "mood_amplitude" decimal(5,2) CHECK (mood_amplitude BETWEEN 0 AND 100),
+  "recovery_speed" decimal(5,2) CHECK (recovery_speed BETWEEN 0 AND 100),
+  "monotony_boredom" decimal(5,2) CHECK (monotony_boredom BETWEEN 0 AND 100),
+  "novelty_stimulation" decimal(5,2) CHECK (novelty_stimulation BETWEEN 0 AND 100),
+  "noise_sensitivity" decimal(5,2) CHECK (noise_sensitivity BETWEEN 0 AND 100),
+  "visual_sensitivity" decimal(5,2) CHECK (visual_sensitivity BETWEEN 0 AND 100),
+  "smell_sensitivity" decimal(5,2) CHECK (smell_sensitivity BETWEEN 0 AND 100),
+  "touch_sensitivity" decimal(5,2) CHECK (touch_sensitivity BETWEEN 0 AND 100),
+  "crowding_overload" decimal(5,2) CHECK (crowding_overload BETWEEN 0 AND 100),
+  "metadata" jsonb NOT NULL DEFAULT ('{}'::jsonb)
+);
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."profile_values" (
+  "user_id" uuid PRIMARY KEY,
+  "autonomy" decimal(5,2) CHECK (autonomy BETWEEN 0 AND 100),
+  "security" decimal(5,2) CHECK (security BETWEEN 0 AND 100),
+  "achievement" decimal(5,2) CHECK (achievement BETWEEN 0 AND 100),
+  "fairness" decimal(5,2) CHECK (fairness BETWEEN 0 AND 100),
+  "care" decimal(5,2) CHECK (care BETWEEN 0 AND 100),
+  "family" decimal(5,2) CHECK (family BETWEEN 0 AND 100),
+  "financial_comfort" decimal(5,2) CHECK (financial_comfort BETWEEN 0 AND 100),
+  "growth" decimal(5,2) CHECK (growth BETWEEN 0 AND 100),
+  "tradition" decimal(5,2) CHECK (tradition BETWEEN 0 AND 100),
+  "contribution" decimal(5,2) CHECK (contribution BETWEEN 0 AND 100),
+  "honesty" decimal(5,2) CHECK (honesty BETWEEN 0 AND 100),
+  "loyalty" decimal(5,2) CHECK (loyalty BETWEEN 0 AND 100),
+  "privacy" decimal(5,2) CHECK (privacy BETWEEN 0 AND 100),
+  "health" decimal(5,2) CHECK (health BETWEEN 0 AND 100),
+  "pleasure" decimal(5,2) CHECK (pleasure BETWEEN 0 AND 100),
+  "creativity" decimal(5,2) CHECK (creativity BETWEEN 0 AND 100),
+  "expertise" decimal(5,2) CHECK (expertise BETWEEN 0 AND 100),
+  "recognition" decimal(5,2) CHECK (recognition BETWEEN 0 AND 100),
+  "environment" decimal(5,2) CHECK (environment BETWEEN 0 AND 100),
+  "spirituality" decimal(5,2) CHECK (spirituality BETWEEN 0 AND 100),
+  "metadata" jsonb NOT NULL DEFAULT ('{}'::jsonb)
+);
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."profile_interests" (
+  "user_id" uuid PRIMARY KEY,
+  "technology" decimal(5,2) CHECK (technology BETWEEN 0 AND 100),
+  "science" decimal(5,2) CHECK (science BETWEEN 0 AND 100),
+  "history" decimal(5,2) CHECK (history BETWEEN 0 AND 100),
+  "philosophy" decimal(5,2) CHECK (philosophy BETWEEN 0 AND 100),
+  "society" decimal(5,2) CHECK (society BETWEEN 0 AND 100),
+  "finance" decimal(5,2) CHECK (finance BETWEEN 0 AND 100),
+  "literature" decimal(5,2) CHECK (literature BETWEEN 0 AND 100),
+  "visual_art" decimal(5,2) CHECK (visual_art BETWEEN 0 AND 100),
+  "music" decimal(5,2) CHECK (music BETWEEN 0 AND 100),
+  "film_performance" decimal(5,2) CHECK (film_performance BETWEEN 0 AND 100),
+  "gaming" decimal(5,2) CHECK (gaming BETWEEN 0 AND 100),
+  "sports" decimal(5,2) CHECK (sports BETWEEN 0 AND 100),
+  "travel" decimal(5,2) CHECK (travel BETWEEN 0 AND 100),
+  "outdoors" decimal(5,2) CHECK (outdoors BETWEEN 0 AND 100),
+  "cooking_food" decimal(5,2) CHECK (cooking_food BETWEEN 0 AND 100),
+  "fashion" decimal(5,2) CHECK (fashion BETWEEN 0 AND 100),
+  "craft" decimal(5,2) CHECK (craft BETWEEN 0 AND 100),
+  "animals" decimal(5,2) CHECK (animals BETWEEN 0 AND 100),
+  "social_gatherings" decimal(5,2) CHECK (social_gatherings BETWEEN 0 AND 100),
+  "collecting" decimal(5,2) CHECK (collecting BETWEEN 0 AND 100),
+  "metadata" jsonb NOT NULL DEFAULT ('{}'::jsonb)
+);
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."profile_decision" (
+  "user_id" uuid PRIMARY KEY,
+  "research_depth" decimal(5,2) CHECK (research_depth BETWEEN 0 AND 100),
+  "source_verification" decimal(5,2) CHECK (source_verification BETWEEN 0 AND 100),
+  "alternative_breadth" decimal(5,2) CHECK (alternative_breadth BETWEEN 0 AND 100),
+  "quantitative_reasoning" decimal(5,2) CHECK (quantitative_reasoning BETWEEN 0 AND 100),
+  "intuition" decimal(5,2) CHECK (intuition BETWEEN 0 AND 100),
+  "consultation" decimal(5,2) CHECK (consultation BETWEEN 0 AND 100),
+  "deliberation_time" decimal(5,2) CHECK (deliberation_time BETWEEN 0 AND 100),
+  "risk_taking" decimal(5,2) CHECK (risk_taking BETWEEN 0 AND 100),
+  "loss_aversion" decimal(5,2) CHECK (loss_aversion BETWEEN 0 AND 100),
+  "long_term" decimal(5,2) CHECK (long_term BETWEEN 0 AND 100),
+  "reversibility" decimal(5,2) CHECK (reversibility BETWEEN 0 AND 100),
+  "small_experiments" decimal(5,2) CHECK (small_experiments BETWEEN 0 AND 100),
+  "explicit_criteria" decimal(5,2) CHECK (explicit_criteria BETWEEN 0 AND 100),
+  "context_adaptation" decimal(5,2) CHECK (context_adaptation BETWEEN 0 AND 100),
+  "belief_revision" decimal(5,2) CHECK (belief_revision BETWEEN 0 AND 100),
+  "satisficing" decimal(5,2) CHECK (satisficing BETWEEN 0 AND 100),
+  "default_retention" decimal(5,2) CHECK (default_retention BETWEEN 0 AND 100),
+  "opportunity_cost" decimal(5,2) CHECK (opportunity_cost BETWEEN 0 AND 100),
+  "tradeoffs" decimal(5,2) CHECK (tradeoffs BETWEEN 0 AND 100),
+  "contingency" decimal(5,2) CHECK (contingency BETWEEN 0 AND 100),
+  "metadata" jsonb NOT NULL DEFAULT ('{}'::jsonb)
+);
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."profile_habits" (
+  "user_id" uuid PRIMARY KEY,
+  "wake_regularity" decimal(5,2) CHECK (wake_regularity BETWEEN 0 AND 100),
+  "sleep_regularity" decimal(5,2) CHECK (sleep_regularity BETWEEN 0 AND 100),
+  "meal_regularity" decimal(5,2) CHECK (meal_regularity BETWEEN 0 AND 100),
+  "exercise" decimal(5,2) CHECK (exercise BETWEEN 0 AND 100),
+  "health_checks" decimal(5,2) CHECK (health_checks BETWEEN 0 AND 100),
+  "plan_recording" decimal(5,2) CHECK (plan_recording BETWEEN 0 AND 100),
+  "plan_execution" decimal(5,2) CHECK (plan_execution BETWEEN 0 AND 100),
+  "deadline" decimal(5,2) CHECK (deadline BETWEEN 0 AND 100),
+  "punctuality" decimal(5,2) CHECK (punctuality BETWEEN 0 AND 100),
+  "physical_order" decimal(5,2) CHECK (physical_order BETWEEN 0 AND 100),
+  "digital_order" decimal(5,2) CHECK (digital_order BETWEEN 0 AND 100),
+  "expense_tracking" decimal(5,2) CHECK (expense_tracking BETWEEN 0 AND 100),
+  "budget_adherence" decimal(5,2) CHECK (budget_adherence BETWEEN 0 AND 100),
+  "saving" decimal(5,2) CHECK (saving BETWEEN 0 AND 100),
+  "learning" decimal(5,2) CHECK (learning BETWEEN 0 AND 100),
+  "reading" decimal(5,2) CHECK (reading BETWEEN 0 AND 100),
+  "procrastination" decimal(5,2) CHECK (procrastination BETWEEN 0 AND 100),
+  "multitasking" decimal(5,2) CHECK (multitasking BETWEEN 0 AND 100),
+  "rest" decimal(5,2) CHECK (rest BETWEEN 0 AND 100),
+  "review" decimal(5,2) CHECK (review BETWEEN 0 AND 100),
+  "metadata" jsonb NOT NULL DEFAULT ('{}'::jsonb)
+);
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."profile_relations" (
+  "user_id" uuid PRIMARY KEY,
+  "social_orientation" decimal(5,2) CHECK (social_orientation BETWEEN 0 AND 100),
+  "stranger_approach" decimal(5,2) CHECK (stranger_approach BETWEEN 0 AND 100),
+  "contact_initiation" decimal(5,2) CHECK (contact_initiation BETWEEN 0 AND 100),
+  "self_disclosure" decimal(5,2) CHECK (self_disclosure BETWEEN 0 AND 100),
+  "intimacy_speed" decimal(5,2) CHECK (intimacy_speed BETWEEN 0 AND 100),
+  "personal_space" decimal(5,2) CHECK (personal_space BETWEEN 0 AND 100),
+  "respect_boundaries" decimal(5,2) CHECK (respect_boundaries BETWEEN 0 AND 100),
+  "assert_boundaries" decimal(5,2) CHECK (assert_boundaries BETWEEN 0 AND 100),
+  "ask_help" decimal(5,2) CHECK (ask_help BETWEEN 0 AND 100),
+  "give_help" decimal(5,2) CHECK (give_help BETWEEN 0 AND 100),
+  "role_coordination" decimal(5,2) CHECK (role_coordination BETWEEN 0 AND 100),
+  "leadership" decimal(5,2) CHECK (leadership BETWEEN 0 AND 100),
+  "trust_speed" decimal(5,2) CHECK (trust_speed BETWEEN 0 AND 100),
+  "conflict_facing" decimal(5,2) CHECK (conflict_facing BETWEEN 0 AND 100),
+  "compromise" decimal(5,2) CHECK (compromise BETWEEN 0 AND 100),
+  "assert_position" decimal(5,2) CHECK (assert_position BETWEEN 0 AND 100),
+  "apology" decimal(5,2) CHECK (apology BETWEEN 0 AND 100),
+  "repair" decimal(5,2) CHECK (repair BETWEEN 0 AND 100),
+  "perspective_check" decimal(5,2) CHECK (perspective_check BETWEEN 0 AND 100),
+  "reciprocity" decimal(5,2) CHECK (reciprocity BETWEEN 0 AND 100),
+  "metadata" jsonb NOT NULL DEFAULT ('{}'::jsonb)
+);
+
+CREATE TABLE IF NOT EXISTS "clone_lab"."profile_expression" (
+  "user_id" uuid PRIMARY KEY,
+  "formality" decimal(5,2) CHECK (formality BETWEEN 0 AND 100),
+  "directness" decimal(5,2) CHECK (directness BETWEEN 0 AND 100),
+  "certainty" decimal(5,2) CHECK (certainty BETWEEN 0 AND 100),
+  "sentence_length" decimal(5,2) CHECK (sentence_length BETWEEN 0 AND 100),
+  "detail" decimal(5,2) CHECK (detail BETWEEN 0 AND 100),
+  "point_first" decimal(5,2) CHECK (point_first BETWEEN 0 AND 100),
+  "examples" decimal(5,2) CHECK (examples BETWEEN 0 AND 100),
+  "metaphors" decimal(5,2) CHECK (metaphors BETWEEN 0 AND 100),
+  "humor" decimal(5,2) CHECK (humor BETWEEN 0 AND 100),
+  "irony" decimal(5,2) CHECK (irony BETWEEN 0 AND 100),
+  "emotion_words" decimal(5,2) CHECK (emotion_words BETWEEN 0 AND 100),
+  "emphasis" decimal(5,2) CHECK (emphasis BETWEEN 0 AND 100),
+  "hedging" decimal(5,2) CHECK (hedging BETWEEN 0 AND 100),
+  "questions" decimal(5,2) CHECK (questions BETWEEN 0 AND 100),
+  "clarification" decimal(5,2) CHECK (clarification BETWEEN 0 AND 100),
+  "terminology" decimal(5,2) CHECK (terminology BETWEEN 0 AND 100),
+  "slang" decimal(5,2) CHECK (slang BETWEEN 0 AND 100),
+  "emoji" decimal(5,2) CHECK (emoji BETWEEN 0 AND 100),
+  "structure" decimal(5,2) CHECK (structure BETWEEN 0 AND 100),
+  "personal_examples" decimal(5,2) CHECK (personal_examples BETWEEN 0 AND 100),
+  "metadata" jsonb NOT NULL DEFAULT ('{}'::jsonb)
+);
+
+CREATE INDEX IF NOT EXISTS sessions_clone_owner_id_actor_user_id_conversation_type_idx ON "clone_lab"."sessions" ("clone_owner_id", "actor_user_id", "conversation_type");
+
+CREATE INDEX IF NOT EXISTS context_conversation_type_sequence_no_idx ON "clone_lab"."context" ("conversation_type", "sequence_no");
+
+CREATE INDEX IF NOT EXISTS context_status_sequence_no_idx ON "clone_lab"."context" ("status", "sequence_no");
+
+CREATE INDEX IF NOT EXISTS vector_store_conversation_type_created_at_idx ON "clone_lab"."vector_store" ("conversation_type", "created_at");
+
+COMMENT ON TABLE "clone_lab"."lab_users" IS 'profile_version을 유지한다. viewer 대화 처리로 다른 사람의 프로필 버전을 올리지 않는다.
+viewer_context는 제거한다. 정보이용자 채팅도 sessions/context/vector_store를 사용한다.
+사용자 프로필 7개 영역의 행은 소유자 분석이 필요한 사용자에게 생성한다.
+';
+
+COMMENT ON COLUMN "clone_lab"."lab_users"."id" IS '실험 사용자 ID. 같은 사람도 대화에 따라 owner 또는 viewer가 될 수 있음';
+
+COMMENT ON COLUMN "clone_lab"."lab_users"."name" IS '표시 이름';
+
+COMMENT ON COLUMN "clone_lab"."lab_users"."persona" IS '가상 인물 평가용 배경·정답. viewer에게는 없어도 되며 모델 입력에 전달하지 않음';
+
+COMMENT ON COLUMN "clone_lab"."lab_users"."profile_version" IS '소유자 프로필 반영 시 증가. 낙관적 충돌 검사와 사용자 행 잠금을 함께 사용';
+
+COMMENT ON COLUMN "clone_lab"."lab_users"."run_state" IS '소유자 자동 실행의 예약·진행 위치·복구·사용량. 원문 삭제 후에도 진행 위치를 보존';
+
+COMMENT ON TABLE "clone_lab"."sessions" IS '세션 전체의 status는 없다. 구간 상태는 analysis에, 개별 원문 상태는 context.status에 기록한다.
+sequence_no는 세션의 표시 순번으로 두지 않는다. 발화 순번은 context.sequence_no다.
+owner 분석·기억 저장·구간 처리 완료·profile_version 증가는 같은 트랜잭션으로 반영한다.
+분석 완료 구간 ID와 처리 원문 ID를 영구 기록해 삭제·재개 후에도 같은 근거를 다시 반영하지 않는다.
+viewer 세션은 해당 clone_owner_id와 actor_user_id 조합으로 검색·이력 조회를 제한한다.
+JSON 요약과 근거 발췌는 VectorStore 의미 검색 후보에 자동 포함되지 않는다. 필요 시 vector_store에도 기록한다.
+';
+
+COMMENT ON COLUMN "clone_lab"."sessions"."session_id" IS '주제별 대화 ID. 기존 batches.id를 변경한 이름이며 대화 순번이 아니다';
+
+COMMENT ON COLUMN "clone_lab"."sessions"."clone_owner_id" IS '현재 대화가 대상으로 하는 클론의 소유자';
+
+COMMENT ON COLUMN "clone_lab"."sessions"."actor_user_id" IS '실제 대화 참여자. viewer이면 정보이용자의 ID';
+
+COMMENT ON COLUMN "clone_lab"."sessions"."conversation_type" IS '계정의 고정 역할이 아니라 이 세션의 대화 종류';
+
+COMMENT ON COLUMN "clone_lab"."sessions"."topic" IS '주제 미입력 시 첫 10쌍으로 확정';
+
+COMMENT ON COLUMN "clone_lab"."sessions"."analysis" IS '고정 구간 ID·contextIds·분석 초안·요약·구간 상태·저장 결과·멱등성 기록. 원문 삭제 후에도 보존';
+
+COMMENT ON TABLE "clone_lab"."context" IS 'PgVectorStore는 id/content/metadata/embedding만 INSERT한다. 일반 운영 컬럼은 기본값·DB 순번·별도 상태 UPDATE로 관리한다.
+conversation_type은 생성 컬럼이므로 metadata와 별도로 갱신할 필요가 없다. DBML의 생성 표현식은 보완 SQL에 있다.
+metadata 안의 사용자·세션 ID는 FK가 아니다. 서버에서 실제 세션의 소유자·참여자·종류와 일치하는지 검증한다.
+owner는 소유자별 최근 100쌍을 세션 구분 없이 유지한다. viewer는 클론 소유자+정보이용자 조합별 최근 100쌍으로 격리한다.
+최근 범위 밖 원문이라도 archived 전에는 삭제하지 않는다. 처리 지연·실패 중에는 일시적으로 100쌍을 초과할 수 있다.
+archived는 장기 기억·필요한 원문 발췌·구간 완료가 안전하게 보존된 상태다. 보존할 정보가 없는 경우도 결과를 명시적으로 기록한다.
+외부 LLM·임베딩 호출은 트랜잭션 밖에서 수행한다. 이관 완료 확정과 조건부 원문 삭제는 짧은 트랜잭션에서 처리한다.
+기본 PgVectorStore upsert가 status·sequence_no·created_at을 바꾸지는 않는다. metadata 전체 교체로 범위·출처를 잃지 않게 한다.
+처리한 원문을 같은 ID로 수정하지 않는다. 정정 시 새로운 ID와 재분석 정책을 사용한다.
+';
+
+COMMENT ON COLUMN "clone_lab"."context"."id" IS '대화 1쌍의 Document ID. 생성 예약의 고정 ID를 사용해 요청 재시도 시 같은 문서를 재사용';
+
+COMMENT ON COLUMN "clone_lab"."context"."content" IS '사용자 발언과 AI 응답 1쌍의 검색용 원문. 소유자 사실 분석은 metadata.user_text만 사용';
+
+COMMENT ON COLUMN "clone_lab"."context"."embedding" IS '최근 대화 검색 벡터';
+
+COMMENT ON COLUMN "clone_lab"."context"."metadata" IS '필수: clone_owner_id, actor_user_id, session_id, conversation_type, user_text, assistant_text. 모두 서버에서 검증·설정';
+
+COMMENT ON COLUMN "clone_lab"."context"."conversation_type" IS 'metadata.conversation_type에서 계산되는 STORED 생성 컬럼. 보완 SQL 참조. 별도로 INSERT하지 않음';
+
+COMMENT ON COLUMN "clone_lab"."context"."created_at" IS '최초 원문 저장 시각. 문서 재시도·임베딩 갱신 시 변경하지 않음';
+
+COMMENT ON COLUMN "clone_lab"."context"."status" IS 'pending → analyzed → saved → archived. 실패하면 마지막 성공 상태와 분석 초안을 보존';
+
+COMMENT ON COLUMN "clone_lab"."context"."sequence_no" IS 'DB가 발급하는 전역 증가 순번. 세션을 넘어 최근 100쌍·구간·복구 순서를 판단하며 번호의 공백은 허용';
+
+COMMENT ON TABLE "clone_lab"."vector_store" IS '사용자 ID/session_id/kind는 독립 컬럼 대신 metadata로 관리해 두 VectorStore의 기본 구조를 통일한다.
+소유자·이용자·세션·분류·출처·실제 사건 시점은 metadata에 보존한다.
+source_ids는 원문 삭제 후에도 보존하고 source_excerpts에는 필요한 사용자 원문 발췌와 해당 원문 ID를 함께 저장한다.
+occurred_at은 날짜 또는 원래의 상대 시점 표현과 정밀도를 보존할 수 있다. created_at으로 대체하지 않는다.
+extraction_key와 고정 문서 ID로 동일 작업의 중복 INSERT를 방지한다. 해당 키의 범위별 UNIQUE 인덱스는 보완 SQL에 정의한다.
+다른 작업에서 의미가 비슷한 기억이 추출되는 문제는 별도 중복 판정 대상이며 멱등성 키만으로 해결된다고 가정하지 않는다.
+viewer 기억은 해당 이용자의 질문·발언 문맥이다. 클론 소유자의 사실이나 소유자 프로필 근거로 사용하지 않는다.
+owner 프로필 분석은 owner 사용자 발언만 허용한다. AI 답변·viewer 발언으로 소유자 사실을 새로 만들지 않는다.
+검색은 owner 기억 범위와 현재 viewer 조합의 범위를 따로 지정한다. viewer 문맥을 owner 사실 근거와 합쳐 취급하지 않는다.
+source_ids와 JSON의 세션 ID는 실제 FK가 아니다. 출처 발췌는 원문 삭제 후의 검증을 위한 최소 보존 자료다.
+';
+
+COMMENT ON COLUMN "clone_lab"."vector_store"."id" IS '동결한 분석 초안의 기억 항목 식별자로 만든 고정 Document ID. 재시도에서 새 UUID를 매번 만들지 않음';
+
+COMMENT ON COLUMN "clone_lab"."vector_store"."content" IS '추출한 장기 기억 또는 viewer 대화의 회상 정보';
+
+COMMENT ON COLUMN "clone_lab"."vector_store"."embedding" IS '장기 기억 검색 벡터';
+
+COMMENT ON COLUMN "clone_lab"."vector_store"."metadata" IS '필수: clone_owner_id, actor_user_id, session_id, conversation_type, kind, source_ids, source_excerpts, extraction_key. 선택: occurred_at';
+
+COMMENT ON COLUMN "clone_lab"."vector_store"."conversation_type" IS 'metadata.conversation_type에서 계산되는 STORED 생성 컬럼. 보완 SQL 참조';
+
+COMMENT ON COLUMN "clone_lab"."vector_store"."created_at" IS '장기 기억의 최초 저장 시각. metadata.occurred_at의 실제 사건 시점과 구분';
+
+COMMENT ON TABLE "clone_lab"."profile_emotion" IS '정서·자극 반응: 상황을 접했을 때의 감정·감각 반응. 제외: 선택 과정·실행 습관·표현 방식.';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."uncertainty_anxiety" IS '불확실한 상황에서의 불안; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."threat_fear" IS '위협·위험에 대한 두려움; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."blocked_frustration" IS '목표가 막혔을 때의 좌절 반응; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."injustice_anger" IS '부당한 대우에 대한 분노 반응; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."loss_sadness" IS '상실 상황에서의 슬픔 반응; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."positive_joy" IS '긍정적 사건에 대한 기쁨 반응; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."anticipation" IS '결과를 기다릴 때의 기대·흥분; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."public_embarrassment" IS '공개적인 실수에 대한 당혹감; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."evaluation_sensitivity" IS '타인의 평가에 대한 정서적 민감성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."emotional_contagion" IS '타인의 감정에 영향받는 정도; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."emotion_duration" IS '감정의 지속 시간; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."mood_amplitude" IS '감정 변화의 폭; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."recovery_speed" IS '스트레스 후 회복 속도; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."monotony_boredom" IS '반복되는 단조로움에 대한 지루함; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."novelty_stimulation" IS '낯선 경험에서의 자극 추구; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."noise_sensitivity" IS '소음에 대한 민감성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."visual_sensitivity" IS '빛·시각적 복잡성에 대한 민감성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."smell_sensitivity" IS '냄새에 대한 민감성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."touch_sensitivity" IS '신체 접촉·촉감에 대한 민감성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."crowding_overload" IS '군중·밀집 환경에서의 과부하; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_emotion"."metadata" IS 'weight / sourceIds / reason';
+
+COMMENT ON TABLE "clone_lab"."profile_values" IS '가치관: 어떤 원칙과 삶의 목표를 중요하게 여기는지. 제외: 좋아하는 대상·실제 실천 빈도.';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."autonomy" IS '자율성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."security" IS '안전·안정; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."achievement" IS '성취; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."fairness" IS '공정; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."care" IS '타인 배려; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."family" IS '가족 유대; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."financial_comfort" IS '경제적 여유; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."growth" IS '학습·성장; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."tradition" IS '전통; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."contribution" IS '사회적 기여; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."honesty" IS '정직; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."loyalty" IS '충성·의리; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."privacy" IS '사생활; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."health" IS '건강; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."pleasure" IS '즐거움; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."creativity" IS '창의성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."expertise" IS '전문성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."recognition" IS '사회적 인정; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."environment" IS '환경 보전; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."spirituality" IS '종교·영성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_values"."metadata" IS 'weight / sourceIds / reason';
+
+COMMENT ON TABLE "clone_lab"."profile_interests" IS '관심·선호: 특정 대상·활동에 대한 호불호. 제외: 가치의 중요도·실제 실행 빈도.';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."technology" IS '기술·디지털; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."science" IS '과학; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."history" IS '역사; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."philosophy" IS '철학; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."society" IS '사회·정치; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."finance" IS '경제·투자; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."literature" IS '문학; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."visual_art" IS '시각예술; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."music" IS '음악; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."film_performance" IS '영화·공연; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."gaming" IS '게임; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."sports" IS '운동·스포츠; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."travel" IS '여행; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."outdoors" IS '자연·야외활동; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."cooking_food" IS '요리·음식; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."fashion" IS '패션·미용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."craft" IS '만들기·수공예; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."animals" IS '동물·반려생활; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."social_gatherings" IS '사교 모임; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."collecting" IS '수집; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_interests"."metadata" IS 'weight / sourceIds / reason';
+
+COMMENT ON TABLE "clone_lab"."profile_decision" IS '의사결정 방식: 선택하기 전 정보를 처리하고 대안을 고르는 방식. 제외: 선택 후 실제 이행·감정 강도.';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."research_depth" IS '정보 탐색의 깊이; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."source_verification" IS '근거 출처 검증; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."alternative_breadth" IS '대안 비교의 폭; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."quantitative_reasoning" IS '수량·통계 활용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."intuition" IS '직관 활용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."consultation" IS '타인 의견 참고; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."deliberation_time" IS '결정 전 숙고 시간; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."risk_taking" IS '위험 감수; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."loss_aversion" IS '손실 회피; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."long_term" IS '장기 결과 고려; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."reversibility" IS '되돌릴 수 있는 선택 선호; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."small_experiments" IS '작은 실험 후 결정; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."explicit_criteria" IS '결정 기준의 사전 명시; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."context_adaptation" IS '상황에 따른 기준 조정; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."belief_revision" IS '새 근거에 따른 결정 수정; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."satisficing" IS '충분한 대안에서 탐색 종료; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."default_retention" IS '기본 선택지 유지; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."opportunity_cost" IS '기회비용 고려; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."tradeoffs" IS '여러 목표 간 절충; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."contingency" IS '최악의 상황 대비; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_decision"."metadata" IS 'weight / sourceIds / reason';
+
+COMMENT ON TABLE "clone_lab"."profile_habits" IS '생활·실행 습관: 구체적으로 반복해서 실행한 행동. 제외: 희망·계획·선호만으로 추정한 행동.';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."wake_regularity" IS '기상 시각 규칙성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."sleep_regularity" IS '취침 시각 규칙성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."meal_regularity" IS '식사 시각 규칙성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."exercise" IS '운동 실천; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."health_checks" IS '건강 상태 점검; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."plan_recording" IS '계획 기록; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."plan_execution" IS '계획 이행; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."deadline" IS '마감 준수; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."punctuality" IS '약속 시간 준수; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."physical_order" IS '물리적 정리; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."digital_order" IS '디지털 자료 정리; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."expense_tracking" IS '지출 기록; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."budget_adherence" IS '예산 준수; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."saving" IS '저축 실행; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."learning" IS '꾸준한 학습; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."reading" IS '독서 실행; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."procrastination" IS '할 일 미루기; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."multitasking" IS '동시 작업; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."rest" IS '휴식 확보; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."review" IS '완료 후 검토; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_habits"."metadata" IS 'weight / sourceIds / reason';
+
+COMMENT ON TABLE "clone_lab"."profile_relations" IS '대인관계 방식: 관계를 형성·조율·유지할 때의 행동 경향. 제외: 단순 감정 반응·문장 형식.';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."social_orientation" IS '사회적 교류 지향; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."stranger_approach" IS '낯선 사람에게 먼저 접근; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."contact_initiation" IS '관계 유지 연락 주도; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."self_disclosure" IS '개인적 정보 공개; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."intimacy_speed" IS '친밀감 형성 속도; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."personal_space" IS '관계에서 필요한 개인 공간; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."respect_boundaries" IS '상대의 경계 존중; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."assert_boundaries" IS '자신의 경계 명시; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."ask_help" IS '도움 요청; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."give_help" IS '도움 제공; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."role_coordination" IS '협업 역할 조율; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."leadership" IS '집단에서의 주도권 행사; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."trust_speed" IS '타인 신뢰 형성 속도; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."conflict_facing" IS '갈등 상황 직접 대면; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."compromise" IS '갈등에서 타협안 탐색; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."assert_position" IS '갈등에서 자기 입장 관철; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."apology" IS '잘못 인정·사과; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."repair" IS '관계 회복 시도; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."perspective_check" IS '상대 관점 확인; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."reciprocity" IS '관계의 상호성 기대; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_relations"."metadata" IS 'weight / sourceIds / reason';
+
+COMMENT ON TABLE "clone_lab"."profile_expression" IS '언어·표현 방식: 사용자 원문의 발화·서술 형식. 제외: AI 답변의 말투·내용의 가치관·실제 행동.';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."formality" IS '격식; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."directness" IS '직설성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."certainty" IS '단정성; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."sentence_length" IS '문장 길이; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."detail" IS '설명 상세도; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."point_first" IS '핵심 선제시; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."examples" IS '예시 사용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."metaphors" IS '비유 사용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."humor" IS '유머 사용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."irony" IS '반어·풍자 사용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."emotion_words" IS '감정어 사용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."emphasis" IS '강조 표현; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."hedging" IS '완곡 표현; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."questions" IS '질문 사용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."clarification" IS '되묻기·요약 확인; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."terminology" IS '전문용어 사용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."slang" IS '구어·속어 사용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."emoji" IS '이모지 사용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."structure" IS '목록·구조화 사용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."personal_examples" IS '개인 경험 인용; 0~100 / NULL=미확인';
+
+COMMENT ON COLUMN "clone_lab"."profile_expression"."metadata" IS 'weight / sourceIds / reason';
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clone_lab.sessions'::regclass AND conname='sessions_clone_owner_id_fkey') THEN
+    ALTER TABLE clone_lab.sessions ADD CONSTRAINT sessions_clone_owner_id_fkey FOREIGN KEY (clone_owner_id) REFERENCES clone_lab.lab_users(id) DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clone_lab.sessions'::regclass AND conname='sessions_actor_user_id_fkey') THEN
+    ALTER TABLE clone_lab.sessions ADD CONSTRAINT sessions_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES clone_lab.lab_users(id) DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clone_lab.profile_emotion'::regclass AND conname='profile_emotion_user_id_fkey') THEN
+    ALTER TABLE clone_lab.profile_emotion ADD CONSTRAINT profile_emotion_user_id_fkey FOREIGN KEY (user_id) REFERENCES clone_lab.lab_users(id) DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clone_lab.profile_values'::regclass AND conname='profile_values_user_id_fkey') THEN
+    ALTER TABLE clone_lab.profile_values ADD CONSTRAINT profile_values_user_id_fkey FOREIGN KEY (user_id) REFERENCES clone_lab.lab_users(id) DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clone_lab.profile_interests'::regclass AND conname='profile_interests_user_id_fkey') THEN
+    ALTER TABLE clone_lab.profile_interests ADD CONSTRAINT profile_interests_user_id_fkey FOREIGN KEY (user_id) REFERENCES clone_lab.lab_users(id) DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clone_lab.profile_decision'::regclass AND conname='profile_decision_user_id_fkey') THEN
+    ALTER TABLE clone_lab.profile_decision ADD CONSTRAINT profile_decision_user_id_fkey FOREIGN KEY (user_id) REFERENCES clone_lab.lab_users(id) DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clone_lab.profile_habits'::regclass AND conname='profile_habits_user_id_fkey') THEN
+    ALTER TABLE clone_lab.profile_habits ADD CONSTRAINT profile_habits_user_id_fkey FOREIGN KEY (user_id) REFERENCES clone_lab.lab_users(id) DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clone_lab.profile_relations'::regclass AND conname='profile_relations_user_id_fkey') THEN
+    ALTER TABLE clone_lab.profile_relations ADD CONSTRAINT profile_relations_user_id_fkey FOREIGN KEY (user_id) REFERENCES clone_lab.lab_users(id) DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='clone_lab.profile_expression'::regclass AND conname='profile_expression_user_id_fkey') THEN
+    ALTER TABLE clone_lab.profile_expression ADD CONSTRAINT profile_expression_user_id_fkey FOREIGN KEY (user_id) REFERENCES clone_lab.lab_users(id) DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+END $$;
+
+
+CREATE INDEX IF NOT EXISTS context_scope_sequence_idx ON clone_lab.context
+  ((metadata->>'clone_owner_id'), (metadata->>'actor_user_id'), conversation_type, sequence_no DESC);
+CREATE INDEX IF NOT EXISTS memory_scope_idx ON clone_lab.vector_store
+  ((metadata->>'clone_owner_id'), (metadata->>'actor_user_id'), conversation_type);
+CREATE UNIQUE INDEX IF NOT EXISTS memory_extraction_once_idx ON clone_lab.vector_store
+  ((metadata->>'clone_owner_id'), (metadata->>'actor_user_id'), conversation_type, (metadata->>'extraction_key'));
+CREATE INDEX IF NOT EXISTS context_embedding_hnsw_idx ON clone_lab.context USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS memory_embedding_hnsw_idx ON clone_lab.vector_store USING hnsw (embedding vector_cosine_ops);
