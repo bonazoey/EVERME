@@ -276,7 +276,7 @@ class LabIntegrationTests {
 
     @Override
     public Iterator<JsonView> iterator() {
-      return LabJson.list(value).stream().map(LabIntegrationTests::v).iterator();
+      return LabJson.list(value).stream().map(LabIntegrationTests::view).iterator();
     }
 
     @Override
