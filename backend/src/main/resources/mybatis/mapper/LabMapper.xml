@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- Clone Lab SQL. 메소드 선언은 com.example.everme.lab.dao.LabMapper에 있다. -->
+<mapper namespace="com.example.everme.lab.dao.LabMapper">
+
+  <!-- ===================== 공통 컬럼 ===================== -->
+
+  <!-- 배치(소유자 대화방) 조회 공통 컬럼. 기존 화면의 id/status 별칭은 유지하되 세션 전체 상태 컬럼은 만들지 않는다.
+       status는 턴 상태로 계산한다: pending 턴이 있으면 generated, analyzed 턴이 있으면 analyzed, 아니면 saved. -->
+  <sql id="sessionColumns"><![CDATA[
+    session_id AS id, owner_id AS user_id, viewer_id, conversation_type, topic, created_at, analysis::text,
+    COALESCE((analysis->>'turnCount')::int,0) AS turn_count,
+    CASE
+      WHEN EXISTS(SELECT 1 FROM clone_lab.session_messages c
+                  WHERE c.session_id=s.session_id AND c.status='pending') THEN 'generated'
+      WHEN EXISTS(SELECT 1 FROM clone_lab.session_messages c
+                  WHERE c.metadata->>'session_id'=s.session_id::text AND c.status='analyzed') THEN 'analyzed'
+      WHEN COALESCE((analysis->>'turnCount')::int,0)>0 THEN 'saved'
+      ELSE 'generated'
+    END AS status
+  ]]></sql>
+
+  <!-- 턴 조회 공통 컬럼 (pair_no를 화면용 ordinal로) -->
+  <sql id="contextColumns"><![CDATA[
+    id, session_id, sequence_no, created_at, status, metadata::text, pair_no::int AS ordinal, user_text, assistant_text
+  ]]></sql>
+
+  <!-- ===================== context: Spring AI ChatMemory 저장소 ===================== -->
+
+  <!-- 영구 원문과 연결된 문맥 메시지를 중복 없이 보존한다. -->
+  <insert id="preserveContext"><![CDATA[
+    INSERT INTO clone_lab.context(conversation_id,content,type,timestamp,source_message_id,is_active)
+    SELECT s.memory_key,v.content,v.type,v.received_at,m.id,false
+    FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON s.session_id=m.session_id
+    CROSS JOIN LATERAL (VALUES
+      (m.user_text,'USER',m.user_received_at),
+      (m.assistant_text,'ASSISTANT',m.assistant_received_at)
+    ) AS v(content,type,received_at)
+    WHERE m.session_id=#{session}
+      AND m.pair_no > COALESCE((SELECT MAX(segment_no)*20
+        FROM clone_lab.context_summaries WHERE session_id=#{session}),0)
+    ON CONFLICT (source_message_id,type) DO NOTHING
+  ]]></insert>
+
+  <!-- 가장 최근 20쌍만 활성화하고 이전 메시지는 논리 삭제한다. -->
+  <update id="slideContext"><![CDATA[
+    UPDATE clone_lab.context c SET is_active=COALESCE(c.source_message_id IN (
+      SELECT id FROM clone_lab.session_messages WHERE session_id=#{session}
+      ORDER BY pair_no DESC LIMIT 20),false)
+    WHERE c.conversation_id=CAST(#{session} AS varchar)
+      AND c.is_active IS DISTINCT FROM (c.source_message_id IN (
+        SELECT id FROM clone_lab.session_messages WHERE session_id=#{session}
+        ORDER BY pair_no DESC LIMIT 20))
+  ]]></update>
+
+  <!-- 요약 저장이 끝난 비활성 문맥만 삭제한다. -->
+  <delete id="deleteSummarizedContext"><![CDATA[
+    DELETE FROM clone_lab.context c USING clone_lab.session_messages m
+    WHERE c.source_message_id=m.id AND m.session_id=#{session} AND NOT c.is_active
+      AND m.pair_no <= COALESCE((SELECT MAX(segment_no)*20
+        FROM clone_lab.context_summaries WHERE session_id=#{session}),0)
+  ]]></delete>
+
+  <!-- ===================== context_summaries: 세션 문맥 요약 ===================== -->
+
+  <!-- 이전 정책으로 너무 일찍 생성된 요약을 지운다. -->
+  <delete id="discardPrematureSummaries"><![CDATA[
+    DELETE FROM clone_lab.context_summaries WHERE session_id=#{session}
+      AND segment_no > #{blocks}
+  ]]></delete>
+
+  <!-- 세션의 모든 쌍 (pair_no 순) -->
+  <select id="sessionPairs" resultType="map"><![CDATA[
+    SELECT id,pair_no,user_text,assistant_text FROM clone_lab.session_messages
+    WHERE session_id=#{id} ORDER BY pair_no
+  ]]></select>
+
+  <!-- 세션의 저장된 요약 (segment_no 순) -->
+  <select id="summaries" resultType="map"><![CDATA[
+    SELECT id,session_id,segment_no,start_message_id,end_message_id,content
+    FROM clone_lab.context_summaries WHERE session_id=#{id} ORDER BY segment_no
+  ]]></select>
+
+  <!-- 20쌍 블록 요약 저장 (같은 번호가 있으면 무시) -->
+  <insert id="summary"><![CDATA[
+    INSERT INTO clone_lab.context_summaries(session_id,segment_no,start_message_id,end_message_id,content)
+    VALUES(#{session},#{segment},#{start},#{end},#{content})
+    ON CONFLICT(session_id,segment_no) DO NOTHING
+  ]]></insert>
+
+  <!-- 최근 5개 요약만 남기고 삭제 -->
+  <delete id="trimSummaries"><![CDATA[
+    DELETE FROM clone_lab.context_summaries WHERE session_id=#{id} AND segment_no NOT IN (
+      SELECT segment_no FROM clone_lab.context_summaries WHERE session_id=#{id}
+      ORDER BY segment_no DESC LIMIT 5)
+  ]]></delete>
+
+  <!-- ===================== users: 테스트 사용자 ===================== -->
+
+  <select id="users" resultType="map"><![CDATA[
+    SELECT id,name,profile_version,created_at FROM clone_lab.users ORDER BY created_at DESC
+  ]]></select>
+
+  <!-- 사용자 한 행, 잠금 없음. user()가 감싸서 run_state를 붙인다. -->
+  <select id="userRow" resultType="map"><![CDATA[
+    SELECT id,name,persona::text,profile_version FROM clone_lab.users WHERE id=#{id}
+  ]]></select>
+
+  <!-- lockUser()가 쓰는 잠금 조회 -->
+  <select id="lockUserRow" resultType="map"><![CDATA[
+    SELECT id,name,persona::text,profile_version FROM clone_lab.users WHERE id=#{id} FOR UPDATE
+  ]]></select>
+
+  <insert id="createUser"><![CDATA[
+    INSERT INTO clone_lab.users(id,name,persona) VALUES(#{id},#{name},CAST(#{persona} AS jsonb))
+  ]]></insert>
+
+  <!-- profile_version이 읽은 값과 같을 때만 +1 (0행이면 다른 저장이 먼저 끝난 것) -->
+  <update id="incrementVersion"><![CDATA[
+    UPDATE clone_lab.users SET profile_version=profile_version+1
+    WHERE id=#{id} AND profile_version=#{version}
+  ]]></update>
+
+  <!-- ===================== runs: 자동 실행 ===================== -->
+
+  <!-- 실행 컬럼을 원본으로 사용하고 state JSON에는 단계별 부가 정보만 저장한다. -->
+  <select id="latestRun" resultType="string"><![CDATA[
+    SELECT state
+      || jsonb_build_object('runId',run_id::text,'batchId',session_id::text,'mode',mode,'topic',topic,
+           'status',status,'error',error,'targetPairs',target_pairs,'generatedPairs',generated_pairs,
+           'analyzedPairs',analyzed_pairs,'savedPairs',saved_pairs,'inputTokens',input_tokens,
+           'outputTokens',output_tokens,'cachedTokens',cached_tokens,'llmElapsedMs',llm_elapsed_ms,
+           'elapsedMs',llm_elapsed_ms,'wallElapsedMs',wall_elapsed_ms,'retryCount',retry_count)
+      || CASE WHEN active_since IS NULL THEN '{}'::jsonb
+              ELSE jsonb_build_object('activeSince',(extract(epoch from active_since)*1000)::bigint) END
+      || CASE WHEN heartbeat_at IS NULL THEN '{}'::jsonb
+              ELSE jsonb_build_object('heartbeatAt',(extract(epoch from heartbeat_at)*1000)::bigint) END
+    FROM clone_lab.runs WHERE clone_owner_id=#{id} ORDER BY run_id DESC LIMIT 1
+  ]]></select>
+
+  <!-- run_state JSON을 runs 컬럼으로 펼쳐 INSERT … ON CONFLICT 한다.
+       알려진 키는 컬럼으로, 나머지 키는 state JSON에 남긴다. -->
+  <update id="runState"><![CDATA[
+    INSERT INTO clone_lab.runs(run_id,clone_owner_id,session_id,mode,topic,status,error,
+      target_pairs,generated_pairs,analyzed_pairs,saved_pairs,input_tokens,output_tokens,cached_tokens,
+      llm_elapsed_ms,wall_elapsed_ms,retry_count,config,state,active_since,heartbeat_at,finished_at)
+    SELECT (j->>'runId')::bigint,#{id},(j->>'batchId')::bigint,j->>'mode',j->>'topic',
+      (j->>'status')::clone_lab.run_status,j->>'error',
+      COALESCE((j->>'targetPairs')::int,1000),COALESCE((j->>'generatedPairs')::int,0),
+      COALESCE((j->>'analyzedPairs')::int,0),COALESCE((j->>'savedPairs')::int,0),
+      COALESCE((j->>'inputTokens')::bigint,0),COALESCE((j->>'outputTokens')::bigint,0),
+      COALESCE((j->>'cachedTokens')::bigint,0),COALESCE((j->>'llmElapsedMs')::bigint,0),
+      COALESCE((j->>'wallElapsedMs')::bigint,0),COALESCE((j->>'retryCount')::int,0),
+      CASE WHEN jsonb_typeof(j->'config')='object' THEN j->'config' ELSE '{}'::jsonb END,
+      j-ARRAY['runId','batchId','mode','topic','status','error','targetPairs','generatedPairs',
+        'analyzedPairs','savedPairs','inputTokens','outputTokens','cachedTokens','llmElapsedMs',
+        'elapsedMs','wallElapsedMs','retryCount','activeSince','heartbeatAt','config'],
+      CASE WHEN j->>'status' IN ('running','stopping') THEN
+        COALESCE(to_timestamp((j->>'activeSince')::double precision/1000),clock_timestamp()) END,
+      COALESCE(to_timestamp((j->>'heartbeatAt')::double precision/1000),clock_timestamp()),
+      CASE WHEN j->>'status' IN ('completed','cancelled') THEN clock_timestamp() END
+    FROM (SELECT CAST(#{state} AS jsonb) j) input
+    ON CONFLICT(run_id) DO UPDATE SET status=EXCLUDED.status,error=EXCLUDED.error,
+      generated_pairs=EXCLUDED.generated_pairs,analyzed_pairs=EXCLUDED.analyzed_pairs,
+      saved_pairs=EXCLUDED.saved_pairs,input_tokens=EXCLUDED.input_tokens,
+      output_tokens=EXCLUDED.output_tokens,cached_tokens=EXCLUDED.cached_tokens,
+      llm_elapsed_ms=EXCLUDED.llm_elapsed_ms,wall_elapsed_ms=EXCLUDED.wall_elapsed_ms,
+      retry_count=EXCLUDED.retry_count,state=EXCLUDED.state,active_since=EXCLUDED.active_since,
+      heartbeat_at=EXCLUDED.heartbeat_at,finished_at=EXCLUDED.finished_at
+  ]]></update>
+
+  <!-- 서버 재시작 시 복구할 실행의 소유자 -->
+  <select id="interruptedUsers" resultType="long"><![CDATA[
+    SELECT clone_owner_id FROM clone_lab.runs WHERE status IN ('running','stopping')
+  ]]></select>
+
+  <!-- 완료된 실행에 최종 프로필 스냅샷 기록 -->
+  <update id="runResult"><![CDATA[
+    UPDATE clone_lab.runs SET result=CAST(#{result} AS jsonb)
+    WHERE clone_owner_id=#{owner}
+      AND run_id=(SELECT max(run_id) FROM clone_lab.runs WHERE clone_owner_id=#{owner})
+      AND status='completed'
+  ]]></update>
+
+  <!-- ===================== 시퀀스 ===================== -->
+
+  <!-- 테이블·컬럼은 바인딩 파라미터로 넘긴다. 허용 목록 검사는 LabMapper.nextId가 먼저 한다. -->
+  <select id="nextSerialValue" resultType="long"><![CDATA[
+    SELECT nextval(pg_get_serial_sequence('clone_lab.' || #{table}, #{column}))
+  ]]></select>
+
+  <!-- ===================== sessions: 대화방(배치) ===================== -->
+
+  <!-- 소유자의 몇 번째 대화인지 (createBatch 인자로 넘기지만 SQL에서는 쓰지 않는다) -->
+  <select id="nextSequence" resultType="int"><![CDATA[
+    SELECT count(*)+1 FROM clone_lab.sessions WHERE owner_id=#{id} AND conversation_type='owner'
+  ]]></select>
+
+  <insert id="createBatch"><![CDATA[
+    INSERT INTO clone_lab.sessions(session_id,owner_id,viewer_id,conversation_type,topic)
+    VALUES(#{id},#{user},#{user},'owner',#{topic})
+  ]]></insert>
+
+  <!-- 배치 목록 (최신 순) -->
+  <select id="batches" resultType="map">
+    SELECT <include refid="sessionColumns"/>
+    FROM clone_lab.sessions s
+    WHERE owner_id=#{user} AND conversation_type='owner'
+    ORDER BY created_at DESC, session_id DESC
+  </select>
+
+  <!-- 배치 한 개 (소유자 확인 포함) -->
+  <select id="batch" resultType="map">
+    SELECT <include refid="sessionColumns"/>
+    FROM clone_lab.sessions s
+    WHERE session_id=#{id} AND owner_id=#{user} AND conversation_type='owner'
+  </select>
+
+  <!-- 분석 초안·배치 결과·체크포인트 등 analysis JSON 갱신 -->
+  <update id="analysis"><![CDATA[
+    UPDATE clone_lab.sessions SET analysis=CAST(#{analysis} AS jsonb) WHERE session_id=#{id}
+  ]]></update>
+
+  <update id="saveDetails"><![CDATA[
+    UPDATE clone_lab.sessions SET analysis=CAST(#{analysis} AS jsonb) WHERE session_id=#{id}
+  ]]></update>
+
+  <update id="appended"><![CDATA[
+    UPDATE clone_lab.sessions SET analysis=CAST(#{analysis} AS jsonb) WHERE session_id=#{id}
+  ]]></update>
+
+  <!-- status 인자는 SQL에서 쓰지 않는다. -->
+  <update id="pipelineDetails"><![CDATA[
+    UPDATE clone_lab.sessions SET analysis=CAST(#{analysis} AS jsonb) WHERE session_id=#{id}
+  ]]></update>
+
+  <!-- 자동 확정한 주제 저장 -->
+  <update id="topic"><![CDATA[
+    UPDATE clone_lab.sessions SET topic=#{topic} WHERE session_id=#{id}
+  ]]></update>
+
+  <!-- 이미 반영된 사용자 발언 (processedEvidence) -->
+  <select id="savedSources" resultType="map"><![CDATA[
+    SELECT e->>'user_text' AS user_text FROM clone_lab.sessions s
+    CROSS JOIN LATERAL jsonb_array_elements(COALESCE(s.analysis->'processedEvidence','[]'::jsonb)) e
+    WHERE owner_id=#{user} AND conversation_type='owner'
+  ]]></select>
+
+  <!-- 세션 행 잠금 -->
+  <select id="lockSession" resultType="map"><![CDATA[
+    SELECT session_id,owner_id,viewer_id,conversation_type,memory_key,analysis::text
+    FROM clone_lab.sessions WHERE session_id=#{id} FOR UPDATE
+  ]]></select>
+
+  <select id="sessionOwner" resultType="long"><![CDATA[
+    SELECT owner_id FROM clone_lab.sessions WHERE session_id=#{id}
+  ]]></select>
+
+  <!-- 잠금 없이 세션 범위 확인 -->
+  <select id="lockFreeSession" resultType="map"><![CDATA[
+    SELECT owner_id,viewer_id,conversation_type FROM clone_lab.sessions WHERE session_id=#{id}
+  ]]></select>
+
+  <!-- ===================== viewer 세션: 클론 대화 ===================== -->
+
+  <insert id="viewerSession"><![CDATA[
+    INSERT INTO clone_lab.sessions(session_id,owner_id,viewer_id,conversation_type,analysis)
+    VALUES(#{id},#{owner},#{actor},'viewer',CAST(#{analysis} AS jsonb))
+  ]]></insert>
+
+  <!-- 정보이용자의 가장 최근 세션 = 현재 대화 -->
+  <select id="currentViewer" resultType="map"><![CDATA[
+    SELECT session_id,analysis::text FROM clone_lab.sessions
+    WHERE owner_id=#{owner} AND viewer_id=#{actor} AND conversation_type='viewer'
+    ORDER BY created_at DESC,session_id DESC LIMIT 1
+  ]]></select>
+
+  <!-- 현재 세션의 질문·답변 -->
+  <select id="viewerTurns" resultType="map"><![CDATA[
+    SELECT m.id,m.session_id,m.sequence_no,m.created_at,m.status,m.metadata::text,
+           m.pair_no::int AS ordinal,m.user_text,m.assistant_text
+    FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON s.session_id=m.session_id
+    WHERE s.owner_id=#{owner} AND s.viewer_id=#{actor} AND s.session_id=#{session}
+      AND s.conversation_type='viewer'
+    ORDER BY m.sequence_no
+  ]]></select>
+
+  <!-- 검색 전에 보완할 viewer 원문 (임베딩 없음) -->
+  <select id="viewerMissingEmbeddings" resultType="map"><![CDATA[
+    SELECT m.id,m.user_text,m.assistant_text FROM clone_lab.session_messages m
+    JOIN clone_lab.sessions s ON s.session_id=m.session_id
+    WHERE s.session_id=#{session} AND s.owner_id=#{owner} AND s.viewer_id=#{viewer}
+      AND s.conversation_type='viewer' AND m.embedding IS NULL ORDER BY m.pair_no LIMIT 32
+  ]]></select>
+
+  <!-- ===================== session_messages: 원문 턴 ===================== -->
+
+  <!-- 배치의 모든 턴 (순서대로) -->
+  <select id="turns" resultType="map">
+    SELECT <include refid="contextColumns"/>
+    FROM clone_lab.session_messages WHERE session_id=#{batch} ORDER BY sequence_no
+  </select>
+
+  <!-- 소유자 전체 대화 중 최근 100쌍 -->
+  <select id="recent" resultType="map"><![CDATA[
+    SELECT * FROM (
+      SELECT m.* FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON s.session_id=m.session_id
+      WHERE s.owner_id=#{user} AND s.conversation_type='owner'
+      ORDER BY m.sequence_no DESC LIMIT 100) r
+    ORDER BY sequence_no
+  ]]></select>
+
+  <!-- 임베딩이 비어 있는 원문 -->
+  <select id="missingEmbeddings" resultType="map"><![CDATA[
+    SELECT m.id,m.user_text FROM clone_lab.session_messages m
+    JOIN clone_lab.sessions s ON s.session_id=m.session_id
+    WHERE s.owner_id=#{user} AND s.conversation_type='owner' AND m.embedding IS NULL
+    ORDER BY m.sequence_no
+  ]]></select>
+
+  <!-- 보류됐던 임베딩 채우기 -->
+  <update id="embedding"><![CDATA[
+    UPDATE clone_lab.session_messages SET embedding=CAST(#{vector} AS vector)
+    WHERE id=#{id} AND embedding IS NULL
+  ]]></update>
+
+  <!-- 턴 저장. 대부분의 컬럼을 metadata JSON에서 꺼낸다. -->
+  <insert id="context"><![CDATA[
+    INSERT INTO clone_lab.session_messages(id,session_id,content,embedding,metadata,user_text,assistant_text,
+      user_received_at,assistant_received_at,pair_no,status)
+    VALUES(#{id},
+      (CAST(#{metadata} AS jsonb)->>'session_id')::bigint,
+      #{content},
+      CAST(#{vector} AS vector),
+      CAST(#{metadata} AS jsonb),
+      CAST(#{metadata} AS jsonb)->>'user_text',
+      CAST(#{metadata} AS jsonb)->>'assistant_text',
+      (CAST(#{metadata} AS jsonb)->>'user_received_at')::timestamptz,
+      (CAST(#{metadata} AS jsonb)->>'assistant_received_at')::timestamptz,
+      (CAST(#{metadata} AS jsonb)->>'ordinal')::bigint,
+      CAST(#{status} AS clone_lab.message_status))
+  ]]></insert>
+
+  <!-- 배치의 pending 턴 → analyzed -->
+  <update id="analyzed"><![CDATA[
+    UPDATE clone_lab.session_messages SET status='analyzed'
+    WHERE metadata->>'session_id'=CAST(#{id} AS text) AND status='pending'
+  ]]></update>
+
+  <!-- analyzed 턴 → saved (현재 lab 패키지 안에서 호출하는 곳이 없다) -->
+  <update id="saved"><![CDATA[
+    UPDATE clone_lab.session_messages SET status='saved'
+    WHERE metadata->>'session_id'=CAST(#{id} AS text) AND status='analyzed'
+  ]]></update>
+
+  <!-- 분석 초안 무효화: analyzed 턴 → pending -->
+  <update id="resetDraft"><![CDATA[
+    UPDATE clone_lab.session_messages SET status='pending'
+    WHERE metadata->>'session_id'=CAST(#{id} AS text) AND status='analyzed'
+  ]]></update>
+
+  <!-- 턴 상태 변경 (pending/analyzed/saved/archived) -->
+  <update id="contextStatus"><![CDATA[
+    UPDATE clone_lab.session_messages SET status=CAST(#{status} AS clone_lab.message_status) WHERE id=#{id}
+  ]]></update>
+
+  <!-- ===================== vector_store: 장기 기억 ===================== -->
+
+  <!-- 최근 100쌍 밖 원문을 장기 기억으로 복사. 이미 있으면 무시. -->
+  <insert id="archive"><![CDATA[
+    INSERT INTO clone_lab.vector_store(owner_id,source_session_record_id,content,embedding,metadata)
+    SELECT s.owner_id,m.id,m.content,m.embedding,m.metadata
+      || jsonb_build_object('record_type','conversation_archive',
+           'source_ids',jsonb_build_array(m.id::text),
+           'source_excerpts',jsonb_build_array(jsonb_build_object('source_id',m.id::text,'user_text',m.user_text)))
+    FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON s.session_id=m.session_id
+    WHERE m.id=#{id} AND m.status='saved' AND m.embedding IS NOT NULL AND s.conversation_type='owner'
+    ON CONFLICT(source_session_record_id) DO NOTHING
+  ]]></insert>
+
+  <!-- 최근 100쌍 밖 원문 id (actor·type 인자는 SQL에서 쓰지 않는다) -->
+  <select id="overflow" resultType="map"><![CDATA[
+    SELECT m.id FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON s.session_id=m.session_id
+    WHERE s.owner_id=#{owner} AND s.conversation_type='owner'
+    ORDER BY m.sequence_no DESC OFFSET 100
+  ]]></select>
+
+  <!-- 소유자의 장기 기억 전체 -->
+  <select id="memories" resultType="map"><![CDATA[
+    SELECT id,content,metadata::text FROM clone_lab.vector_store WHERE owner_id=#{user} ORDER BY created_at,id
+  ]]></select>
+
+  <!-- 장기 기억으로 보관할 수 있는지 (저장 완료 + 임베딩 있음) -->
+  <select id="archiveReady" resultType="boolean"><![CDATA[
+    SELECT status='saved' AND embedding IS NOT NULL FROM clone_lab.session_messages WHERE id=#{id}
+  ]]></select>
+
+  <!-- ===================== profile_*: 7개 영역 점수 =====================
+       ${table}·${column}은 SQL 식별자라 바인딩할 수 없다. LabMapper의 default 메소드가
+       허용 목록(7개 영역)과 컬럼명 형식을 먼저 검사한 값만 들어온다. -->
+
+  <insert id="initializeProfileRow">
+    INSERT INTO ${table}(user_id) VALUES(#{user})
+  </insert>
+
+  <select id="profileRow" resultType="string">
+    SELECT (to_jsonb(p)-'user_id'-'id')::text FROM ${table} p WHERE user_id=#{user}
+  </select>
+
+  <update id="updateProfileRow">
+    UPDATE ${table} SET
+    <foreach collection="scores" index="column" item="score" separator=",">
+      ${column}=#{score}
+    </foreach>,
+    metadata=CAST(#{metadata} AS jsonb)
+    WHERE user_id=#{user}
+  </update>
+
+</mapper>

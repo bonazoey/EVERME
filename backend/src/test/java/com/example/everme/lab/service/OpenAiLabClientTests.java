@@ -3,19 +3,34 @@ package com.example.everme.lab.service;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.node.*;
+import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
 import java.net.*;
+import java.net.ConnectException;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.net.ssl.SSLHandshakeException;
 import org.junit.jupiter.api.*;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 class OpenAiLabClientTests {
   private final ObjectMapper json = new ObjectMapper();
   private HttpServer server;
   private OpenAiLabClient client;
-  private final List<JsonNode> requests = new ArrayList<>();
+  private final List<Map<String, Object>> requests = new ArrayList<>();
   private final AtomicInteger calls = new AtomicInteger();
   private int[] statuses = {200};
   private String failure = "{\"error\":{\"code\":\"rate_limit_exceeded\"}}";
@@ -31,7 +46,7 @@ class OpenAiLabClientTests {
     server.createContext(
         "/v1/chat/completions",
         exchange -> {
-          requests.add(json.readTree(exchange.getRequestBody()));
+          requests.add(body(exchange));
           int i = calls.getAndIncrement();
           int status = statuses[Math.min(i, statuses.length - 1)];
           byte[] bytes = (status == 200 ? success : failure).getBytes(StandardCharsets.UTF_8);
@@ -43,7 +58,7 @@ class OpenAiLabClientTests {
         });
     server.start();
     client =
-        new OpenAiLabClient(
+        OpenAiLabClient.standalone(
             json,
             "test-key",
             "http://127.0.0.1:" + server.getAddress().getPort() + "/v1",
@@ -58,12 +73,21 @@ class OpenAiLabClientTests {
     server.stop(0);
   }
 
+  // 가짜 서버가 받은 요청 본문을 Map으로 읽는다.
+  private Map<String, Object> body(HttpExchange exchange) throws IOException {
+    return LabJson.map(json.readValue(exchange.getRequestBody(), Object.class));
+  }
+
+  private static Map<String, Object> message(Map<String, Object> request, int index) {
+    return LabJson.map(LabJson.list(request.get("messages")).get(index));
+  }
+
   @Test
   void providerErrorsLogDetailsAndRequestIdWithoutLeakingKey() {
-    var logger =
-        (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(LabAiTransport.class);
-    var appender =
-        new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    Logger logger =
+        (Logger) LoggerFactory.getLogger(LabAiTransport.class);
+    ListAppender<ILoggingEvent> appender =
+        new ListAppender<ILoggingEvent>();
     appender.start();
     logger.addAppender(appender);
     server.createContext(
@@ -75,7 +99,7 @@ class OpenAiLabClientTests {
           exchange.getResponseBody().write(bytes);
           exchange.close();
         });
-    var transport =
+    LabAiTransport transport =
         new LabAiTransport(
             json, "test-key", "http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
     try {
@@ -86,7 +110,7 @@ class OpenAiLabClientTests {
       assertThrows(LabException.class, () -> transport.request("/error-log", null));
       String logged =
           appender.list.stream()
-              .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+              .map(ILoggingEvent::getFormattedMessage)
               .filter(m -> m.startsWith("lab_http_error"))
               .findFirst()
               .orElseThrow();
@@ -107,14 +131,13 @@ class OpenAiLabClientTests {
     }
   }
 
-  private JsonNode schema() {
-    return new LabSchemas(json)
-        .object(Map.of("ok", json.createObjectNode().put("type", "boolean")));
+  private Map<String, Object> schema() {
+    return new LabSchemas().object(Map.of("ok", Map.of("type", "boolean")));
   }
 
-  private ObjectNode input(String text) {
-    var input = json.createObjectNode();
-    input.set("catalog", json.createObjectNode().put("definition", "fixed reference"));
+  private Map<String, Object> input(String text) {
+    Map<String, Object> input = LabJson.object();
+    input.put("catalog", Map.of("definition", "fixed reference"));
     input.put("text", text);
     return input;
   }
@@ -122,28 +145,28 @@ class OpenAiLabClientTests {
   @Test
   void boundedRetriesKeepPayloadAndReportTokens() {
     statuses = new int[] {429, 500, 502, 503, 200};
-    var result = client.structured("generation", "fixed rules", input("first"), schema());
+    LabAi.Result result = client.structured("generation", "fixed rules", input("first"), schema());
     assertEquals(5, calls.get());
     assertEquals(4, result.retries());
     assertEquals(6, result.cachedTokens());
-    for (var request : requests) assertEquals(requests.getFirst(), request);
-    assertEquals("low", requests.getFirst().path("reasoning_effort").asText());
+    for (Map<String, Object> request : requests) assertEquals(requests.getFirst(), request);
+    assertEquals("low", LabJson.text(requests.getFirst().get("reasoning_effort")));
   }
 
   @Test
   void fixedPrefixPrecedesVariableInputAndEffortCanBeOmitted() {
     client.structured("analysis", "fixed rules", input("first"), schema());
     client.structured("analysis", "fixed rules", input("second"), schema());
-    var a = requests.get(0);
-    var b = requests.get(1);
-    assertEquals(a.path("messages").get(0), b.path("messages").get(0));
-    assertEquals("system", a.path("messages").get(0).path("role").asText());
-    assertTrue(a.path("messages").get(0).path("content").asText().contains("fixed reference"));
-    assertFalse(a.path("messages").get(1).path("content").asText().contains("fixed reference"));
-    assertEquals("medium", a.path("reasoning_effort").asText());
+    Map<String, Object> a = requests.get(0);
+    Map<String, Object> b = requests.get(1);
+    assertEquals(message(a, 0), message(b, 0));
+    assertEquals("system", LabJson.text(message(a, 0).get("role")));
+    assertTrue(LabJson.text(message(a, 0).get("content")).contains("fixed reference"));
+    assertFalse(LabJson.text(message(a, 1).get("content")).contains("fixed reference"));
+    assertEquals("medium", LabJson.text(a.get("reasoning_effort")));
     client.configureEfforts("", "", "", "");
     client.structured("generation", "rules", input("third"), schema());
-    assertFalse(requests.get(2).has("reasoning_effort"));
+    assertFalse(requests.get(2).containsKey("reasoning_effort"));
   }
 
   @Test
@@ -192,7 +215,7 @@ class OpenAiLabClientTests {
     assertEquals(5, calls.get());
     retryAfter = "60";
     long start = System.nanoTime();
-    try (var context = new LabCallContext(() -> false)) {
+    try (LabCallContext context = new LabCallContext(() -> false)) {
       assertThrows(
           LabException.class,
           () -> client.structured("analysis", "rules", input("test"), schema()));
@@ -206,124 +229,124 @@ class OpenAiLabClientTests {
     assertEquals(2500, OpenAiLabClient.retryAfter("2.5"));
     assertEquals(0, OpenAiLabClient.retryAfter("invalid"));
     String future =
-        java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC)
+        ZonedDateTime.now(ZoneOffset.UTC)
             .plusSeconds(5)
-            .format(java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME);
+            .format(DateTimeFormatter.RFC_1123_DATE_TIME);
     assertTrue(OpenAiLabClient.retryAfter(future) > 3000);
   }
 
   @Test
   void transientConnectionsAndTimeoutsAreRetryableButTlsIsNot() {
-    assertTrue(OpenAiLabClient.retryableConnection(new java.net.ConnectException()));
+    assertTrue(OpenAiLabClient.retryableConnection(new ConnectException()));
     assertTrue(
-        OpenAiLabClient.retryableConnection(new java.net.http.HttpTimeoutException("timeout")));
+        OpenAiLabClient.retryableConnection(new HttpTimeoutException("timeout")));
     assertFalse(
         OpenAiLabClient.retryableConnection(
-            new javax.net.ssl.SSLHandshakeException("invalid certificate")));
+            new SSLHandshakeException("invalid certificate")));
   }
 
   @Test
   void nativeChatUsesStrictSchemaWithoutSamplingDefaults() {
-    var result = client.structured("summary", "rules", input("test"), schema());
-    var request = requests.getFirst();
-    assertTrue(result.data().path("ok").asBoolean());
-    assertEquals("gpt-6.1-sol", request.path("model").asText());
-    assertEquals("json_schema", request.path("response_format").path("type").asText());
-    assertTrue(request.path("response_format").path("json_schema").path("strict").asBoolean());
-    assertEquals(schema(), request.path("response_format").path("json_schema").path("schema"));
-    assertFalse(request.path("store").asBoolean());
-    assertFalse(request.has("temperature"));
-    assertFalse(request.has("top_p"));
-    assertFalse(request.has("tools"));
+    LabAi.Result result = client.structured("summary", "rules", input("test"), schema());
+    Map<String, Object> request = requests.getFirst();
+    assertTrue(LabJson.bool(result.data().get("ok")));
+    assertEquals("gpt-6.1-sol", LabJson.text(request.get("model")));
+    assertEquals("json_schema", LabJson.text(LabJson.path(request, "response_format", "type")));
+    assertTrue(
+        LabJson.bool(LabJson.path(request, "response_format", "json_schema", "strict")));
+    assertEquals(schema(), LabJson.path(request, "response_format", "json_schema", "schema"));
+    assertFalse(LabJson.bool(request.get("store")));
+    assertFalse(request.containsKey("temperature"));
+    assertFalse(request.containsKey("top_p"));
+    assertFalse(request.containsKey("tools"));
   }
 
   @Test
   void responsesAdapterPreservesReasoningAndFunctionCallReplay() throws Exception {
-    var wire = new ArrayList<JsonNode>();
+    List<Map<String, Object>> wire = new ArrayList<Map<String, Object>>();
     server.createContext(
         "/v1/responses",
         exchange -> {
-          wire.add(json.readTree(exchange.getRequestBody()));
+          wire.add(body(exchange));
           byte[] bytes = responsesSuccess.getBytes(StandardCharsets.UTF_8);
           exchange.getResponseHeaders().set("Content-Type", "application/json");
           exchange.sendResponseHeaders(200, bytes.length);
           exchange.getResponseBody().write(bytes);
           exchange.close();
         });
-    var raw = json.createObjectNode().put("status", "completed");
-    var output = raw.putArray("output");
-    output
-        .addObject()
-        .put("type", "reasoning")
-        .put("id", "rs-1")
-        .put("encrypted_content", "opaque-state")
-        .putArray("summary");
-    output
-        .addObject()
-        .put("type", "function_call")
-        .put("call_id", "call-1")
-        .put("name", "searchLongTermMemory")
-        .put("arguments", "{\"query\":\"running\"}");
-    responsesSuccess = raw.toString();
-    var input = json.createArrayNode();
-    input.addObject().put("role", "user").put("content", "question");
-    var tools =
+    Map<String, Object> raw = LabJson.object();
+    raw.put("status", "completed");
+    List<Object> output = LabJson.childList(raw, "output");
+    Map<String, Object> reasoning = LabJson.object();
+    reasoning.put("type", "reasoning");
+    reasoning.put("id", "rs-1");
+    reasoning.put("encrypted_content", "opaque-state");
+    reasoning.put("summary", LabJson.array());
+    output.add(reasoning);
+    Map<String, Object> call = LabJson.object();
+    call.put("type", "function_call");
+    call.put("call_id", "call-1");
+    call.put("name", "searchLongTermMemory");
+    call.put("arguments", "{\"query\":\"running\"}");
+    output.add(call);
+    responsesSuccess = json.writeValueAsString(raw);
+    List<Object> input = LabJson.array();
+    input.add(Map.of("role", "user", "content", "question"));
+    List<Map<String, Object>> tools =
         List.of(
-            new LabSchemas(json)
-                .tool(
-                    "searchLongTermMemory",
-                    "search",
-                    Map.of("query", new LabSchemas(json).string())));
-    var response = client.respond("rules", input, schema(), tools);
+            new LabSchemas()
+                .tool("searchLongTermMemory", "search", Map.of("query", new LabSchemas().string())));
+    Map<String, Object> response = client.respond("rules", input, schema(), tools);
     assertEquals(raw, response);
-    for (var item : response.path("output")) input.add(item);
-    input
-        .addObject()
-        .put("type", "function_call_output")
-        .put("call_id", "call-1")
-        .put("output", "[]");
+    for (Object item : LabJson.list(response.get("output"))) input.add(item);
+    input.add(Map.of("type", "function_call_output", "call_id", "call-1", "output", "[]"));
     responsesSuccess =
         "{\"status\":\"completed\",\"output\":[{\"content\":[{\"type\":\"output_text\",\"text\":\"{\\\"ok\\\":true}\"}]}]}";
     assertTrue(
-        OpenAiLabClient.output(json, client.respond("rules", input, schema(), List.of()))
-            .path("ok")
-            .asBoolean());
-    assertEquals(input, wire.get(1).path("input"));
+        LabJson.bool(
+            OpenAiLabClient.output(json, client.respond("rules", input, schema(), List.of()))
+                .get("ok")));
+    assertEquals(input, wire.get(1).get("input"));
     assertEquals(
-        "opaque-state", wire.get(1).path("input").get(1).path("encrypted_content").asText());
-    assertFalse(wire.getFirst().has("reasoning"));
-    assertFalse(wire.getFirst().path("parallel_tool_calls").asBoolean());
-    assertEquals(tools.getFirst(), wire.getFirst().path("tools").get(0));
+        "opaque-state",
+        LabJson.text(
+            LabJson.path(LabJson.list(wire.get(1).get("input")).get(1), "encrypted_content")));
+    assertFalse(wire.getFirst().containsKey("reasoning"));
+    assertFalse(LabJson.bool(wire.getFirst().get("parallel_tool_calls")));
+    assertEquals(tools.getFirst(), LabJson.list(wire.getFirst().get("tools")).get(0));
   }
 
   @Test
   void springEmbeddingModelUses1536DimensionsAndValidatesResults() {
-    var wire = new ArrayList<JsonNode>();
-    var embeddingResponse = json.createObjectNode().put("model", "text-embedding-3-small");
-    var data = embeddingResponse.putArray("data");
+    List<Map<String, Object>> wire = new ArrayList<Map<String, Object>>();
+    Map<String, Object> embeddingResponse = LabJson.object();
+    embeddingResponse.put("model", "text-embedding-3-small");
+    List<Object> data = LabJson.childList(embeddingResponse, "data");
     for (int index = 0; index < 2; index++) {
-      var item = data.addObject().put("index", index);
-      var vector = item.putArray("embedding");
+      Map<String, Object> item = LabJson.object();
+      item.put("index", index);
+      List<Object> vector = LabJson.childList(item, "embedding");
       for (int n = 0; n < 1536; n++) vector.add(index + 0.5);
+      data.add(item);
     }
     server.createContext(
         "/v1/embeddings",
         exchange -> {
-          wire.add(json.readTree(exchange.getRequestBody()));
-          byte[] bytes = embeddingResponse.toString().getBytes(StandardCharsets.UTF_8);
+          wire.add(body(exchange));
+          byte[] bytes = json.writeValueAsBytes(embeddingResponse);
           exchange.getResponseHeaders().set("Content-Type", "application/json");
           exchange.sendResponseHeaders(200, bytes.length);
           exchange.getResponseBody().write(bytes);
           exchange.close();
         });
-    var vectors = client.embed(List.of("one", "two"));
+    List<float[]> vectors = client.embed(List.of("one", "two"));
     assertEquals(2, vectors.size());
     assertEquals(1536, vectors.getFirst().length);
     assertEquals(0.5f, vectors.get(0)[0]);
     assertEquals(1.5f, vectors.get(1)[0]);
-    assertEquals(1536, wire.getFirst().path("dimensions").asInt());
-    assertEquals("text-embedding-3-small", wire.getFirst().path("model").asText());
-    ((ArrayNode) data.get(0).path("embedding")).remove(0);
+    assertEquals(1536, LabJson.integer(wire.getFirst().get("dimensions")));
+    assertEquals("text-embedding-3-small", LabJson.text(wire.getFirst().get("model")));
+    LabJson.list(LabJson.path(data.get(0), "embedding")).remove(0);
     assertThrows(LabException.class, () -> client.embed(List.of("one", "two")));
     assertEquals(2, wire.size());
     assertTrue(client.embed(List.of()).isEmpty());
@@ -346,16 +369,16 @@ class OpenAiLabClientTests {
 
   @Test
   void simpleLoggerAdvisorLogsBothChatClients() {
-    var logger =
-        (ch.qos.logback.classic.Logger)
-            org.slf4j.LoggerFactory.getLogger(
-                org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor.class);
-    var previous = logger.getLevel();
-    var events =
-        new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    Logger logger =
+        (Logger)
+            LoggerFactory.getLogger(
+                SimpleLoggerAdvisor.class);
+    Level previous = logger.getLevel();
+    ListAppender<ILoggingEvent> events =
+        new ListAppender<ILoggingEvent>();
     events.start();
     logger.addAppender(events);
-    logger.setLevel(ch.qos.logback.classic.Level.DEBUG);
+    logger.setLevel(Level.DEBUG);
     server.createContext(
         "/v1/responses",
         exchange -> {
@@ -367,12 +390,12 @@ class OpenAiLabClientTests {
         });
     try {
       client.structured("generation", "advisor rules", input("advisor-test"), schema());
-      var input = json.createArrayNode();
-      input.addObject().put("role", "user").put("content", "advisor-test");
+      List<Object> input = LabJson.array();
+      input.add(Map.of("role", "user", "content", "advisor-test"));
       client.respond("advisor rules", input, schema(), List.of());
-      var messages =
+      List<String> messages =
           events.list.stream()
-              .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+              .map(ILoggingEvent::getFormattedMessage)
               .toList();
       assertEquals(2, messages.stream().filter(message -> message.startsWith("request:")).count());
       assertEquals(2, messages.stream().filter(message -> message.startsWith("response:")).count());
@@ -380,7 +403,7 @@ class OpenAiLabClientTests {
           messages.stream().anyMatch(message -> message.contains("\"labStage\" : \"generation\"")));
       assertTrue(
           messages.stream().anyMatch(message -> message.contains("\"labStage\" : \"answer\"")));
-      var request =
+      String request =
           messages.stream()
               .filter(message -> message.startsWith("request:"))
               .findFirst()

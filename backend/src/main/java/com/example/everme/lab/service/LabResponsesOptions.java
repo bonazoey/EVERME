@@ -1,21 +1,24 @@
 package com.example.everme.lab.service;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.ai.chat.prompt.ChatOptions;
-
-import com.fasterxml.jackson.databind.JsonNode;
 
 /** Request-local Responses options; never stores a viewer's conversation on a singleton. */
 public record LabResponsesOptions(
     // ##### 필드 #####
-    String model, String effort, JsonNode input, JsonNode schema, List<JsonNode> tools)
+    String model,
+    String effort,
+    List<Object> input,
+    Map<String, Object> schema,
+    List<Map<String, Object>> tools)
     implements ChatOptions {
   // ##### 생성자 #####
   public LabResponsesOptions {
-    input = input.deepCopy();
-    schema = schema.deepCopy();
-    tools = tools.stream().<JsonNode>map(JsonNode::deepCopy).toList();
+    input = LabJson.copy(input);
+    schema = LabJson.copy(schema);
+    tools = tools.stream().<Map<String, Object>>map(LabJson::copy).toList();
   }
 
   public String getModel() {

@@ -6,74 +6,65 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 /** Strict Responses JSON schemas. All object keys required; uncertainty is explicit null. */
 public class LabSchemas {
-  // ##### 필드 #####
-  private final ObjectMapper json;
+  // 스키마는 순수 Map·List로 만든다. 직렬화는 LLM 호출 시 ObjectMapper가 맡는다.
+  public LabSchemas() {}
 
-  // ##### 생성자 #####
-  public LabSchemas(ObjectMapper json) {
-    this.json = json;
+  public Map<String, Object> string() {
+    return Map.of("type", "string");
   }
 
-  public JsonNode string() {
-    return json.valueToTree(Map.of("type", "string"));
+  public Map<String, Object> number() {
+    return Map.of("type", "number", "minimum", 0, "maximum", 100);
   }
 
-  public JsonNode number() {
-    return json.valueToTree(Map.of("type", "number", "minimum", 0, "maximum", 100));
+  public Map<String, Object> integer(int min, int max) {
+    return Map.of("type", "integer", "minimum", min, "maximum", max);
   }
 
-  public JsonNode integer(int min, int max) {
-    return json.valueToTree(Map.of("type", "integer", "minimum", min, "maximum", max));
+  public Map<String, Object> nullable(Map<String, Object> node) {
+    return Map.of("anyOf", List.of(node, Map.of("type", "null")));
   }
 
-  public JsonNode nullable(JsonNode node) {
-    return json.valueToTree(Map.of("anyOf", List.of(node, Map.of("type", "null"))));
+  public Map<String, Object> array(Map<String, Object> node) {
+    return Map.of("type", "array", "items", node);
   }
 
-  public JsonNode array(JsonNode node) {
-    return json.valueToTree(Map.of("type", "array", "items", node));
+  public Map<String, Object> array(Map<String, Object> node, int minItems, int maxItems) {
+    return Map.of("type", "array", "items", node, "minItems", minItems, "maxItems", maxItems);
   }
 
-  public JsonNode array(JsonNode node, int minItems, int maxItems) {
-    return json.valueToTree(
-        Map.of("type", "array", "items", node, "minItems", minItems, "maxItems", maxItems));
+  public Map<String, Object> object(Map<String, Map<String, Object>> props) {
+    return Map.of(
+        "type",
+        "object",
+        "properties",
+        props,
+        "required",
+        new ArrayList<>(props.keySet()),
+        "additionalProperties",
+        false);
   }
 
-  public JsonNode object(Map<String, JsonNode> props) {
-    return json.valueToTree(
-        Map.of(
-            "type",
-            "object",
-            "properties",
-            props,
-            "required",
-            new ArrayList<>(props.keySet()),
-            "additionalProperties",
-            false));
+  public Map<String, Object> enumeration(Collection<String> values) {
+    return Map.of("type", "string", "enum", List.copyOf(values));
   }
 
-  public JsonNode enumeration(Collection<String> values) {
-    return json.valueToTree(Map.of("type", "string", "enum", values));
-  }
-
-  public JsonNode persona(LabCatalog catalog) {
-    LinkedHashMap<String, JsonNode> scores = new LinkedHashMap<String, JsonNode>();
+  public Map<String, Object> persona(LabCatalog catalog) {
+    LinkedHashMap<String, Map<String, Object>> scores =
+        new LinkedHashMap<String, Map<String, Object>>();
     catalog.codes().forEach(c -> scores.put(c, number()));
     return object(
         Map.of("biography", string(), "scores", object(scores), "facts", array(string())));
   }
 
-  public JsonNode turns() {
+  public Map<String, Object> turns() {
     return object(Map.of("turns", array(object(Map.of("user", string(), "assistant", string())))));
   }
 
-  public JsonNode analysis(LabCatalog catalog) {
-    JsonNode element =
+  public Map<String, Object> analysis(LabCatalog catalog) {
+    Map<String, Object> element =
         object(
             Map.of(
                 "code",
@@ -86,7 +77,7 @@ public class LabSchemas {
                 array(string()),
                 "reason",
                 string()));
-    JsonNode memory =
+    Map<String, Object> memory =
         object(
             Map.of(
                 "kind",
@@ -110,7 +101,7 @@ public class LabSchemas {
   }
 
   // ##### 정보이용자 질문에 답변하는 메소드 #####
-  public JsonNode answer() {
+  public Map<String, Object> answer() {
     return object(
         Map.of(
             "answer",
@@ -129,23 +120,23 @@ public class LabSchemas {
             "reason",
             string(),
             "inferred",
-            json.valueToTree(Map.of("type", "boolean")),
+            Map.of("type", "boolean"),
             "evidenceIds",
             array(string())));
   }
 
-  public JsonNode tool(String name, String description, Map<String, JsonNode> props) {
-    return json.valueToTree(
-        Map.of(
-            "type",
-            "function",
-            "name",
-            name,
-            "description",
-            description,
-            "strict",
-            true,
-            "parameters",
-            object(props)));
+  public Map<String, Object> tool(
+      String name, String description, Map<String, Map<String, Object>> props) {
+    return Map.of(
+        "type",
+        "function",
+        "name",
+        name,
+        "description",
+        description,
+        "strict",
+        true,
+        "parameters",
+        object(props));
   }
 }

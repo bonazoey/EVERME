@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.example.everme.lab.dao.LabMapper;
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.*;
 import org.junit.jupiter.api.*;
 
@@ -15,108 +14,123 @@ class LabValidationTests {
 
   @BeforeEach
   void setup() throws Exception {
-    catalog = new LabCatalog(json);
+    catalog = LabCatalog.load(json);
     validation = new LabValidation(catalog);
+  }
+
+  private Map<String, Object> readMap(String text) {
+    return LabJson.readMap(json, text);
+  }
+
+  private List<Object> readList(String text) {
+    return LabJson.list(LabJson.read(json, text));
+  }
+
+  private int length(Object value) {
+    return LabJson.write(json, value).length();
+  }
+
+  private static Map<String, Object> observation(String code, int score, int strength) {
+    Map<String, Object> item = LabJson.object();
+    item.put("code", code);
+    item.put("score", score);
+    item.put("strength", strength);
+    item.put("reason", "evidence");
+    item.put("sourceIds", new ArrayList<Object>(List.of("a")));
+    return item;
   }
 
   @Test
   void profileToolDescriptorLimitsCodeCountToOneThroughTwenty() throws Exception {
-    var tools = new LabCloneTools(null, catalog, new LabSchemas(json), null);
-    var codes = json.readTree(tools.profile(1L).getToolDefinition().inputSchema()).path("properties").path("codes");
-    assertEquals(1, codes.path("minItems").asInt());
-    assertEquals(20, codes.path("maxItems").asInt());
-    assertEquals(140, codes.path("items").path("enum").size());
+    LabCloneTools tools = new LabCloneTools(null, catalog, new LabSchemas(), null);
+    Object codes =
+        LabJson.path(
+            readMap(tools.profile(1L).getToolDefinition().inputSchema()), "properties", "codes");
+    assertEquals(1, LabJson.integer(LabJson.path(codes, "minItems")));
+    assertEquals(20, LabJson.integer(LabJson.path(codes, "maxItems")));
+    assertEquals(140, LabJson.list(LabJson.path(codes, "items", "enum")).size());
   }
 
   @Test
   void catalogHas140DistinctElementsAndExplicitAnchors() {
     assertEquals(140, catalog.codes().size());
     assertEquals(7, catalog.domains().size());
-    for (var code : catalog.codes()) {
-      var e = catalog.element(code);
-      assertEquals(5, e.path("anchors").size());
-      assertFalse(e.path("boundary").asText().isBlank());
+    for (String code : catalog.codes()) {
+      Map<String, Object> e = catalog.element(code);
+      assertEquals(5, LabJson.map(e.get("anchors")).size());
+      assertFalse(LabJson.text(e.get("boundary")).isBlank());
     }
     assertTrue(
-        catalog
-            .element("relations.social_orientation")
-            .path("anchors")
-            .path("0")
-            .asText()
+        LabJson.text(
+                LabJson.path(catalog.element("relations.social_orientation"), "anchors", "0"))
             .contains("내향"));
     assertTrue(
-        catalog
-            .element("relations.social_orientation")
-            .path("anchors")
-            .path("100")
-            .asText()
+        LabJson.text(
+                LabJson.path(catalog.element("relations.social_orientation"), "anchors", "100"))
             .contains("외향"));
   }
 
   @Test
   void rejectsOutOfRangeAndNonNumericScores() {
-    for (var node :
-        List.of(
-            json.valueToTree(-1),
-            json.valueToTree(101),
-            json.valueToTree("50"),
-            json.valueToTree(50.001),
-            json.nullNode())) assertThrows(LabException.class, () -> LabValidation.score(node));
-    assertEquals(50, LabValidation.score(json.valueToTree(50)).intValue());
+    for (Object value : Arrays.asList(-1, 101, "50", 50.001, null))
+      assertThrows(LabException.class, () -> LabValidation.score(value));
+    assertEquals(50, LabValidation.score(50).intValue());
   }
 
   @Test
   void compactCatalogPreservesEveryCodeAnchorAndExample() {
-    var compact = catalog.analysisDocument();
-    var codes = new HashSet<String>();
-    for (var domain : compact.path("domains")) {
-      assertFalse(domain.path("exclude").asText().isBlank());
-      assertFalse(domain.path("counterExample").asText().isBlank());
-      for (var element : domain.path("elements")) {
-        String code = element.path("code").asText();
+    Map<String, Object> compact = catalog.analysisDocument();
+    Set<String> codes = new HashSet<String>();
+    Map<String, Object> anchorDefinitions = LabJson.map(compact.get("anchorDefinitions"));
+    for (Object domainValue : LabJson.list(compact.get("domains"))) {
+      Map<String, Object> domain = LabJson.map(domainValue);
+      assertFalse(LabJson.text(domain.get("exclude")).isBlank());
+      assertFalse(LabJson.text(domain.get("counterExample")).isBlank());
+      for (Object elementValue : LabJson.list(domain.get("elements"))) {
+        Map<String, Object> element = LabJson.map(elementValue);
+        String code = LabJson.text(element.get("code"));
         assertTrue(codes.add(code));
-        assertFalse(element.has("anchors"));
+        assertFalse(element.containsKey("anchors"));
         assertEquals(
-            catalog.element(code).path("anchors"),
-            compact.path("anchorDefinitions").path(element.path("anchorRef").asText()));
-        assertEquals(
-            catalog.element(code).path("positiveExample"), element.path("positiveExample"));
-        assertFalse(element.has("updatePolicy"));
-        assertFalse(element.has("column"));
+            catalog.element(code).get("anchors"),
+            anchorDefinitions.get(LabJson.text(element.get("anchorRef"))));
+        assertEquals(catalog.element(code).get("positiveExample"), element.get("positiveExample"));
+        assertFalse(element.containsKey("updatePolicy"));
+        assertFalse(element.containsKey("column"));
       }
     }
-    var uniqueAnchors = new HashSet<JsonNode>();
-    for (var code : catalog.codes()) uniqueAnchors.add(catalog.element(code).path("anchors"));
-    assertEquals(uniqueAnchors.size(), compact.path("anchorDefinitions").size());
-    var expanded = compact.deepCopy();
-    ((ObjectNode) expanded).remove(List.of("anchorRule", "anchorDefinitions"));
-    for (var domain : expanded.path("domains"))
-      for (var element : domain.path("elements")) {
-        var item = (ObjectNode) element;
-        item.set(
-            "anchors", compact.path("anchorDefinitions").path(item.path("anchorRef").asText()));
+    Set<Object> uniqueAnchors = new HashSet<Object>();
+    for (String code : catalog.codes()) uniqueAnchors.add(catalog.element(code).get("anchors"));
+    assertEquals(uniqueAnchors.size(), anchorDefinitions.size());
+    Map<String, Object> expanded = LabJson.copy(compact);
+    expanded.remove("anchorRule");
+    expanded.remove("anchorDefinitions");
+    for (Object domain : LabJson.list(expanded.get("domains")))
+      for (Object element : LabJson.list(LabJson.path(domain, "elements"))) {
+        Map<String, Object> item = LabJson.map(element);
+        item.put("anchors", anchorDefinitions.get(LabJson.text(item.get("anchorRef"))));
         item.remove("anchorRef");
       }
-    assertTrue(compact.toString().length() < expanded.toString().length());
+    assertTrue(length(compact) < length(expanded));
     System.out.printf(
         "Analysis catalog: before=%d after=%d anchorDefinitions=%d%n",
-        expanded.toString().length(), compact.toString().length(), uniqueAnchors.size());
+        length(expanded), length(compact), uniqueAnchors.size());
     assertEquals(catalog.codes(), codes);
-    assertTrue(compact.toString().length() < catalog.document().toString().length() / 2);
+    assertTrue(length(compact) < length(catalog.document()) / 2);
   }
 
   @Test
   void catalogRejectsMissingInvalidDuplicateAndUnknownPolicies() {
     for (int mode = 0; mode < 5; mode++) {
-      var doc = catalog.document();
-      var elements = doc.path("domains").get(0).path("elements");
-      var first = (ObjectNode) elements.get(0);
+      Map<String, Object> doc = catalog.document();
+      List<Object> elements = LabJson.list(LabJson.path(LabJson.list(doc.get("domains")).get(0), "elements"));
+      Map<String, Object> first = LabJson.map(elements.get(0));
       switch (mode) {
         case 0 -> first.remove("updatePolicy");
-        case 1 -> first.withObject("/updatePolicy").put("maxWeight", 15);
-        case 2 -> first.put("code", elements.get(1).path("code").asText());
-        case 3 -> ((com.fasterxml.jackson.databind.node.ArrayNode) elements).remove(0);
-        case 4 -> ((ObjectNode) doc).put("updatePolicyVersion", "unknown");
+        case 1 -> LabJson.child(first, "updatePolicy").put("maxWeight", 15);
+        case 2 -> first.put("code", LabJson.text(LabJson.path(elements.get(1), "code")));
+        case 3 -> elements.remove(0);
+        case 4 -> doc.put("updatePolicyVersion", "unknown");
       }
       assertThrows(IllegalStateException.class, () -> new LabCatalog(doc));
     }
@@ -125,22 +139,17 @@ class LabValidationTests {
   @Test
   void allElementsUseTheirOwnCapsAndRetainLowExistingWeights() {
     assertEquals("element-cap-v1", catalog.policyVersion());
-    var counts = new HashMap<Integer, Integer>();
+    Map<Integer, Integer> counts = new HashMap<Integer, Integer>();
     for (String code : catalog.codes()) {
       int cap = catalog.maxWeight(code);
       counts.merge(cap, 1, Integer::sum);
-      assertFalse(catalog.element(code).path("updatePolicy").path("rationale").asText().isBlank());
-      ObjectNode old = json.createObjectNode();
-      old.putObject(code).put("score", 40).put("weight", 200);
-      var observations = json.createArrayNode();
-      observations
-          .addObject()
-          .put("code", code)
-          .put("score", 60)
-          .put("strength", 2)
-          .put("reason", "evidence")
-          .putArray("sourceIds")
-          .add("a");
+      assertFalse(
+          LabJson.text(LabJson.path(catalog.element(code), "updatePolicy", "rationale")).isBlank());
+      Map<String, Object> old = LabJson.object();
+      Map<String, Object> point = LabJson.child(old, code);
+      point.put("score", 40);
+      point.put("weight", 200);
+      List<Object> observations = new ArrayList<Object>(List.of(observation(code, 60, 2)));
       String expected =
           switch (cap) {
             case 10 -> "43.33";
@@ -148,120 +157,93 @@ class LabValidationTests {
             case 40 -> "40.95";
             default -> throw new AssertionError();
           };
-      var result = json.createObjectNode();
-      result
-          .putArray("updates")
-          .addObject()
-          .put("code", code)
-          .put("score", new java.math.BigDecimal(expected))
-          .put("weight", cap);
-      var point = validation.merge(old, observations).path(code);
-      assertEquals(expected, point.path("score").asText());
-      assertEquals(cap, point.path("weight").asInt());
+      Map<String, Object> merged = LabJson.map(validation.merge(old, observations).get(code));
+      assertEquals(expected, LabJson.text(merged.get("score")));
+      assertEquals(cap, LabJson.integer(merged.get("weight")));
     }
     assertEquals(Map.of(10, 38, 20, 48, 40, 54), counts);
-    ObjectNode old = json.createObjectNode();
-    old.putObject("values.family").put("score", 40).put("weight", 20);
-    var observations = json.createArrayNode();
-    observations
-        .addObject()
-        .put("code", "values.family")
-        .put("score", 60)
-        .put("strength", 2)
-        .put("reason", "evidence")
-        .putArray("sourceIds")
-        .add("a");
-    var result = json.createObjectNode();
-    result
-        .putArray("updates")
-        .addObject()
-        .put("code", "values.family")
-        .put("score", 41.82)
-        .put("weight", 22);
+    Map<String, Object> old = LabJson.object();
+    Map<String, Object> family = LabJson.child(old, "values.family");
+    family.put("score", 40);
+    family.put("weight", 20);
+    List<Object> observations =
+        new ArrayList<Object>(List.of(observation("values.family", 60, 2)));
     assertEquals(
-        22, validation.merge(old, observations).path("values.family").path("weight").asInt());
+        22,
+        LabJson.integer(
+            LabJson.path(validation.merge(old, observations), "values.family", "weight")));
   }
 
   @Test
   void analysisRejectsAssistantOrForgedSourcesAndDuplicateDimensions() throws Exception {
-    var analysis =
-        json.readTree(
+    Map<String, Object> analysis =
+        readMap(
             """
 {"observations":[{"code":"habits.exercise","score":80,"strength":2,"sourceIds":["assistant-id"],"reason":"운동한다"}],"memories":[]}
 """);
     assertThrows(LabException.class, () -> validation.analysis(analysis, Set.of("owner-id")));
-    ((ObjectNode) analysis.path("observations").get(0)).putArray("sourceIds").add("owner-id");
+    List<Object> observations = LabJson.list(analysis.get("observations"));
+    LabJson.map(observations.get(0)).put("sourceIds", new ArrayList<Object>(List.of("owner-id")));
     validation.analysis(analysis, Set.of("owner-id"));
-    ((com.fasterxml.jackson.databind.node.ArrayNode) analysis.path("observations"))
-        .add(analysis.path("observations").get(0).deepCopy());
+    observations.add(LabJson.copy(observations.get(0)));
     assertThrows(LabException.class, () -> validation.analysis(analysis, Set.of("owner-id")));
   }
 
   @Test
   void mergeChecksLlmArithmeticAndPreservesUnknowns() throws Exception {
-    ObjectNode old =
-        (ObjectNode)
-            json.readTree(
-                """
+    Map<String, Object> old =
+        readMap(
+            """
 {"habits.exercise":{"score":20,"weight":2},"values.family":{"score":null,"weight":0},"interests.music":{"score":50,"weight":2}}
 """);
-    var observations =
-        json.readTree(
+    List<Object> observations =
+        readList(
             """
 [{"code":"habits.exercise","score":80,"strength":1,"sourceIds":["a"],"reason":"actual practice"}]
 """);
-    var valid =
-        json.readTree(
-            """
-            {"updates":[{"code":"habits.exercise","score":40,"weight":3}]}
-            """);
-    var merged = validation.merge(old, observations);
-    assertEquals(40, merged.path("habits.exercise").path("score").asInt());
-    assertTrue(merged.path("values.family").path("score").isNull());
-    assertEquals(50, merged.path("interests.music").path("score").asInt());
+    Map<String, Object> merged = validation.merge(old, observations);
+    assertEquals(40, LabJson.integer(LabJson.path(merged, "habits.exercise", "score")));
+    assertNull(LabJson.path(merged, "values.family", "score"));
+    assertTrue(LabJson.map(merged.get("values.family")).containsKey("score"));
+    assertEquals(50, LabJson.integer(LabJson.path(merged, "interests.music", "score")));
   }
 
   @Test
   void capsLegacyWeightAndRejectsUncappedOrSimpleAverageResults() throws Exception {
-    ObjectNode old =
-        (ObjectNode) json.readTree("{\"habits.plan_execution\":{\"score\":40,\"weight\":200}}");
-    var observations =
-        json.readTree(
+    Map<String, Object> old = readMap("{\"habits.plan_execution\":{\"score\":40,\"weight\":200}}");
+    List<Object> observations =
+        readList(
             "[{\"code\":\"habits.plan_execution\",\"score\":60,\"strength\":2,\"sourceIds\":[\"a\"],\"reason\":\"new"
                 + " evidence\"}]");
-    var result =
-        json.readTree(
-            "{\"updates\":[{\"code\":\"habits.plan_execution\",\"score\":41.82,\"weight\":20}]}");
-    var merged = validation.merge(old, observations);
-    assertEquals("41.82", merged.path("habits.plan_execution").path("score").asText());
-    assertEquals(20, merged.path("habits.plan_execution").path("weight").asInt());
+    Map<String, Object> merged = validation.merge(old, observations);
+    assertEquals("41.82", LabJson.text(LabJson.path(merged, "habits.plan_execution", "score")));
+    assertEquals(20, LabJson.integer(LabJson.path(merged, "habits.plan_execution", "weight")));
   }
 
   @Test
   void crossingCapUsesUncappedDenominatorAndNullHasNoPriorWeight() throws Exception {
-    ObjectNode old =
-        (ObjectNode) json.readTree("{\"habits.plan_execution\":{\"score\":40,\"weight\":19}}");
-    var observations =
-        json.readTree(
+    Map<String, Object> old = readMap("{\"habits.plan_execution\":{\"score\":40,\"weight\":19}}");
+    List<Object> observations =
+        readList(
             "[{\"code\":\"habits.plan_execution\",\"score\":60,\"strength\":3,\"sourceIds\":[\"a\"],\"reason\":\"new"
                 + " evidence\"}]");
-    var result =
-        json.readTree(
-            "{\"updates\":[{\"code\":\"habits.plan_execution\",\"score\":42.73,\"weight\":20}]}");
     assertEquals(
         "42.73",
-        validation.merge(old, observations).path("habits.plan_execution").path("score").asText());
-    old.withObject("/habits.plan_execution").putNull("score").put("weight", 200);
-    ((ObjectNode) result.path("updates").get(0)).put("score", 60).put("weight", 3);
+        LabJson.text(
+            LabJson.path(validation.merge(old, observations), "habits.plan_execution", "score")));
+    Map<String, Object> previous = LabJson.child(old, "habits.plan_execution");
+    previous.put("score", null);
+    previous.put("weight", 200);
     assertEquals(
         3,
-        validation.merge(old, observations).path("habits.plan_execution").path("weight").asInt());
+        LabJson.integer(
+            LabJson.path(validation.merge(old, observations), "habits.plan_execution", "weight")));
   }
 
   @Test
   void refusesProfileIdentifierInjection() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> LabMapper.ProfileSql.read(Map.of("table", "emotion; DROP TABLE accounts")));
+        () -> LabMapper.profileTable("emotion; DROP TABLE accounts"));
   }
 }

@@ -9,50 +9,37 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
-@Component
-@Profile("clone-lab")
+// Spring Bean은 LabConfiguration.labCatalog가 load(json)로 만든다.
 public class LabCatalog {
-  
+
   // ##### 필드 #####
-  private final JsonNode document;
-  private final Map<String, JsonNode> elements = new LinkedHashMap<>();
+  private final Map<String, Object> document;
+  private final Map<String, Map<String, Object>> elements = new LinkedHashMap<>();
   private final Map<String, List<String>> domains = new LinkedHashMap<>();
 
   // ##### 생성자 #####
-  @org.springframework.beans.factory.annotation.Autowired
-  public LabCatalog(ObjectMapper json) throws IOException {
-    this(read(json));
-  }
-
-  private static JsonNode read(ObjectMapper json) throws IOException {
-    try (InputStream in = new ClassPathResource("clone-lab/catalog.json").getInputStream()) {
-      return json.readTree(in);
-    }
-  }
-
-  LabCatalog(JsonNode source) {
-    document = source.deepCopy();
-    if (!"element-cap-v1".equals(document.path("updatePolicyVersion").asText())) {
+  // 카탈로그 구조를 검증하고 code → 요소, 영역 → 코드 목록 색인을 만든다. 테스트도 이 생성자를 쓴다.
+  LabCatalog(Map<String, Object> source) {
+    document = LabJson.copy(source);
+    if (!"element-cap-v1".equals(LabJson.text(document.get("updatePolicyVersion")))) {
       throw new IllegalStateException("Invalid update policy version");
     }
-    for (JsonNode domain : document.path("domains")) {
+    for (Object domainValue : LabJson.list(document.get("domains"))) {
+      Map<String, Object> domain = LabJson.map(domainValue);
       ArrayList<String> codes = new ArrayList<String>();
-      for (JsonNode element : domain.path("elements")) {
-        String code = element.path("code").asText();
-        JsonNode policy = element.path("updatePolicy");
-        if (!code.equals(domain.path("code").asText() + "." + element.path("column").asText())
-            || !policy.path("maxWeight").isIntegralNumber()
-            || !Set.of(10, 20, 40).contains(policy.path("maxWeight").asInt())
-            || policy.path("rationale").asText().isBlank()) {
+      for (Object elementValue : LabJson.list(domain.get("elements"))) {
+        Map<String, Object> element = LabJson.map(elementValue);
+        String code = LabJson.text(element.get("code"));
+        Map<String, Object> policy = LabJson.map(element.get("updatePolicy"));
+        if (!code.equals(
+                LabJson.text(domain.get("code")) + "." + LabJson.text(element.get("column")))
+            || !LabJson.isIntegral(policy.get("maxWeight"))
+            || !Set.of(10, 20, 40).contains(LabJson.integer(policy.get("maxWeight")))
+            || LabJson.text(policy.get("rationale")).isBlank()) {
           throw new IllegalStateException("Invalid update policy: " + code);
         }
         if (elements.put(code, element) != null) {
@@ -63,7 +50,7 @@ public class LabCatalog {
       if (codes.size() != 20) {
         throw new IllegalStateException("20 elements required per domain");
       }
-      if (domains.put(domain.path("code").asText(), List.copyOf(codes)) != null) {
+      if (domains.put(LabJson.text(domain.get("code")), List.copyOf(codes)) != null) {
         throw new IllegalStateException("Duplicate domain");
       }
     }
@@ -72,55 +59,64 @@ public class LabCatalog {
     }
   }
 
-  public JsonNode document() {
-    return document.deepCopy();
+  // ##### classpath clone-lab/catalog.json을 읽어 카탈로그를 만드는 메소드 #####
+  @SuppressWarnings("unchecked")
+  public static LabCatalog load(ObjectMapper json) throws IOException {
+    try (InputStream in = new ClassPathResource("clone-lab/catalog.json").getInputStream()) {
+      return new LabCatalog(json.readValue(in, Map.class));
+    }
   }
 
-  public JsonNode analysisDocument() {
-    ObjectNode result = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+  public Map<String, Object> document() {
+    return LabJson.copy(document);
+  }
+
+  public Map<String, Object> analysisDocument() {
+    Map<String, Object> result = LabJson.object();
     result.put("anchorRule", "각 요소의 anchorRef가 가리키는 anchorDefinitions의 점수 해석을 적용한다.");
-    ObjectNode anchorDefinitions = result.putObject("anchorDefinitions");
-    Map<JsonNode, String> anchorRefs = new LinkedHashMap<>();
+    Map<String, Object> anchorDefinitions = LabJson.child(result, "anchorDefinitions");
+    Map<Object, String> anchorRefs = new LinkedHashMap<>();
     result.put(
         "defaultBoundary",
         "요소 이름에 직접 해당하는 근거만 사용한다. 영역의 exclude를 이 점수로 대신 측정하지 않는다. 요소에 boundary 또는 counterExample이"
             + " 없으면 영역의 공통 규칙을 적용한다.");
-    ArrayNode list = result.putArray("domains");
-    for (JsonNode domain : document.path("domains")) {
-      ObjectNode target = list.addObject();
+    List<Object> list = LabJson.childList(result, "domains");
+    for (Object domainValue : LabJson.list(document.get("domains"))) {
+      Map<String, Object> domain = LabJson.map(domainValue);
+      Map<String, Object> target = LabJson.object();
+      list.add(target);
       for (String field : List.of("code", "label", "definition", "exclude")) {
-        target.set(field, domain.path(field));
+        target.put(field, LabJson.copy(domain.get(field)));
       }
-      JsonNode first = domain.path("elements").get(0);
+      List<Object> domainElements = LabJson.list(domain.get("elements"));
+      Map<String, Object> first = LabJson.map(domainElements.isEmpty() ? null : domainElements.get(0));
       String commonCounter =
-          first.path("counterExample").asText().replace(first.path("label").asText(), "{요소}");
+          LabJson.text(first.get("counterExample")).replace(LabJson.text(first.get("label")), "{요소}");
       target.put("counterExample", commonCounter);
-      ArrayNode items = target.putArray("elements");
-      for (JsonNode element : domain.path("elements")) {
-        ObjectNode item = items.addObject();
+      List<Object> items = LabJson.childList(target, "elements");
+      for (Object elementValue : domainElements) {
+        Map<String, Object> element = LabJson.map(elementValue);
+        Map<String, Object> item = LabJson.object();
+        items.add(item);
         for (String field : List.of("code", "label", "positiveExample")) {
-          item.set(field, element.path(field));
+          item.put(field, LabJson.copy(element.get(field)));
         }
-        JsonNode anchors = element.path("anchors");
+        Object anchors = element.get("anchors");
         String anchorRef = anchorRefs.get(anchors);
         if (anchorRef == null) {
           anchorRef = "scale_" + (anchorRefs.size() + 1);
           anchorRefs.put(anchors, anchorRef);
-          anchorDefinitions.set(anchorRef, anchors.deepCopy());
+          anchorDefinitions.put(anchorRef, LabJson.copy(anchors));
         }
         item.put("anchorRef", anchorRef);
-        if (!element
-            .path("boundary")
-            .asText()
-            .startsWith(element.path("label").asText() + "에 직접 해당하는 근거만")) {
-          item.set("boundary", element.path("boundary"));
+        String label = LabJson.text(element.get("label"));
+        if (!LabJson.text(element.get("boundary")).startsWith(label + "에 직접 해당하는 근거만")) {
+          item.put("boundary", LabJson.copy(element.get("boundary")));
         }
-        if (!element
-            .path("counterExample")
-            .asText()
-            .replace(element.path("label").asText(), "{요소}")
+        if (!LabJson.text(element.get("counterExample"))
+            .replace(label, "{요소}")
             .equals(commonCounter)) {
-          item.set("counterExample", element.path("counterExample"));
+          item.put("counterExample", LabJson.copy(element.get("counterExample")));
         }
       }
     }
@@ -135,23 +131,23 @@ public class LabCatalog {
     return Collections.unmodifiableSet(elements.keySet());
   }
 
-  public JsonNode element(String code) {
+  public Map<String, Object> element(String code) {
     if (!elements.containsKey(code)) {
       throw LabException.bad("알 수 없는 분석 요소입니다.");
     }
-    return elements.get(code).deepCopy();
+    return LabJson.copy(elements.get(code));
   }
 
   public String column(String code) {
-    return element(code).path("column").asText();
+    return LabJson.text(element(code).get("column"));
   }
 
   public int maxWeight(String code) {
-    return element(code).path("updatePolicy").path("maxWeight").asInt();
+    return LabJson.integer(LabJson.path(element(code), "updatePolicy", "maxWeight"));
   }
 
   public String policyVersion() {
-    return document.path("updatePolicyVersion").asText();
+    return LabJson.text(document.get("updatePolicyVersion"));
   }
 
   public void requireDomain(String code) {

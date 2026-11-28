@@ -11,9 +11,8 @@ import org.springframework.stereotype.Repository;
 
 import com.example.everme.lab.service.LabCatalog;
 import com.example.everme.lab.service.LabException;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.example.everme.lab.service.LabJson;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @Repository
 @Profile("clone-lab")
@@ -34,15 +33,17 @@ public class LabDao {
     return mapper;
   }
 
-  public JsonNode parse(Object value) {
+  // DB JSON 문자열을 Map·List·값으로 바꾼다. null은 null 그대로 (응답에 JSON null로 나간다).
+  public Object parse(Object value) {
     if (value == null) {
-      return json.nullNode();
+      return null;
     }
-    try {
-      return json.readTree(value.toString());
-    } catch (Exception e) {
-      throw new IllegalStateException("Invalid lab JSON", e);
-    }
+    return LabJson.read(json, value.toString());
+  }
+
+  // DB JSON 문자열을 수정 가능한 Map으로 바꾼다. null이거나 객체가 아니면 빈 Map.
+  public Map<String, Object> parseMap(Object value) {
+    return LabJson.map(parse(value));
   }
 
   public Map<String, Object> requireUser(Long user) {
@@ -62,37 +63,35 @@ public class LabDao {
   }
 
   // ##### 분석 프로필을 조회하는 메소드 #####
-  public ObjectNode profile(Long user) {
-    ObjectNode profile = json.createObjectNode();
+  public Map<String, Object> profile(Long user) {
+    Map<String, Object> profile = LabJson.object();
     for (Entry<String, List<String>> d : catalog.domains().entrySet()) {
-      JsonNode row = parse(mapper.profile(d.getKey(), user));
+      Map<String, Object> row = parseMap(mapper.profile(d.getKey(), user));
       for (String code : d.getValue()) {
-        ObjectNode point = json.createObjectNode();
-        point.set("score", row.path(catalog.column(code)));
-        JsonNode meta = row.path("metadata").path(code);
-        point.put("weight", meta.path("weight").asInt(0));
-        point.set(
-            "sourceIds",
-            meta.path("sourceIds").isArray() ? meta.path("sourceIds") : json.createArrayNode());
-        point.put("reason", meta.path("reason").asText(""));
-        profile.set(code, point);
+        Map<String, Object> point = LabJson.object();
+        point.put("score", row.get(catalog.column(code)));
+        Object meta = LabJson.path(row, "metadata", code);
+        point.put("weight", (int) LabJson.longValue(LabJson.path(meta, "weight"), 0));
+        Object sourceIds = LabJson.path(meta, "sourceIds");
+        point.put("sourceIds", LabJson.isList(sourceIds) ? sourceIds : LabJson.array());
+        point.put("reason", LabJson.text(LabJson.path(meta, "reason"), ""));
+        profile.put(code, point);
       }
     }
     return profile;
   }
 
-  public void updateProfile(Long user, JsonNode profile) {
+  public void updateProfile(Long user, Map<String, Object> profile) {
     for (Entry<String, List<String>> d : catalog.domains().entrySet()) {
       LinkedHashMap<String, Object> scores = new LinkedHashMap<String, Object>();
-      ObjectNode metadata = json.createObjectNode();
+      Map<String, Object> metadata = LabJson.object();
       for (String code : d.getValue()) {
-        JsonNode point = profile.path(code);
-        scores.put(
-            catalog.column(code),
-            point.path("score").isNumber() ? point.path("score").decimalValue() : null);
-        metadata.set(code, point);
+        Object point = profile.get(code);
+        Object score = LabJson.path(point, "score");
+        scores.put(catalog.column(code), LabJson.isNumber(score) ? LabJson.decimal(score) : null);
+        metadata.put(code, point);
       }
-      mapper.profileUpdate(d.getKey(), user, scores, metadata.toString());
+      mapper.profileUpdate(d.getKey(), user, scores, LabJson.write(json, metadata));
     }
   }
 

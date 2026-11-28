@@ -1,6 +1,7 @@
 package com.example.everme.lab.service;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.Embedding;
@@ -32,15 +33,15 @@ public class LabVectorConfiguration {
         new EmbeddingModel() {
           @Override
           public EmbeddingResponse call(EmbeddingRequest request) {
-            var vectors = ai.embed(request.getInstructions());
-            var results = new ArrayList<Embedding>();
+            List<float[]> vectors = ai.embed(request.getInstructions());
+            List<Embedding> results = new ArrayList<Embedding>();
             for (int i = 0; i < vectors.size(); i++) results.add(new Embedding(vectors.get(i), i));
             return new EmbeddingResponse(results);
           }
 
           @Override
           public float[] embed(Document document) {
-            return ai.embed(java.util.List.of(document.getText())).getFirst();
+            return ai.embed(List.of(document.getText())).getFirst();
           }
 
           @Override

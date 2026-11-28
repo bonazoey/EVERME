@@ -10,10 +10,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import com.example.everme.lab.dao.LabDao;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** 원문·장기 기억의 metadata, 출처 보존과 최근 100쌍 보관 규칙을 관리한다. */
 @Service
@@ -33,12 +30,13 @@ public class LabMemoryService {
     return "USER: " + user + "\nASSISTANT: " + assistant;
   }
 
-  public ObjectNode metadata(Long owner, Long actor, Long session, String type) {
-    return json.createObjectNode()
-        .put("owner_id", owner.toString())
-        .put("viewer_id", actor.toString())
-        .put("session_id", session.toString())
-        .put("conversation_type", type);
+  public Map<String, Object> metadata(Long owner, Long actor, Long session, String type) {
+    Map<String, Object> meta = LabJson.object();
+    meta.put("owner_id", owner.toString());
+    meta.put("viewer_id", actor.toString());
+    meta.put("session_id", session.toString());
+    meta.put("conversation_type", type);
+    return meta;
   }
 
   // ##### 임베딩이 준비된 대화와 질문·응답 시각을 저장하는 메소드 #####
@@ -55,7 +53,7 @@ public class LabMemoryService {
       Instant received,
       Instant answered,
       boolean synthetic,
-      JsonNode response) {
+      Object response) {
     Map<String, Object> selected = dao.mapper().lockSession(session);
     if (selected == null
         || !owner.equals(((Number) selected.get("owner_id")).longValue())
@@ -63,41 +61,45 @@ public class LabMemoryService {
         || !type.equals(selected.get("conversation_type").toString())) {
       throw LabException.conflict("대화방의 소유자·참여자·종류가 일치하지 않습니다.");
     }
-    ObjectNode meta = metadata(owner, actor, session, type);
-    meta.put("message_id", id.toString())
-        .put("ordinal", ordinal)
-        .put("user_text", user)
-        .put("assistant_text", assistant)
-        .put("user_received_at", received.toString())
-        .put("assistant_received_at", answered.toString())
-        .put("synthetic", synthetic);
+    Map<String, Object> meta = metadata(owner, actor, session, type);
+    meta.put("message_id", id.toString());
+    meta.put("ordinal", ordinal);
+    meta.put("user_text", user);
+    meta.put("assistant_text", assistant);
+    meta.put("user_received_at", received.toString());
+    meta.put("assistant_received_at", answered.toString());
+    meta.put("synthetic", synthetic);
     if (synthetic) {
       meta.put("time_semantics", "generation_request_response_shared_by_pairs");
     }
     if (response != null) {
-      meta.set("response", response);
+      meta.put("response", response);
     }
     dao.mapper()
         .context(
             id,
             content(user, assistant),
             vector == null ? null : LabDao.vector(vector),
-            meta.toString(),
+            LabJson.write(json, meta),
             "owner".equals(type) ? "pending" : "saved");
   }
 
   // ##### 영구 원문 ID로 중복 반영을 검사할 근거를 보존하는 메소드 #####
-  public void complete(ObjectNode details, List<Map<String, Object>> turns, Set<String> ids) {
-    ArrayNode evidence = details.withArray("processedEvidence");
-    ArrayNode processed = details.withArray("processedSourceIds");
+  public void complete(
+      Map<String, Object> details, List<Map<String, Object>> turns, Set<String> ids) {
+    List<Object> evidence = LabJson.childList(details, "processedEvidence");
+    List<Object> processed = LabJson.childList(details, "processedSourceIds");
     Set<String> known = new HashSet<>();
-    processed.forEach(id -> known.add(id.asText()));
+    processed.forEach(id -> known.add(LabJson.text(id)));
     for (Map<String, Object> turn : turns) {
       String id = turn.get("id").toString();
       if (ids.contains(id)) {
         if (known.add(id)) {
           processed.add(id);
-          evidence.addObject().put("id", id).put("user_text", turn.get("user_text").toString());
+          Map<String, Object> item = LabJson.object();
+          item.put("id", id);
+          item.put("user_text", turn.get("user_text").toString());
+          evidence.add(item);
         }
         dao.mapper().contextStatus(Long.valueOf(id), "saved");
       }

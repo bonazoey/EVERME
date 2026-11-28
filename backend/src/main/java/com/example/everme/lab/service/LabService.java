@@ -1,8 +1,12 @@
 package com.example.everme.lab.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -12,7 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -20,10 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.example.everme.lab.dao.LabDao;
 import com.example.everme.lab.prompt.LabPrompts;
 import com.example.everme.lab.service.LabAi.Result;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @Service
 @Profile("clone-lab")
@@ -61,12 +64,20 @@ public class LabService {
     this.contexts = contexts;
   }
 
-  ObjectNode object() {
-    return json.createObjectNode();
+  Map<String, Object> object() {
+    return LabJson.object();
   }
 
-  private JsonNode tree(Object value) {
-    return json.valueToTree(value);
+  // DB 행(Map·List·날짜 등)을 응답용 Map·List 구조로 바꾼다.
+  private Object tree(Object value) {
+    return LabJson.convert(json, value);
+  }
+
+  private static Map<String, Object> pair(Object user, Object assistant) {
+    Map<String, Object> turn = LabJson.object();
+    turn.put("user", user);
+    turn.put("assistant", assistant);
+    return turn;
   }
 
   // ##### 정보이용자 원문 쌍을 현재 대화방 검색용으로 임베딩하는 메소드 #####
@@ -81,70 +92,71 @@ public class LabService {
   }
 
   // ##### 분석 요소 카탈로그를 조회하는 메소드 #####
-  public JsonNode catalog() {
+  public Map<String, Object> catalog() {
     return catalog.document();
   }
 
   // ##### 모델 설정을 조회하는 메소드 #####
-  public JsonNode config() {
+  public Map<String, Object> config() {
     return ai.models();
   }
 
   // ##### 테스트 사용자 목록을 조회하는 메소드 #####
-  public JsonNode users() {
-    return tree(dao.mapper().users());
+  public List<Object> users() {
+    return LabJson.list(tree(dao.mapper().users()));
   }
 
   // ##### 분석 프로필을 조회하는 메소드 #####
-  public JsonNode profile(Long user) {
+  public Map<String, Object> profile(Long user) {
     return tx.execute(
         s -> {
           Map<String, Object> row = dao.mapper().lockUser(user);
           if (row == null) {
             throw new LabException(404, "테스트 사용자를 찾을 수 없습니다.");
           }
-          ObjectNode r = object();
+          Map<String, Object> r = object();
           r.put("userId", user.toString());
           r.put("name", row.get("name").toString());
           r.put("version", ((Number) row.get("profile_version")).longValue());
-          r.set("elements", dao.profile(user));
+          r.put("elements", dao.profile(user));
           return r;
         });
   }
 
   // ##### 테스트 사용자를 생성하는 메소드 #####
-  public JsonNode createUser(String name, String seed) {
+  public Map<String, Object> createUser(String name, String seed) {
     LabValidation.text(name, 80, "이름");
     LabValidation.text(seed, 3000, "인물 설명");
-    ObjectNode input = object();
+    Map<String, Object> input = object();
     input.put("seed", seed);
-    input.set("catalog", catalog.analysisDocument());
+    input.put("catalog", catalog.analysisDocument());
     Result result =
         ai.structured("generation", LabPrompts.PERSONA, input, schemas.persona(catalog));
-    JsonNode persona = result.data();
-    if (persona.path("scores").size() != 140 || persona.path("biography").asText().isBlank()) {
+    Map<String, Object> persona = result.data();
+    Map<String, Object> scores = LabJson.map(persona.get("scores"));
+    if (scores.size() != 140 || LabJson.text(persona.get("biography")).isBlank()) {
       throw LabException.invalid("가상 인물 설정 오류입니다.");
     }
     for (String code : catalog.codes()) {
-      LabValidation.score(persona.path("scores").path(code));
+      LabValidation.score(scores.get(code));
     }
     Long id = dao.mapper().nextId("users", "id");
     tx.executeWithoutResult(
         s -> {
-          dao.mapper().createUser(id, name, persona.toString());
+          dao.mapper().createUser(id, name, LabJson.write(json, persona));
           for (String domain : catalog.domains().keySet()) {
             dao.mapper().initialize(domain, id);
           }
         });
-    ObjectNode r = object();
+    Map<String, Object> r = object();
     r.put("id", id.toString());
     r.put("name", name);
-    r.set("metrics", metrics(result));
+    r.put("metrics", metrics(result));
     return r;
   }
 
-  ObjectNode metrics(LabAi.Result result) {
-    ObjectNode r = object();
+  Map<String, Object> metrics(LabAi.Result result) {
+    Map<String, Object> r = object();
     r.put("model", result.model());
     r.put("inputTokens", result.inputTokens());
     r.put("outputTokens", result.outputTokens());
@@ -155,34 +167,36 @@ public class LabService {
   }
 
   void manualAllowed(Map<String, Object> row, boolean automatic) {
-    JsonNode state = dao.parse(row.get("run_state"));
+    Map<String, Object> state = dao.parseMap(row.get("run_state"));
+    String status = LabJson.text(state.get("status"));
     if (!automatic
-        && (Set.of("running", "stopping").contains(state.path("status").asText())
-            || ("single-session-pipeline-v1".equals(state.path("mode").asText())
-                && Set.of("paused", "failed").contains(state.path("status").asText())))) {
+        && (Set.of("running", "stopping").contains(status)
+            || ("single-session-pipeline-v1".equals(LabJson.text(state.get("mode")))
+                && Set.of("paused", "failed").contains(status)))) {
       throw LabException.conflict("미완료 자동 실행이 있어 수동 변경할 수 없습니다. 먼저 재개해 완료해 주세요.");
     }
   }
 
   // ##### 테스트 대화 10쌍을 생성하는 메소드 #####
-  public JsonNode generate(Long user, String topic, boolean automatic) {
+  public Map<String, Object> generate(Long user, String topic, boolean automatic) {
     return generate(user, topic, automatic, null);
   }
 
   // ##### 같은 주제의 대화를 추가하는 메소드 #####
-  public JsonNode append(Long user, Long batch) {
+  public Map<String, Object> append(Long user, Long batch) {
     return generate(user, dao.requireBatch(user, batch).get("topic").toString(), false, batch);
   }
 
   // ##### 자동 실행 대화를 추가하는 메소드 #####
-  JsonNode appendAutomatic(Long user, Long batch) {
+  Map<String, Object> appendAutomatic(Long user, Long batch) {
     return generate(user, dao.requireBatch(user, batch).get("topic").toString(), true, batch);
   }
 
   // ##### 테스트 대화 10쌍을 생성하는 메소드 #####
-  private JsonNode generate(Long user, String topic, boolean automatic, Long existing) {
+  private Map<String, Object> generate(
+      Long user, String topic, boolean automatic, Long existing) {
     try (LabTiming timing = new LabTiming("dialogue.generate")) {
-      java.time.Instant receivedAt = java.time.Instant.now();
+      Instant receivedAt = Instant.now();
       topic = topic == null ? "" : topic.strip();
       if (topic.length() > 1000) {
         throw LabException.bad("주제를 확인해 주세요.");
@@ -193,21 +207,22 @@ public class LabService {
       List<Map<String, Object>> original =
           existing == null ? List.<Map<String, Object>>of() : dao.mapper().turns(existing);
       // 인물 설정은 합성 대화 생성에만 전달하며 분석·대변인 답변에는 전달하지 않는다.
-      ObjectNode input = object();
+      Map<String, Object> input = object();
       input.put("topic", topic);
-      input.set("persona", dao.parse(row.get("persona")));
+      input.put("persona", dao.parse(row.get("persona")));
       input.put("continuation", existing != null);
-      if (existing != null) input.setAll(contexts.prepare(existing));
+      if (existing != null) input.putAll(contexts.prepare(existing));
       timing.mark("load_db_and_prepare_input");
       Result result = ai.structured("generation", LabPrompts.GENERATION, input, schemas.turns());
       timing.mark("generate_llm");
-      JsonNode turns = result.data().path("turns");
-      if (!turns.isArray() || turns.size() != 10) {
+      Object turnsValue = result.data().get("turns");
+      List<Object> turns = LabJson.list(turnsValue);
+      if (!LabJson.isList(turnsValue) || turns.size() != 10) {
         throw LabException.invalid("정확히 10쌍의 대화가 필요합니다.");
       }
-      for (JsonNode t : turns) {
-        LabValidation.text(t.path("user").asText(), 8000, "사용자 발언");
-        LabValidation.text(t.path("assistant").asText(), 8000, "AI 응답");
+      for (Object t : turns) {
+        LabValidation.text(LabJson.text(LabJson.path(t, "user")), 8000, "사용자 발언");
+        LabValidation.text(LabJson.text(LabJson.path(t, "assistant")), 8000, "AI 응답");
       }
       timing.mark("validate_turns");
       Long batch =
@@ -221,11 +236,11 @@ public class LabService {
               turns,
               result,
               receivedAt,
-              java.time.Instant.now(),
+              Instant.now(),
               true);
       timing.mark("store_turns_including_topic");
-      ObjectNode r = (ObjectNode) batch(user, batch);
-      r.set("metrics", metrics(result));
+      Map<String, Object> r = batch(user, batch);
+      r.put("metrics", metrics(result));
       timing.mark("read_response_from_db");
       timing.success();
       return r;
@@ -233,9 +248,10 @@ public class LabService {
   }
 
   // ##### 사용자 직접 입력을 처리하는 메소드 #####
-  public JsonNode message(Long user, Long existing, String requestedTopic, String content) {
+  public Map<String, Object> message(
+      Long user, Long existing, String requestedTopic, String content) {
     try (LabTiming timing = new LabTiming("dialogue.message")) {
-      java.time.Instant receivedAt = java.time.Instant.now();
+      Instant receivedAt = Instant.now();
       LabValidation.text(content, 8000, "메시지");
       manualAllowed(dao.requireUser(user), false);
       Map<String, Object> target = existing == null ? null : dao.requireBatch(user, existing);
@@ -248,10 +264,10 @@ public class LabService {
       }
       List<Map<String, Object>> original =
           existing == null ? List.<Map<String, Object>>of() : dao.mapper().turns(existing);
-      ObjectNode input = object();
+      Map<String, Object> input = object();
       input.put("topic", topic);
       input.put("content", content);
-      if (existing != null) input.setAll(contexts.prepare(existing));
+      if (existing != null) input.putAll(contexts.prepare(existing));
       timing.mark("load_db_and_prepare_input");
       Result result =
           ai.structured(
@@ -260,10 +276,10 @@ public class LabService {
               input,
               schemas.object(Map.of("assistant", schemas.string())));
       timing.mark("answer_llm");
-      String reply = result.data().path("assistant").asText();
+      String reply = LabJson.text(result.data().get("assistant"));
       LabValidation.text(reply, 8000, "AI 응답");
-      ArrayNode turns = json.createArrayNode();
-      turns.addObject().put("user", content).put("assistant", reply);
+      List<Object> turns = LabJson.array();
+      turns.add(pair(content, reply));
       timing.mark("validate_turns");
       Long batch =
           storeTurns(
@@ -276,11 +292,11 @@ public class LabService {
               turns,
               result,
               receivedAt,
-              java.time.Instant.now(),
+              Instant.now(),
               false);
       timing.mark("store_turns_including_topic");
-      ObjectNode response = (ObjectNode) batch(user, batch);
-      response.set("metrics", metrics(result));
+      Map<String, Object> response = batch(user, batch);
+      response.put("metrics", metrics(result));
       timing.mark("read_response_from_db");
       timing.success();
       return response;
@@ -294,24 +310,23 @@ public class LabService {
       Long existing,
       Map<String, Object> target,
       List<Map<String, Object>> original,
-      JsonNode turns,
+      List<Object> turns,
       LabAi.Result result,
-      java.time.Instant receivedAt,
-      java.time.Instant answeredAt,
+      Instant receivedAt,
+      Instant answeredAt,
       boolean synthetic) {
     try (LabTiming timing = new LabTiming("dialogue.store")) {
       String resolvedTopic = topic;
       if (topic.isBlank() && original.size() + turns.size() >= 10) {
-        ObjectNode input = object();
-        ArrayNode first = input.putArray("turns");
+        Map<String, Object> input = object();
+        List<Object> first = LabJson.childList(input, "turns");
         for (Map<String, Object> turn : original) {
           if (first.size() == 10) {
             break;
           }
-          first.add(
-              tree(Map.of("user", turn.get("user_text"), "assistant", turn.get("assistant_text"))));
+          first.add(pair(turn.get("user_text"), turn.get("assistant_text")));
         }
-        for (JsonNode turn : turns) {
+        for (Object turn : turns) {
           if (first.size() == 10) {
             break;
           }
@@ -323,25 +338,22 @@ public class LabService {
                 LabPrompts.TOPIC,
                 input,
                 schemas.object(Map.of("topic", schemas.string())));
-        resolvedTopic = inferred.data().path("topic").asText().strip();
+        resolvedTopic = LabJson.text(inferred.data().get("topic")).strip();
         LabValidation.text(resolvedTopic, 80, "자동 확정 주제");
       }
       timing.mark("infer_topic_if_required");
       List<float[]> preparedVectors;
       try {
         preparedVectors =
-            ai.embed(
-                java.util.stream.StreamSupport.stream(turns.spliterator(), false)
-                    .map(t -> t.path("user").asText())
-                    .toList());
+            ai.embed(turns.stream().map(t -> LabJson.text(LabJson.path(t, "user"))).toList());
       } catch (LabException failure) {
-        org.slf4j.LoggerFactory.getLogger(LabService.class)
+        LoggerFactory.getLogger(LabService.class)
             .warn(
                 "lab_embedding_deferred ownerId={} pairCount={} reason={}",
                 user,
                 turns.size(),
                 failure.getMessage());
-        preparedVectors = new ArrayList<>(java.util.Collections.nCopies(turns.size(), null));
+        preparedVectors = new ArrayList<>(Collections.nCopies(turns.size(), null));
       }
       final List<float[]> turnVectors = preparedVectors;
       if (turnVectors.size() != turns.size()) throw LabException.invalid("대화 임베딩 개수가 다릅니다.");
@@ -352,8 +364,8 @@ public class LabService {
             Map<String, Object> current = dao.mapper().lockUser(user);
             manualAllowed(current, automatic);
             int n = 0;
-            ObjectNode run = (ObjectNode) dao.parse(current.get("run_state"));
-            boolean pipeline = automatic && LabPipeline.MODE.equals(run.path("mode").asText());
+            Map<String, Object> run = dao.parseMap(current.get("run_state"));
+            boolean pipeline = automatic && LabPipeline.MODE.equals(LabJson.text(run.get("mode")));
             if (existing == null) {
               dao.mapper().createBatch(batch, user, storedTopic, dao.mapper().nextSequence(user));
             } else {
@@ -365,27 +377,28 @@ public class LabService {
                           || !Objects.equals(now.get("analysis"), target.get("analysis"))))) {
                 throw LabException.conflict("대화 또는 분석이 변경되었습니다. 다시 추가해 주세요.");
               }
-              ObjectNode checkpoint = object();
-              JsonNode previousDetails = dao.parse(now.get("analysis"));
+              Map<String, Object> checkpoint = object();
+              Map<String, Object> previousDetails = dao.parseMap(now.get("analysis"));
               for (String field : List.of("processedEvidence", "turnCount"))
-                if (previousDetails.has(field)) checkpoint.set(field, previousDetails.path(field));
-              ArrayNode processed = checkpoint.putArray("processedSourceIds");
+                if (previousDetails.containsKey(field))
+                  checkpoint.put(field, previousDetails.get(field));
+              List<Object> processed = LabJson.childList(checkpoint, "processedSourceIds");
               if ("saved".equals(now.get("status"))) {
                 for (Map<String, Object> t : existingTurns) {
                   processed.add(t.get("id").toString());
                 }
               } else {
-                JsonNode ids = dao.parse(now.get("analysis")).path("processedSourceIds");
-                if (ids.isArray()) {
-                  checkpoint.set("processedSourceIds", ids);
+                Object ids = previousDetails.get("processedSourceIds");
+                if (LabJson.isList(ids)) {
+                  checkpoint.put("processedSourceIds", ids);
                 }
               }
-              JsonNode cachedSummaries = dao.parse(now.get("analysis")).path("summaryCache");
-              if (cachedSummaries.isObject()) {
-                checkpoint.set("summaryCache", cachedSummaries);
+              Object cachedSummaries = previousDetails.get("summaryCache");
+              if (LabJson.isMap(cachedSummaries)) {
+                checkpoint.put("summaryCache", cachedSummaries);
               }
               if (!pipeline) {
-                dao.mapper().appended(batch, checkpoint.toString());
+                dao.mapper().appended(batch, LabJson.write(json, checkpoint));
                 dao.mapper().resetDraft(batch);
               }
               n = ((Number) now.get("turn_count")).intValue();
@@ -393,10 +406,10 @@ public class LabService {
                 dao.mapper().topic(batch, storedTopic);
               }
             }
-            ArrayNode createdIds = json.createArrayNode();
+            List<Object> createdIds = LabJson.array();
             int from = n + 1;
             int vectorIndex = 0;
-            for (JsonNode turn : turns) {
+            for (Object turn : turns) {
               Long id = dao.mapper().nextId("session_messages", "id");
               memory.turn(
                   id,
@@ -405,8 +418,8 @@ public class LabService {
                   batch,
                   "owner",
                   ++n,
-                  turn.path("user").asText(),
-                  turn.path("assistant").asText(),
+                  LabJson.text(LabJson.path(turn, "user")),
+                  LabJson.text(LabJson.path(turn, "assistant")),
                   turnVectors.get(vectorIndex++),
                   receivedAt,
                   answeredAt,
@@ -414,47 +427,50 @@ public class LabService {
                   null);
               createdIds.add(id.toString());
             }
-            ObjectNode counted =
-                (ObjectNode) dao.parse(dao.requireBatch(user, batch).get("analysis"));
+            Map<String, Object> counted =
+                dao.parseMap(dao.requireBatch(user, batch).get("analysis"));
             counted.put("turnCount", n);
-            dao.mapper().pipelineDetails(batch, counted.toString(), "generated");
+            dao.mapper().pipelineDetails(batch, LabJson.write(json, counted), "generated");
             memory.retain(user, user, "owner");
             if (pipeline) {
-              if (run.path("generationReservation").path("from").asInt() != from
-                  || !batch.toString().equals(run.path("batchId").asText())) {
+              if (LabJson.integer(LabJson.path(run, "generationReservation", "from")) != from
+                  || !batch.toString().equals(LabJson.text(run.get("batchId")))) {
                 throw LabException.conflict("Generation reservation changed");
               }
-              ObjectNode details =
-                  (ObjectNode) dao.parse(dao.requireBatch(user, batch).get("analysis"));
-              ObjectNode segment = details.withArray("segments").addObject();
+              Map<String, Object> details =
+                  dao.parseMap(dao.requireBatch(user, batch).get("analysis"));
+              Map<String, Object> segment = LabJson.object();
+              LabJson.childList(details, "segments").add(segment);
               segment.put("number", from / 10 + 1);
               segment.put("from", from);
               segment.put("to", n);
-              segment.set("sourceIds", createdIds);
+              segment.put("sourceIds", createdIds);
               segment.put("status", "generated");
-              segment.set("generationMetrics", metrics(result));
-              dao.mapper().pipelineDetails(batch, details.toString(), "generated");
+              segment.put("generationMetrics", metrics(result));
+              dao.mapper().pipelineDetails(batch, LabJson.write(json, details), "generated");
               run.put("generatedPairs", n);
               run.put("generationPhase", n >= 1000 ? "completed" : "waiting");
               run.remove("generationReservation");
               LabPipeline.addMetrics(run, metrics(result));
-              dao.mapper().runState(user, run.toString());
+              dao.mapper().runState(user, LabJson.write(json, run));
             }
             if (automatic && !pipeline) {
-              ObjectNode state = (ObjectNode) dao.parse(current.get("run_state"));
+              Map<String, Object> state = dao.parseMap(current.get("run_state"));
               state.put("batchId", batch.toString());
-              if ("single-session-v1".equals(state.path("mode").asText())) {
+              if ("single-session-v1".equals(LabJson.text(state.get("mode")))) {
                 state.put("generatedPairs", n);
                 state.put("completedPairs", n);
                 state.put("completedBatches", n / 10);
+                Map<String, Object> used = metrics(result);
                 for (String metric : List.of("inputTokens", "outputTokens", "elapsedMs")) {
                   state.put(
-                      metric, state.path(metric).asLong() + metrics(result).path(metric).asLong());
+                      metric,
+                      LabJson.longValue(state.get(metric)) + LabJson.longValue(used.get(metric)));
                 }
               } else {
-                state.set("generationMetrics", metrics(result));
+                state.put("generationMetrics", metrics(result));
               }
-              dao.mapper().runState(user, state.toString());
+              dao.mapper().runState(user, LabJson.write(json, state));
             }
           });
       timing.mark("db_transaction");
@@ -465,11 +481,11 @@ public class LabService {
   }
 
   // ##### 대화 배치 목록을 조회하는 메소드 #####
-  public JsonNode batches(Long user) {
+  public List<Object> batches(Long user) {
     dao.requireUser(user);
-    ArrayNode rows = json.createArrayNode();
+    List<Object> rows = LabJson.array();
     for (Map<String, Object> b : dao.mapper().batches(user)) {
-      ObjectNode item = (ObjectNode) tree(b);
+      Map<String, Object> item = LabJson.map(tree(b));
       item.remove("analysis");
       rows.add(item);
     }
@@ -477,11 +493,11 @@ public class LabService {
   }
 
   // ##### 대화 배치를 조회하는 메소드 #####
-  public JsonNode batch(Long user, Long batch) {
+  public Map<String, Object> batch(Long user, Long batch) {
     Map<String, Object> row = dao.requireBatch(user, batch);
-    ObjectNode r = (ObjectNode) tree(row);
-    r.set("analysis", dao.parse(row.get("analysis")));
-    r.set("turns", tree(dao.mapper().turns(batch)));
+    Map<String, Object> r = LabJson.map(tree(row));
+    r.put("analysis", dao.parse(row.get("analysis")));
+    r.put("turns", tree(dao.mapper().turns(batch)));
     return r;
   }
 
@@ -497,54 +513,58 @@ public class LabService {
     return set;
   }
 
-  private ArrayNode freshSources(Long user, Long batch) {
+  private List<Object> freshSources(Long user, Long batch) {
     Set<String> seen = duplicateTexts(user);
-    ArrayNode source = json.createArrayNode();
+    List<Object> source = LabJson.array();
     for (Map<String, Object> t : dao.mapper().turns(batch)) {
       String text = t.get("user_text").toString();
       if (("pending".equals(t.get("status").toString())
               || "analyzed".equals(t.get("status").toString()))
           && seen.add(normalized(text))) {
-        source.add(tree(Map.of("id", t.get("id").toString(), "text", text)));
+        Map<String, Object> item = LabJson.object();
+        item.put("id", t.get("id").toString());
+        item.put("text", text);
+        source.add(item);
       }
     }
     return source;
   }
 
-  Set<String> sourceIds(JsonNode sources) {
+  Set<String> sourceIds(List<Object> sources) {
     HashSet<String> set = new HashSet<String>();
-    for (JsonNode s : sources) {
-      set.add(s.path("id").asText());
+    for (Object s : sources) {
+      set.add(LabJson.text(LabJson.path(s, "id")));
     }
     return set;
   }
 
   // ##### 대화 분석을 실행하는 메소드 #####
-  public JsonNode analyze(Long user, Long batch, boolean automatic) {
+  public Map<String, Object> analyze(Long user, Long batch, boolean automatic) {
     try (LabTiming timing = new LabTiming("analysis.batch")) {
       manualAllowed(dao.requireUser(user), automatic);
       Map<String, Object> row = dao.requireBatch(user, batch);
       if ("saved".equals(row.get("status"))) {
-        JsonNode response = batch(user, batch);
+        Map<String, Object> response = batch(user, batch);
         timing.mark("already_saved");
         timing.success();
         return response;
       }
       int turnCount = ((Number) row.get("turn_count")).intValue();
-      ArrayNode sources = freshSources(user, batch);
+      List<Object> sources = freshSources(user, batch);
       timing.mark("load_sources");
-      ObjectNode analysis = analyzeWindows(user, batch, sources);
+      Map<String, Object> analysis = analyzeWindows(user, batch, sources);
       timing.mark("summaries_and_analysis_llm");
       validation.analysis(
           analysis, sourceIds(sources), Math.max(40, ((sources.size() + 9) / 10) * 40));
       timing.mark("validate_analysis");
-      JsonNode processed = dao.parse(row.get("analysis")).path("processedSourceIds");
-      if (processed.isArray()) {
-        ((ObjectNode) analysis).set("processedSourceIds", processed);
+      Map<String, Object> previous = dao.parseMap(row.get("analysis"));
+      Object processed = previous.get("processedSourceIds");
+      if (LabJson.isList(processed)) {
+        analysis.put("processedSourceIds", processed);
       }
       analysis.put("turnCount", turnCount);
-      JsonNode evidence = dao.parse(row.get("analysis")).path("processedEvidence");
-      if (evidence.isArray()) analysis.set("processedEvidence", evidence);
+      Object evidence = previous.get("processedEvidence");
+      if (LabJson.isList(evidence)) analysis.put("processedEvidence", evidence);
       tx.executeWithoutResult(
           s -> {
             manualAllowed(dao.mapper().lockUser(user), automatic);
@@ -552,13 +572,13 @@ public class LabService {
                 != turnCount) {
               throw LabException.conflict("분석 중 대화가 추가되었습니다. 다시 분석해 주세요.");
             }
-            if (dao.mapper().analysis(batch, analysis.toString()) != 1) {
+            if (dao.mapper().analysis(batch, LabJson.write(json, analysis)) != 1) {
               throw LabException.conflict("이미 저장된 배치입니다.");
             }
             dao.mapper().analyzed(batch);
           });
       timing.mark("save_analysis_draft");
-      JsonNode response = batch(user, batch);
+      Map<String, Object> response = batch(user, batch);
       timing.mark("read_response_from_db");
       timing.success();
       return response;
@@ -569,8 +589,8 @@ public class LabService {
   void repairEmbeddings(Long user) {
     List<Map<String, Object>> missing = dao.mapper().missingEmbeddings(user);
     for (int offset = 0; offset < missing.size(); offset += 100) {
-      var group = missing.subList(offset, Math.min(offset + 100, missing.size()));
-      var vectors = ai.embed(group.stream().map(row -> row.get("user_text").toString()).toList());
+      List<Map<String, Object>> group = missing.subList(offset, Math.min(offset + 100, missing.size()));
+      List<float[]> vectors = ai.embed(group.stream().map(row -> row.get("user_text").toString()).toList());
       if (vectors.size() != group.size()) throw LabException.invalid("대화 임베딩 개수가 다릅니다.");
       tx.executeWithoutResult(
           status -> {
@@ -584,39 +604,38 @@ public class LabService {
     }
   }
 
-  private ObjectNode analyzeWindows(Long user, Long batch, ArrayNode sources) {
+  private Map<String, Object> analyzeWindows(Long user, Long batch, List<Object> sources) {
     ArrayList<Map<String, Object>> history = new ArrayList<>(dao.mapper().turns(batch));
-    ObjectNode output = object();
-    ArrayNode observations = output.putArray("observations");
-    ArrayNode memories = output.putArray("memories");
-    ArrayNode windows = output.putArray("windows");
-    LinkedHashMap<String, List<JsonNode>> grouped = new LinkedHashMap<String, List<JsonNode>>();
-    HashMap<Integer, JsonNode> summaries = new HashMap<Integer, JsonNode>();
-    JsonNode cached = dao.parse(dao.requireBatch(user, batch).get("analysis")).path("summaryCache");
-    if (cached.isObject()) {
-      cached
-          .fields()
-          .forEachRemaining(
-              entry -> summaries.put(Integer.parseInt(entry.getKey()), entry.getValue()));
+    Map<String, Object> output = object();
+    List<Object> observations = LabJson.childList(output, "observations");
+    List<Object> memories = LabJson.childList(output, "memories");
+    List<Object> windows = LabJson.childList(output, "windows");
+    LinkedHashMap<String, List<Map<String, Object>>> grouped =
+        new LinkedHashMap<String, List<Map<String, Object>>>();
+    HashMap<Integer, Object> summaries = new HashMap<Integer, Object>();
+    Object cached =
+        dao.parseMap(dao.requireBatch(user, batch).get("analysis")).get("summaryCache");
+    if (LabJson.isMap(cached)) {
+      LabJson.map(cached).forEach((key, value) -> summaries.put(Integer.parseInt(key), value));
     }
     long inputTokens = 0, outputTokens = 0, elapsed = 0, cachedTokens = 0;
     int retries = 0;
     for (int offset = 0; offset < sources.size(); offset += 10) {
-      ArrayNode current = json.createArrayNode();
+      List<Object> current = LabJson.array();
       for (int i = offset; i < Math.min(offset + 10, sources.size()); i++) {
         current.add(sources.get(i));
       }
-      String first = current.get(0).path("id").asText();
+      String first = LabJson.text(LabJson.path(current.get(0), "id"));
       int before = 0;
       while (before < history.size() && !history.get(before).get("id").toString().equals(first)) {
         before++;
       }
       int complete = (((Number) history.get(before).get("ordinal")).intValue() - 1) / 10;
-      ArrayNode context = json.createArrayNode();
+      List<Object> context = LabJson.array();
       for (int block = Math.max(0, complete - 5); block < complete; block++) {
         if (!summaries.containsKey(block)) {
-          ObjectNode request = object();
-          ArrayNode turns = request.putArray("turns");
+          Map<String, Object> request = object();
+          List<Object> turns = LabJson.childList(request, "turns");
           final int blockStart = block * 10;
           for (Map<String, Object> t :
               history.stream()
@@ -625,8 +644,7 @@ public class LabService {
                           ((Number) t.get("ordinal")).intValue() > blockStart
                               && ((Number) t.get("ordinal")).intValue() <= blockStart + 10)
                   .toList()) {
-            turns.add(
-                tree(Map.of("user", t.get("user_text"), "assistant", t.get("assistant_text"))));
+            turns.add(pair(t.get("user_text"), t.get("assistant_text")));
           }
           Result summary =
               ai.structured(
@@ -634,7 +652,7 @@ public class LabService {
                   LabPrompts.HISTORY_SUMMARY,
                   request,
                   schemas.object(Map.of("summary", schemas.string())));
-          LabValidation.text(summary.data().path("summary").asText(), 1000, "대화 요약");
+          LabValidation.text(LabJson.text(summary.data().get("summary")), 1000, "대화 요약");
           summaries.put(block, summary.data());
           inputTokens += summary.inputTokens();
           outputTokens += summary.outputTokens();
@@ -642,17 +660,18 @@ public class LabService {
           cachedTokens += summary.cachedTokens();
           retries += summary.retries();
         }
-        ObjectNode entry = context.addObject();
+        Map<String, Object> entry = LabJson.object();
         entry.put("from", block * 10 + 1);
         entry.put("to", block * 10 + 10);
-        entry.put("summary", summaries.get(block).path("summary").asText());
+        entry.put("summary", LabJson.text(LabJson.path(summaries.get(block), "summary")));
+        context.add(entry);
       }
-      ObjectNode request = object();
+      Map<String, Object> request = object();
       request.put("maxMemories", 40);
       request.put("maxReasonLength", 1000);
-      request.set("sources", current);
-      request.set("summaries", context);
-      request.set("catalog", catalog.analysisDocument());
+      request.put("sources", current);
+      request.put("summaries", context);
+      request.put("catalog", catalog.analysisDocument());
       Result result =
           ai.structured("analysis", LabPrompts.ANALYSIS, request, schemas.analysis(catalog));
       validation.analysis(result.data(), sourceIds(current));
@@ -661,35 +680,38 @@ public class LabService {
       elapsed += result.elapsedMs();
       cachedTokens += result.cachedTokens();
       retries += result.retries();
-      for (JsonNode observation : result.data().path("observations")) {
+      for (Object observation : LabJson.list(result.data().get("observations"))) {
         grouped
-            .computeIfAbsent(observation.path("code").asText(), k -> new ArrayList<>())
-            .add(observation);
+            .computeIfAbsent(
+                LabJson.text(LabJson.path(observation, "code")), k -> new ArrayList<>())
+            .add(LabJson.map(observation));
       }
-      for (JsonNode memory : result.data().path("memories")) {
+      for (Object memory : LabJson.list(result.data().get("memories"))) {
         memories.add(memory);
       }
-      ObjectNode window = windows.addObject();
-      window.set("sourceIds", tree(sourceIds(current)));
-      window.set("summaries", context);
-      window.set("observations", result.data().path("observations"));
+      Map<String, Object> window = LabJson.object();
+      window.put("sourceIds", new ArrayList<Object>(sourceIds(current)));
+      window.put("summaries", context);
+      window.put("observations", result.data().get("observations"));
+      windows.add(window);
     }
-    for (List<JsonNode> group : grouped.values()) {
-      ObjectNode combined = (ObjectNode) group.getFirst().deepCopy();
+    for (List<Map<String, Object>> group : grouped.values()) {
+      Map<String, Object> combined = LabJson.copy(group.getFirst());
       LinkedHashSet<String> ids = new LinkedHashSet<String>();
-      java.math.BigDecimal sum = java.math.BigDecimal.ZERO;
+      BigDecimal sum = BigDecimal.ZERO;
       int weight = 0;
       ArrayList<String> reasons = new ArrayList<String>();
-      for (JsonNode item : group) {
-        int strength = item.path("strength").asInt();
+      for (Map<String, Object> item : group) {
+        int strength = LabJson.integer(item.get("strength"));
         weight += strength;
         sum =
             sum.add(
-                item.path("score").decimalValue().multiply(java.math.BigDecimal.valueOf(strength)));
-        for (JsonNode id : item.path("sourceIds")) {
-          ids.add(id.asText());
+                LabJson.decimal(item.get("score"))
+                    .multiply(BigDecimal.valueOf(strength)));
+        for (Object id : LabJson.list(item.get("sourceIds"))) {
+          ids.add(LabJson.text(id));
         }
-        reasons.add(item.path("reason").asText());
+        reasons.add(LabJson.text(item.get("reason")));
       }
       String explanation = String.join(" / ", new LinkedHashSet<>(reasons));
       if (explanation.length() > 2000) {
@@ -697,15 +719,15 @@ public class LabService {
       }
       combined.put(
           "score",
-          sum.divide(java.math.BigDecimal.valueOf(weight), 2, java.math.RoundingMode.HALF_UP));
+          sum.divide(BigDecimal.valueOf(weight), 2, RoundingMode.HALF_UP));
       combined.put("strength", Math.min(3, weight));
-      combined.set("sourceIds", tree(ids));
+      combined.put("sourceIds", new ArrayList<Object>(ids));
       combined.put("reason", explanation);
       observations.add(combined);
     }
-    ObjectNode cache = output.putObject("summaryCache");
-    summaries.forEach((key, value) -> cache.set(key.toString(), value));
-    ObjectNode metrics = output.putObject("metrics");
+    Map<String, Object> cache = LabJson.child(output, "summaryCache");
+    summaries.forEach((key, value) -> cache.put(key.toString(), value));
+    Map<String, Object> metrics = LabJson.child(output, "metrics");
     metrics.put("inputTokens", inputTokens);
     metrics.put("outputTokens", outputTokens);
     metrics.put("elapsedMs", elapsed);
@@ -715,14 +737,14 @@ public class LabService {
   }
 
   // ##### 분석 결과를 저장하는 메소드 #####
-  public JsonNode save(Long user, Long batch, boolean automatic) {
+  public Map<String, Object> save(Long user, Long batch, boolean automatic) {
     try (LabTiming timing = new LabTiming("profile.save")) {
       Map<String, Object> row = dao.requireUser(user);
       manualAllowed(row, automatic);
       repairEmbeddings(user);
       Map<String, Object> b = dao.requireBatch(user, batch);
       if ("saved".equals(b.get("status"))) {
-        JsonNode response = profile(user);
+        Map<String, Object> response = profile(user);
         timing.mark("already_saved");
         timing.success();
         return response;
@@ -730,26 +752,27 @@ public class LabService {
       if (!"analyzed".equals(b.get("status"))) {
         throw LabException.conflict("먼저 분석해 주세요.");
       }
-      JsonNode analysis = dao.parse(b.get("analysis"));
-      ArrayNode sources = freshSources(user, batch);
+      Map<String, Object> analysis = dao.parseMap(b.get("analysis"));
+      List<Object> observations = LabJson.list(analysis.get("observations"));
+      List<Object> sources = freshSources(user, batch);
       validation.analysis(
           analysis, sourceIds(sources), Math.max(40, ((sources.size() + 9) / 10) * 40));
       // Snapshot profile + version together. External calls must never run while
       // holding a DB lock.
-      JsonNode snapshot = profile(user);
-      long version = snapshot.path("version").asLong();
-      ObjectNode old = (ObjectNode) snapshot.path("elements");
-      ObjectNode input = object();
-      input.set("previous", old);
-      input.set("observations", analysis.path("observations"));
-      ObjectNode caps = input.putObject("maxWeights");
-      for (JsonNode observation : analysis.path("observations")) {
-        String code = observation.path("code").asText();
+      Map<String, Object> snapshot = profile(user);
+      long version = LabJson.longValue(snapshot.get("version"));
+      Map<String, Object> old = LabJson.map(snapshot.get("elements"));
+      Map<String, Object> input = object();
+      input.put("previous", old);
+      input.put("observations", observations);
+      Map<String, Object> caps = LabJson.child(input, "maxWeights");
+      for (Object observation : observations) {
+        String code = LabJson.text(LabJson.path(observation, "code"));
         caps.put(code, catalog.maxWeight(code));
       }
       input.put("updatePolicyVersion", catalog.policyVersion());
       timing.mark("load_profile_validate_and_prepare_merge");
-      ObjectNode merged = validation.merge(old, analysis.path("observations"));
+      Map<String, Object> merged = validation.merge(old, observations);
       timing.mark("merge_server");
       tx.executeWithoutResult(
           s -> {
@@ -771,28 +794,27 @@ public class LabService {
                 Math.max(40, ((sources.size() + 9) / 10) * 40));
             dao.updateProfile(user, merged);
             List<Map<String, Object>> currentTurns = dao.mapper().turns(batch);
-            ObjectNode persisted = (ObjectNode) analysis.deepCopy();
+            Map<String, Object> persisted = LabJson.copy(analysis);
             persisted.put("updatePolicyVersion", catalog.policyVersion());
-            persisted.set("maxWeights", input.path("maxWeights"));
-            ArrayNode changes = persisted.putArray("changes");
-            for (JsonNode observation : analysis.path("observations")) {
-              String code = observation.path("code").asText();
-              ObjectNode change = changes.addObject();
+            persisted.put("maxWeights", input.get("maxWeights"));
+            List<Object> changes = LabJson.childList(persisted, "changes");
+            for (Object observation : observations) {
+              String code = LabJson.text(LabJson.path(observation, "code"));
+              Object previousScore = LabJson.path(old, code, "score");
+              Object storedScore = LabJson.path(merged, code, "score");
+              Map<String, Object> change = LabJson.object();
               change.put("code", code);
-              change.set("previous", old.path(code).path("score"));
-              change.set("observed", observation.path("score"));
-              change.set("stored", merged.path(code).path("score"));
-              if (old.path(code).path("score").isNumber()) {
+              change.put("previous", previousScore);
+              change.put("observed", LabJson.path(observation, "score"));
+              change.put("stored", storedScore);
+              if (LabJson.isNumber(previousScore)) {
                 change.put(
                     "delta",
-                    merged
-                        .path(code)
-                        .path("score")
-                        .decimalValue()
-                        .subtract(old.path(code).path("score").decimalValue()));
+                    LabJson.decimal(storedScore).subtract(LabJson.decimal(previousScore)));
               } else {
-                change.putNull("delta");
+                change.put("delta", null);
               }
+              changes.add(change);
             }
             memory.complete(
                 persisted,
@@ -800,15 +822,15 @@ public class LabService {
                 currentTurns.stream()
                     .filter(t -> Set.of("pending", "analyzed").contains(t.get("status").toString()))
                     .map(t -> t.get("id").toString())
-                    .collect(java.util.stream.Collectors.toSet()));
-            if (dao.mapper().saveDetails(batch, persisted.toString()) != 1
+                    .collect(Collectors.toSet()));
+            if (dao.mapper().saveDetails(batch, LabJson.write(json, persisted)) != 1
                 || dao.mapper().incrementVersion(user, version) != 1) {
               throw LabException.conflict("저장 충돌입니다.");
             }
             memory.retain(user, user, "owner");
           });
       timing.mark("db_transaction");
-      ObjectNode response = (ObjectNode) profile(user);
+      Map<String, Object> response = profile(user);
       timing.mark("read_response_from_db");
       timing.success();
       return response;
@@ -826,43 +848,50 @@ public class LabService {
   }
 
   // ##### 실험 결과를 내보내는 메소드 #####
-  public JsonNode export(Long user) {
-    ObjectNode r = object();
-    r.set("profile", profile(user));
-    r.set("catalog", catalog.document());
-    ArrayNode all = json.createArrayNode();
+  public Map<String, Object> export(Long user) {
+    Map<String, Object> r = object();
+    Map<String, Object> profile = profile(user);
+    r.put("profile", profile);
+    r.put("catalog", catalog.document());
+    List<Object> all = LabJson.array();
     for (Map<String, Object> b : dao.mapper().batches(user)) {
       all.add(batch(user, (Long) b.get("id")));
     }
-    r.set("batches", all);
-    r.set("memories", tree(dao.mapper().memories(user)));
-    r.set("run", dao.parse(dao.requireUser(user).get("run_state")));
+    r.put("batches", all);
+    r.put("memories", tree(dao.mapper().memories(user)));
+    r.put("run", dao.parse(dao.requireUser(user).get("run_state")));
     // Ground truth is evaluator-only and is never returned by normal profile/chat
     // APIs.
-    JsonNode truth = dao.parse(dao.requireUser(user).get("persona")).path("scores");
-    ArrayNode errors = json.createArrayNode();
+    Object truth = LabJson.path(dao.parse(dao.requireUser(user).get("persona")), "scores");
+    List<Object> errors = LabJson.array();
     double sum = 0;
     int count = 0;
     for (String code : catalog.codes()) {
-      JsonNode point = r.path("profile").path("elements").path(code);
-      if (point.path("score").isNumber()) {
-        double error = Math.abs(point.path("score").asDouble() - truth.path(code).asDouble());
+      Object score = LabJson.path(profile, "elements", code, "score");
+      if (LabJson.isNumber(score)) {
+        double error =
+            Math.abs(
+                LabJson.decimal(score).doubleValue()
+                    - LabJson.decimal(LabJson.path(truth, code)).doubleValue());
         sum += error;
         count++;
-        errors.add(tree(Map.of("code", code, "absoluteError", error)));
+        Map<String, Object> item = LabJson.object();
+        item.put("code", code);
+        item.put("absoluteError", error);
+        errors.add(item);
       }
     }
-    ObjectNode evaluation = object();
+    Map<String, Object> evaluation = object();
     evaluation.put("observedElements", count);
     evaluation.put("totalElements", 140);
     if (count > 0) {
       evaluation.put("meanAbsoluteError", sum / count);
     } else {
-      evaluation.putNull("meanAbsoluteError");
+      evaluation.put("meanAbsoluteError", null);
     }
-    evaluation.set("errors", errors);
+    evaluation.put("errors", errors);
     evaluation.put("note", "합성 인물의 관찰된 요소만 비교한 실험 지표입니다. 실제 사람 재현 정확도를 의미하지 않습니다.");
-    r.set("evaluation", evaluation);
+    r.put("evaluation", evaluation);
     return r;
   }
 }

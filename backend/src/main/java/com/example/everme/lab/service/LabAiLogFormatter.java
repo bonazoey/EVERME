@@ -1,14 +1,14 @@
 package com.example.everme.lab.service;
 
+import java.util.Map;
+
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Human-readable formatting only; never changes the prompt sent to the model. */
 final class LabAiLogFormatter {
@@ -30,12 +30,11 @@ final class LabAiLogFormatter {
     ChatOptions options = request.prompt().getOptions();
     if (options instanceof LabResponsesOptions responses) {
       section(text, "RESPONSES INPUT", pretty(responses.input()));
-      ObjectNode settings =
-          json.createObjectNode()
-              .put("model", responses.model())
-              .put("reasoningEffort", responses.effort());
-      settings.set("schema", responses.schema());
-      settings.set("tools", json.valueToTree(responses.tools()));
+      Map<String, Object> settings = LabJson.object();
+      settings.put("model", responses.model());
+      settings.put("reasoningEffort", responses.effort());
+      settings.put("schema", responses.schema());
+      settings.put("tools", responses.tools());
       section(text, "MODEL OPTIONS", pretty(settings));
     } else {
       section(text, "MODEL OPTIONS", pretty(options));
@@ -72,8 +71,8 @@ final class LabAiLogFormatter {
       return value.substring(0, catalog) + "\nCATALOG\n" + content(value.substring(catalog + 9));
     }
     try {
-      JsonNode node = json.readTree(value);
-      if (node != null && node.isContainerNode()) {
+      Object node = json.readValue(value, Object.class);
+      if (LabJson.isMap(node) || LabJson.isList(node)) {
         return pretty(node);
       }
     } catch (Exception ignored) {

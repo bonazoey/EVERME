@@ -1,6 +1,7 @@
 package com.example.everme.lab.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.ai.document.Document;
@@ -53,7 +54,7 @@ public class LabRetrievalService {
 
   // ##### 현재 정보이용자와 대화방 범위를 검증하고 이전 대화를 검색하는 메소드 #####
   public List<Document> viewerHistory(Long owner, Long viewer, Long session, String question) {
-    var selected = dao.mapper().lockFreeSession(session);
+    Map<String, Object> selected = dao.mapper().lockFreeSession(session);
     if (selected == null
         || !owner.equals(((Number) selected.get("owner_id")).longValue())
         || !viewer.equals(((Number) selected.get("viewer_id")).longValue())

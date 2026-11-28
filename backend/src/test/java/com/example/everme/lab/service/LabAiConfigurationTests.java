@@ -14,8 +14,8 @@ class LabAiConfigurationTests {
                 .run(context->{
                     assertNull(context.getStartupFailure());assertInstanceOf(OpenAiChatModel.class,context.getBean("labChatModel"));
                     assertInstanceOf(OpenAiEmbeddingModel.class,context.getBean("labEmbeddingModel"));assertInstanceOf(LabResponsesChatModel.class,context.getBean("labResponsesChatModel"));
-                    assertEquals(1,context.getBeansOfType(LabAi.class).size());assertEquals("spring-ai",context.getBean(LabAi.class).models().path("framework").asText());
-                    assertFalse(context.getBean(LabAi.class).models().path("keyConfigured").asBoolean());
+                    assertEquals(1,context.getBeansOfType(LabAi.class).size());assertEquals("spring-ai",LabJson.text(context.getBean(LabAi.class).models().get("framework")));
+                    assertFalse(LabJson.bool(context.getBean(LabAi.class).models().get("keyConfigured")));
                 });
     }
 }

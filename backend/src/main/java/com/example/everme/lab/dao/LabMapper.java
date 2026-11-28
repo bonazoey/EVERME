@@ -1,94 +1,65 @@
 package com.example.everme.lab.dao;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.SelectProvider;
-import org.apache.ibatis.annotations.Update;
-import org.apache.ibatis.annotations.UpdateProvider;
 import org.springframework.context.annotation.Profile;
 
+// Clone Lab MyBatis 매퍼. SQL은 resources/mybatis/mapper/LabMapper.xml에 있다.
+// SQL 식별자(테이블·컬럼)가 들어가는 호출은 default 메소드에서 허용 목록을 검사한 뒤 XML 문장을 부른다.
 @Mapper
 @Profile("clone-lab")
 public interface LabMapper {
-  // ##### 영구 원문과 연결된 문맥 메시지를 중복 없이 보존하는 메소드 #####
-  @Insert(
-      """
-INSERT INTO clone_lab.context(conversation_id,content,type,timestamp,source_message_id,is_active)
-SELECT s.memory_key,v.content,v.type,v.received_at,m.id,false
-FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON s.session_id=m.session_id
-CROSS JOIN LATERAL (VALUES
-  (m.user_text,'USER',m.user_received_at),
-  (m.assistant_text,'ASSISTANT',m.assistant_received_at)
-) AS v(content,type,received_at)
-WHERE m.session_id=#{session}
-  AND m.pair_no > COALESCE((SELECT MAX(segment_no)*20
-    FROM clone_lab.context_summaries WHERE session_id=#{session}),0)
-ON CONFLICT (source_message_id,type) DO NOTHING
-""")
+  // ##### 필드 #####
+  Set<String> SEQUENCES =
+      Set.of("users.id", "sessions.session_id", "session_messages.id", "runs.run_id");
+  Set<String> PROFILE_TABLES =
+      Set.of("emotion", "values", "interests", "decision", "habits", "relations", "expression");
+
+  // ##### context: Spring AI ChatMemory 저장소 #####
   void preserveContext(Long session);
 
-  // ##### 가장 최근 20쌍만 활성화하고 이전 메시지는 논리 삭제하는 메소드 #####
-  @Update(
-      """
-      UPDATE clone_lab.context c SET is_active=COALESCE(c.source_message_id IN (
-        SELECT id FROM clone_lab.session_messages WHERE session_id=#{session}
-        ORDER BY pair_no DESC LIMIT 20),false)
-      WHERE c.conversation_id=CAST(#{session} AS varchar)
-        AND c.is_active IS DISTINCT FROM (c.source_message_id IN (
-          SELECT id FROM clone_lab.session_messages WHERE session_id=#{session}
-          ORDER BY pair_no DESC LIMIT 20))
-      """)
   void slideContext(Long session);
 
-  // ##### 요약 저장이 끝난 비활성 문맥만 삭제하는 메소드 #####
-  @org.apache.ibatis.annotations.Delete(
-      """
-      DELETE FROM clone_lab.context c USING clone_lab.session_messages m
-      WHERE c.source_message_id=m.id AND m.session_id=#{session} AND NOT c.is_active
-        AND m.pair_no <= COALESCE((SELECT MAX(segment_no)*20
-          FROM clone_lab.context_summaries WHERE session_id=#{session}),0)
-      """)
   void deleteSummarizedContext(Long session);
 
-  @org.apache.ibatis.annotations.Delete(
-      """
-      DELETE FROM clone_lab.context_summaries WHERE session_id=#{session}
-        AND segment_no > #{blocks}
-      """)
+  // ##### context_summaries: 세션 문맥 요약 #####
   void discardPrematureSummaries(@Param("session") Long session, @Param("blocks") int blocks);
 
-  @Select(
-      """
-      SELECT m.id,m.user_text,m.assistant_text FROM clone_lab.session_messages m
-      JOIN clone_lab.sessions s ON s.session_id=m.session_id
-      WHERE s.session_id=#{session} AND s.owner_id=#{owner} AND s.viewer_id=#{viewer}
-        AND s.conversation_type='viewer' AND m.embedding IS NULL ORDER BY m.pair_no LIMIT 32
-      """)
-  List<Map<String, Object>> viewerMissingEmbeddings(
-      @Param("owner") Long owner, @Param("viewer") Long viewer, @Param("session") Long session);
+  List<Map<String, Object>> sessionPairs(Long id);
 
-  @Select("SELECT id,name,profile_version,created_at FROM clone_lab.users ORDER BY created_at DESC")
+  List<Map<String, Object>> summaries(Long id);
+
+  int summary(
+      @Param("session") Long session,
+      @Param("segment") int segment,
+      @Param("start") Long start,
+      @Param("end") Long end,
+      @Param("content") String content);
+
+  void trimSummaries(Long id);
+
+  // ##### users: 테스트 사용자 #####
   List<Map<String, Object>> users();
 
-  @Select("SELECT id,name,persona::text,profile_version FROM clone_lab.users WHERE" + " id=#{id}")
   Map<String, Object> userRow(Long id);
 
+  Map<String, Object> lockUserRow(Long id);
+
+  // 사용자 + 최신 실행 상태(run_state). LabDao.requireUser가 사용한다.
   default Map<String, Object> user(Long id) {
     return withRun(userRow(id), id);
   }
 
+  // 사용자 행을 FOR UPDATE로 잠그고 run_state를 붙인다.
   default Map<String, Object> lockUser(Long id) {
     return withRun(lockUserRow(id), id);
   }
 
+  // runs 테이블의 최신 실행을 JSON 문자열로 붙인다. 실행이 없으면 "{}".
   private Map<String, Object> withRun(Map<String, Object> row, Long id) {
     if (row != null) {
       String state = latestRun(id);
@@ -97,119 +68,87 @@ ON CONFLICT (source_message_id,type) DO NOTHING
     return row;
   }
 
-  @Select(
-      "SELECT id,name,persona::text,profile_version FROM clone_lab.users WHERE"
-          + " id=#{id} FOR UPDATE")
-  Map<String, Object> lockUserRow(Long id);
-
-  @Insert(
-      "INSERT INTO clone_lab.users(id,name,persona) VALUES(#{id},#{name},CAST(#{persona} AS"
-          + " jsonb))")
   void createUser(
       @Param("id") Long id, @Param("name") String name, @Param("persona") String persona);
 
-  @Update(
-      "UPDATE clone_lab.users SET profile_version=profile_version+1 WHERE id=#{id} AND"
-          + " profile_version=#{version}")
   int incrementVersion(@Param("id") Long id, @Param("version") long version);
 
-  // 실행 컬럼을 원본으로 사용하고 state JSON에는 단계별 부가 정보만 저장한다.
-  @Select(
-      "SELECT state ||"
-          + " jsonb_build_object('runId',run_id::text,'batchId',session_id::text,'mode',mode,'topic',topic,'status',status,'error',error,'targetPairs',target_pairs,'generatedPairs',generated_pairs,'analyzedPairs',analyzed_pairs,'savedPairs',saved_pairs,'inputTokens',input_tokens,'outputTokens',output_tokens,'cachedTokens',cached_tokens,'llmElapsedMs',llm_elapsed_ms,'elapsedMs',llm_elapsed_ms,'wallElapsedMs',wall_elapsed_ms,'retryCount',retry_count)"
-          + " || CASE WHEN active_since IS NULL THEN '{}'::jsonb ELSE"
-          + " jsonb_build_object('activeSince',(extract(epoch from active_since)*1000)::bigint) END"
-          + " || CASE WHEN heartbeat_at IS NULL THEN '{}'::jsonb ELSE"
-          + " jsonb_build_object('heartbeatAt',(extract(epoch from heartbeat_at)*1000)::bigint) END"
-          + " FROM clone_lab.runs WHERE clone_owner_id=#{id} ORDER BY run_id DESC LIMIT 1")
+  // ##### runs: 자동 실행 #####
   String latestRun(Long id);
 
-  @UpdateProvider(type = LabRunSql.class, method = "upsert")
   void runState(@Param("id") Long id, @Param("state") String state);
 
-  @Select("SELECT clone_owner_id FROM clone_lab.runs WHERE status IN ('running','stopping')")
   List<Long> interruptedUsers();
 
-  @SelectProvider(type = LabRunSql.class, method = "nextId")
-  Long nextId(@Param("table") String table, @Param("column") String column);
+  void runResult(@Param("owner") Long owner, @Param("result") String result);
 
-  @Select(
-      "SELECT count(*)+1 FROM clone_lab.sessions WHERE owner_id=#{id} AND"
-          + " conversation_type='owner'")
+  // ##### 시퀀스 다음 값을 구하는 메소드 #####
+  // 허용 목록에 있는 테이블·컬럼만 받는다. 값은 바인딩 파라미터로 넘긴다.
+  default Long nextId(String table, String column) {
+    if (!SEQUENCES.contains(table + "." + column)) {
+      throw new IllegalArgumentException("허용되지 않은 시퀀스");
+    }
+    return nextSerialValue(table, column);
+  }
+
+  Long nextSerialValue(@Param("table") String table, @Param("column") String column);
+
+  // ##### sessions: 대화방(배치) #####
   int nextSequence(Long id);
 
-  @Insert(
-      "INSERT INTO"
-          + " clone_lab.sessions(session_id,owner_id,viewer_id,conversation_type,topic)"
-          + " VALUES(#{id},#{user},#{user},'owner',#{topic})")
   void createBatch(
       @Param("id") Long id,
       @Param("user") Long user,
       @Param("topic") String topic,
       @Param("sequence") int sequence);
 
-  // 기존 화면의 id/status 별칭은 유지하되 세션 전체 상태 컬럼은 만들지 않는다.
-  String SESSION_COLUMNS =
-      "session_id AS id,owner_id AS"
-          + " user_id,viewer_id,conversation_type,topic,created_at,analysis::text,"
-          + " COALESCE((analysis->>'turnCount')::int,0) AS turn_count, CASE WHEN EXISTS(SELECT 1"
-          + " FROM clone_lab.session_messages c WHERE c.session_id=s.session_id AND"
-          + " c.status='pending') THEN 'generated' WHEN EXISTS(SELECT 1 FROM"
-          + " clone_lab.session_messages c WHERE c.metadata->>'session_id'=s.session_id::text AND"
-          + " c.status='analyzed') THEN 'analyzed' WHEN COALESCE((analysis->>'turnCount')::int,0)>0"
-          + " THEN 'saved' ELSE 'generated' END AS status";
-
-  @Select(
-      "SELECT "
-          + SESSION_COLUMNS
-          + " FROM clone_lab.sessions s WHERE owner_id=#{user} AND conversation_type='owner'"
-          + " ORDER BY created_at DESC,session_id DESC")
   List<Map<String, Object>> batches(Long user);
 
-  @Select(
-      "SELECT "
-          + SESSION_COLUMNS
-          + " FROM clone_lab.sessions s WHERE session_id=#{id} AND owner_id=#{user} AND"
-          + " conversation_type='owner'")
   Map<String, Object> batch(@Param("user") Long user, @Param("id") Long id);
 
-  String CONTEXT_COLUMNS =
-      "id,session_id,sequence_no,created_at,status,metadata::text,pair_no::int AS"
-          + " ordinal,user_text,assistant_text";
+  int analysis(@Param("id") Long id, @Param("analysis") String analysis);
 
-  @Select(
-      "SELECT "
-          + CONTEXT_COLUMNS
-          + " FROM clone_lab.session_messages WHERE session_id=#{batch} ORDER BY sequence_no")
+  int saveDetails(@Param("id") Long id, @Param("analysis") String analysis);
+
+  void appended(@Param("id") Long id, @Param("analysis") String analysis);
+
+  void pipelineDetails(
+      @Param("id") Long id, @Param("analysis") String analysis, @Param("status") String status);
+
+  void topic(@Param("id") Long id, @Param("topic") String topic);
+
+  List<Map<String, Object>> savedSources(Long user);
+
+  Map<String, Object> lockSession(Long id);
+
+  Long sessionOwner(Long id);
+
+  Map<String, Object> lockFreeSession(Long id);
+
+  // ##### viewer 세션: 클론 대화 #####
+  void viewerSession(
+      @Param("id") Long id,
+      @Param("owner") Long owner,
+      @Param("actor") Long actor,
+      @Param("analysis") String analysis);
+
+  Map<String, Object> currentViewer(@Param("owner") Long owner, @Param("actor") Long actor);
+
+  List<Map<String, Object>> viewerTurns(
+      @Param("owner") Long owner, @Param("actor") Long actor, @Param("session") Long session);
+
+  List<Map<String, Object>> viewerMissingEmbeddings(
+      @Param("owner") Long owner, @Param("viewer") Long viewer, @Param("session") Long session);
+
+  // ##### session_messages: 원문 턴 #####
   List<Map<String, Object>> turns(Long batch);
 
-  @Select(
-      "SELECT * FROM (SELECT m.* FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON"
-          + " s.session_id=m.session_id WHERE s.owner_id=#{user} AND s.conversation_type='owner'"
-          + " ORDER BY m.sequence_no DESC LIMIT 100) r ORDER BY sequence_no")
   List<Map<String, Object>> recent(Long user);
 
-  @Select(
-      "SELECT m.id,m.user_text FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON"
-          + " s.session_id=m.session_id WHERE s.owner_id=#{user} AND s.conversation_type='owner'"
-          + " AND m.embedding IS NULL ORDER BY m.sequence_no")
   List<Map<String, Object>> missingEmbeddings(Long user);
 
-  @Update(
-      "UPDATE clone_lab.session_messages SET embedding=CAST(#{vector} AS vector) WHERE id=#{id} AND"
-          + " embedding IS NULL")
   void embedding(@Param("id") Long id, @Param("vector") String vector);
 
-  @Insert(
-      "INSERT INTO"
-          + " clone_lab.session_messages(id,session_id,content,embedding,metadata,user_text,assistant_text,user_received_at,assistant_received_at,pair_no,status)"
-          + " VALUES(#{id},(CAST(#{metadata} AS"
-          + " jsonb)->>'session_id')::bigint,#{content},CAST(#{vector} AS vector),CAST(#{metadata}"
-          + " AS jsonb),CAST(#{metadata} AS jsonb)->>'user_text',CAST(#{metadata} AS"
-          + " jsonb)->>'assistant_text',(CAST(#{metadata} AS"
-          + " jsonb)->>'user_received_at')::timestamptz,(CAST(#{metadata} AS"
-          + " jsonb)->>'assistant_received_at')::timestamptz,(CAST(#{metadata} AS"
-          + " jsonb)->>'ordinal')::bigint,CAST(#{status} AS clone_lab.message_status))")
   void context(
       @Param("id") Long id,
       @Param("content") String content,
@@ -217,203 +156,61 @@ ON CONFLICT (source_message_id,type) DO NOTHING
       @Param("metadata") String metadata,
       @Param("status") String status);
 
-  @Update(
-      "UPDATE clone_lab.sessions SET analysis=CAST(#{analysis} AS jsonb) WHERE session_id=#{id}")
-  int analysis(@Param("id") Long id, @Param("analysis") String analysis);
-
-  @Update(
-      "UPDATE clone_lab.session_messages SET status='analyzed' WHERE"
-          + " metadata->>'session_id'=CAST(#{id} AS text) AND status='pending'")
   void analyzed(Long id);
 
-  @Update(
-      "UPDATE clone_lab.session_messages SET status='saved' WHERE"
-          + " metadata->>'session_id'=CAST(#{id} AS text) AND status='analyzed'")
   int saved(Long id);
 
-  @Update(
-      "UPDATE clone_lab.sessions SET analysis=CAST(#{analysis} AS jsonb) WHERE session_id=#{id}")
-  int saveDetails(@Param("id") Long id, @Param("analysis") String analysis);
-
-  @Select(
-      "SELECT e->>'user_text' AS user_text FROM clone_lab.sessions s CROSS JOIN LATERAL"
-          + " jsonb_array_elements(COALESCE(s.analysis->'processedEvidence','[]'::jsonb)) e WHERE"
-          + " owner_id=#{user} AND conversation_type='owner'")
-  List<Map<String, Object>> savedSources(Long user);
-
-  @Update(
-      "UPDATE clone_lab.sessions SET analysis=CAST(#{analysis} AS jsonb) WHERE session_id=#{id}")
-  void appended(@Param("id") Long id, @Param("analysis") String analysis);
-
-  @Update(
-      "UPDATE clone_lab.session_messages SET status='pending' WHERE"
-          + " metadata->>'session_id'=CAST(#{id} AS text) AND status='analyzed'")
   void resetDraft(Long id);
 
-  @Update("UPDATE clone_lab.sessions SET topic=#{topic} WHERE session_id=#{id}")
-  void topic(@Param("id") Long id, @Param("topic") String topic);
+  void contextStatus(@Param("id") Long id, @Param("status") String status);
 
-  @Update(
-      "UPDATE clone_lab.sessions SET analysis=CAST(#{analysis} AS jsonb) WHERE session_id=#{id}")
-  void pipelineDetails(
-      @Param("id") Long id, @Param("analysis") String analysis, @Param("status") String status);
-
-  @Insert(
-      "INSERT INTO"
-          + " clone_lab.vector_store(owner_id,source_session_record_id,content,embedding,metadata)"
-          + " SELECT s.owner_id,m.id,m.content,m.embedding,m.metadata ||"
-          + " jsonb_build_object('record_type','conversation_archive','source_ids',jsonb_build_array(m.id::text),'source_excerpts',jsonb_build_array(jsonb_build_object('source_id',m.id::text,'user_text',m.user_text)))"
-          + " FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON"
-          + " s.session_id=m.session_id WHERE m.id=#{id} AND m.status='saved' AND m.embedding IS"
-          + " NOT NULL AND s.conversation_type='owner' ON CONFLICT(source_session_record_id) DO"
-          + " NOTHING")
+  // ##### vector_store: 장기 기억 #####
   int archive(Long id);
 
-  @Select(
-      "SELECT m.id FROM clone_lab.session_messages m JOIN clone_lab.sessions s ON"
-          + " s.session_id=m.session_id WHERE s.owner_id=#{owner} AND s.conversation_type='owner'"
-          + " ORDER BY m.sequence_no DESC OFFSET 100")
   List<Map<String, Object>> overflow(
       @Param("owner") Long owner, @Param("actor") Long actor, @Param("type") String type);
 
-  @Select(
-      "SELECT id,content,metadata::text FROM clone_lab.vector_store WHERE owner_id=#{user} ORDER BY"
-          + " created_at,id")
   List<Map<String, Object>> memories(Long user);
 
-  @Update(
-      "UPDATE clone_lab.session_messages SET status=CAST(#{status} AS clone_lab.message_status)"
-          + " WHERE id=#{id}")
-  void contextStatus(@Param("id") Long id, @Param("status") String status);
-
-  @Select(
-      "SELECT status='saved' AND embedding IS NOT NULL FROM clone_lab.session_messages WHERE"
-          + " id=#{id}")
   boolean archiveReady(Long id);
 
-  @Insert(
-      "INSERT INTO"
-          + " clone_lab.sessions(session_id,owner_id,viewer_id,conversation_type,analysis)"
-          + " VALUES(#{id},#{owner},#{actor},'viewer',CAST(#{analysis} AS jsonb))")
-  void viewerSession(
-      @Param("id") Long id,
-      @Param("owner") Long owner,
-      @Param("actor") Long actor,
-      @Param("analysis") String analysis);
+  // ##### profile_*: 7개 영역 점수 #####
+  // 영역 코드를 검사해 실제 테이블명으로 바꾼다. 요청이나 모델이 준 값은 여기서 거부된다.
+  static String profileTable(String domain) {
+    if (!PROFILE_TABLES.contains(domain)) {
+      throw new IllegalArgumentException("Unknown profile table");
+    }
+    return "clone_lab.profile_" + domain;
+  }
 
-  @Select(
-      "SELECT session_id,analysis::text FROM clone_lab.sessions WHERE owner_id=#{owner} AND"
-          + " viewer_id=#{actor} AND conversation_type='viewer' ORDER BY created_at"
-          + " DESC,session_id DESC LIMIT 1")
-  Map<String, Object> currentViewer(@Param("owner") Long owner, @Param("actor") Long actor);
+  // 영역 테이블에 빈 행 만들기
+  default void initialize(String table, Long user) {
+    initializeProfileRow(profileTable(table), user);
+  }
 
-  @Select(
-      "SELECT m.id,m.session_id,m.sequence_no,m.created_at,m.status,m.metadata::text,m.pair_no::int"
-          + " AS ordinal,m.user_text,m.assistant_text FROM clone_lab.session_messages m JOIN"
-          + " clone_lab.sessions s ON s.session_id=m.session_id WHERE s.owner_id=#{owner} AND"
-          + " s.viewer_id=#{actor} AND s.session_id=#{session} AND s.conversation_type='viewer'"
-          + " ORDER BY m.sequence_no")
-  List<Map<String, Object>> viewerTurns(
-      @Param("owner") Long owner, @Param("actor") Long actor, @Param("session") Long session);
+  // 영역 행 전체를 JSON 문자열로
+  default String profile(String table, Long user) {
+    return profileRow(profileTable(table), user);
+  }
 
-  @Select(
-      "SELECT session_id,owner_id,viewer_id,conversation_type,memory_key,analysis::text FROM"
-          + " clone_lab.sessions WHERE session_id=#{id} FOR UPDATE")
-  Map<String, Object> lockSession(Long id);
+  // 영역 점수·metadata 저장. 컬럼명은 소문자·밑줄만 허용한다.
+  default void profileUpdate(
+      String table, Long user, Map<String, Object> scores, String metadata) {
+    for (String column : scores.keySet()) {
+      if (!column.matches("[a-z][a-z_]*")) {
+        throw new IllegalArgumentException("Invalid column");
+      }
+    }
+    updateProfileRow(profileTable(table), user, scores, metadata);
+  }
 
-  @Select("SELECT owner_id FROM clone_lab.sessions WHERE session_id=#{id}")
-  Long sessionOwner(Long id);
+  void initializeProfileRow(@Param("table") String table, @Param("user") Long user);
 
-  @Select(
-      "SELECT owner_id,viewer_id,conversation_type FROM clone_lab.sessions WHERE session_id=#{id}")
-  Map<String, Object> lockFreeSession(Long id);
+  String profileRow(@Param("table") String table, @Param("user") Long user);
 
-  @Update(
-      "UPDATE clone_lab.runs SET result=CAST(#{result} AS jsonb) WHERE clone_owner_id=#{owner} AND"
-          + " run_id=(SELECT max(run_id) FROM clone_lab.runs WHERE clone_owner_id=#{owner}) AND"
-          + " status='completed'")
-  void runResult(@Param("owner") Long owner, @Param("result") String result);
-
-  @Select(
-      "SELECT id,pair_no,user_text,assistant_text FROM clone_lab.session_messages WHERE"
-          + " session_id=#{id} ORDER BY pair_no")
-  List<Map<String, Object>> sessionPairs(Long id);
-
-  @Select(
-      "SELECT id,session_id,segment_no,start_message_id,end_message_id,content FROM"
-          + " clone_lab.context_summaries WHERE session_id=#{id} ORDER BY segment_no")
-  List<Map<String, Object>> summaries(Long id);
-
-  @Insert(
-      "INSERT INTO"
-          + " clone_lab.context_summaries(session_id,segment_no,start_message_id,end_message_id,content)"
-          + " VALUES(#{session},#{segment},#{start},#{end},#{content}) ON"
-          + " CONFLICT(session_id,segment_no) DO NOTHING")
-  int summary(
-      @Param("session") Long session,
-      @Param("segment") int segment,
-      @Param("start") Long start,
-      @Param("end") Long end,
-      @Param("content") String content);
-
-  @org.apache.ibatis.annotations.Delete(
-      "DELETE FROM clone_lab.context_summaries WHERE session_id=#{id} AND segment_no NOT IN (SELECT"
-          + " segment_no FROM clone_lab.context_summaries WHERE session_id=#{id} ORDER BY"
-          + " segment_no DESC LIMIT 5)")
-  void trimSummaries(Long id);
-
-  @InsertProvider(type = ProfileSql.class, method = "initialize")
-  void initialize(@Param("table") String table, @Param("user") Long user);
-
-  @SelectProvider(type = ProfileSql.class, method = "read")
-  String profile(@Param("table") String table, @Param("user") Long user);
-
-  @UpdateProvider(type = ProfileSql.class, method = "update")
-  void profileUpdate(
+  void updateProfileRow(
       @Param("table") String table,
       @Param("user") Long user,
       @Param("scores") Map<String, Object> scores,
       @Param("metadata") String metadata);
-
-  /** Identifiers never come from SQL supplied by a request or a model. */
-  class ProfileSql {
-    private static final Set<String> TABLES =
-        Set.of("emotion", "values", "interests", "decision", "habits", "relations", "expression");
-
-    private static String table(Map<String, Object> p) {
-      String t = String.valueOf(p.get("table"));
-      if (!TABLES.contains(t)) {
-        throw new IllegalArgumentException("Unknown profile table");
-      }
-      return "clone_lab.profile_" + t;
-    }
-
-    public static String initialize(Map<String, Object> p) {
-      return "INSERT INTO " + table(p) + "(user_id) VALUES(#{user})";
-    }
-
-    public static String read(Map<String, Object> p) {
-      return "SELECT (to_jsonb(p)-'user_id'-'id')::text FROM "
-          + table(p)
-          + " p WHERE user_id=#{user}";
-    }
-
-    public static String update(Map<String, Object> p) {
-      @SuppressWarnings("unchecked")
-      Map<String, Object> scores = (Map<String, Object>) p.get("scores");
-      ArrayList<String> assignments = new ArrayList<String>();
-      for (String col : scores.keySet()) {
-        if (!col.matches("[a-z][a-z_]*")) {
-          throw new IllegalArgumentException("Invalid column");
-        }
-        assignments.add(col + "=#{scores." + col + "}");
-      }
-      assignments.add("metadata=CAST(#{metadata} AS jsonb)");
-      return "UPDATE "
-          + table(p)
-          + " SET "
-          + String.join(",", assignments)
-          + " WHERE user_id=#{user}";
-    }
-  }
 }

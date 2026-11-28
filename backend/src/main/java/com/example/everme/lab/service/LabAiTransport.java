@@ -3,10 +3,19 @@ package com.example.everme.lab.service;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
+import javax.net.ssl.SSLException;
+
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatusCode;
@@ -16,7 +25,6 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
@@ -63,16 +71,18 @@ public final class LabAiTransport {
   }
 
   // ##### 모델 요청을 처리하는 메소드 #####
-  public JsonNode request(String route, JsonNode body) {
+  // 요청 본문 Map은 RestClient의 Jackson 변환기가 직렬화하고, 응답 JSON 객체는 Map으로 받는다.
+  @SuppressWarnings("unchecked")
+  public Map<String, Object> request(String route, Map<String, Object> body) {
     return body == null
-        ? client.get().uri(route).retrieve().body(JsonNode.class)
+        ? client.get().uri(route).retrieve().body(Map.class)
         : client
             .post()
             .uri(route)
             .contentType(MediaType.APPLICATION_JSON)
             .body(body)
             .retrieve()
-            .body(JsonNode.class);
+            .body(Map.class);
   }
 
   public void begin() {
@@ -141,28 +151,25 @@ public final class LabAiTransport {
 
   // ##### 재시도 전 OpenAI 오류 원인과 요청 식별자를 기록하는 메소드 #####
   private void logProviderError(HttpRequest request, BufferedResponse response, int attempt) {
-    JsonNode error = json.createObjectNode();
+    Object error = null;
     try {
-      JsonNode body = json.readTree(response.bytes);
-      if (body != null) {
-        error = body.path("error");
-      }
+      error = LabJson.path(json.readValue(response.bytes, Object.class), "error");
     } catch (IOException ignored) {
       // JSON이 아닌 오류 응답은 본문 대신 상태 코드와 요청 ID로 추적한다.
     }
     log.warn(
         "lab_http_error requestId={} runId={} segment={} route={} status={} attempt={}"
             + " providerRequestId={} errorCode={} errorType={} errorMessage={}",
-        org.slf4j.MDC.get("labRequestId"),
-        org.slf4j.MDC.get("labRunId"),
-        org.slf4j.MDC.get("labSegment"),
+        MDC.get("labRequestId"),
+        MDC.get("labRunId"),
+        MDC.get("labSegment"),
         request.getURI().getPath(),
         response.status.value(),
         attempt,
         logValue(response.headers.getFirst("x-request-id")),
-        logValue(error.path("code").asText("unavailable")),
-        logValue(error.path("type").asText("unavailable")),
-        logValue(error.path("message").asText("unavailable")));
+        logValue(LabJson.text(LabJson.path(error, "code"), "unavailable")),
+        logValue(LabJson.text(LabJson.path(error, "type"), "unavailable")),
+        logValue(LabJson.text(LabJson.path(error, "message"), "unavailable")));
   }
 
   private String logValue(String value) {
@@ -176,22 +183,22 @@ public final class LabAiTransport {
 
   private boolean quotaError(byte[] body) {
     try {
-      JsonNode error = json.readTree(body).path("error");
-      return "insufficient_quota".equals(error.path("type").asText())
+      Object error = LabJson.path(json.readValue(body, Object.class), "error");
+      return "insufficient_quota".equals(LabJson.text(LabJson.path(error, "type")))
           || Set.of(
                   "insufficient_quota",
                   "credit_balance_exhausted",
                   "organization_usage_limit_exceeded",
                   "billing_hard_limit_reached",
                   "billing_not_active")
-              .contains(error.path("code").asText());
+              .contains(LabJson.text(LabJson.path(error, "code")));
     } catch (IOException ignored) {
       return false;
     }
   }
 
   static boolean retryableConnection(IOException failure) {
-    return !(failure instanceof javax.net.ssl.SSLException);
+    return !(failure instanceof SSLException);
   }
 
   static long retryAfter(String value) {
@@ -204,8 +211,8 @@ public final class LabAiTransport {
       try {
         return Math.max(
             0,
-            java.time.ZonedDateTime.parse(
-                        value, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+            ZonedDateTime.parse(
+                        value, DateTimeFormatter.RFC_1123_DATE_TIME)
                     .toInstant()
                     .toEpochMilli()
                 - System.currentTimeMillis());
@@ -219,15 +226,15 @@ public final class LabAiTransport {
     long wait =
         specified > 0
             ? specified
-            : (1000L << attempt) + java.util.concurrent.ThreadLocalRandom.current().nextLong(251);
+            : (1000L << attempt) + ThreadLocalRandom.current().nextLong(251);
     log.info(
         "lab_retry runId={} segment={} route={} attempt={} waitMs={}",
-        org.slf4j.MDC.get("labRunId"),
-        org.slf4j.MDC.get("labSegment"),
+        MDC.get("labRunId"),
+        MDC.get("labSegment"),
         route,
         attempt + 1,
         wait);
-    long end = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(wait);
+    long end = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(wait);
     try {
       while (System.nanoTime() < end) {
         checkRetry();
@@ -236,14 +243,14 @@ public final class LabAiTransport {
                 100,
                 Math.max(
                     1,
-                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(end - System.nanoTime()))));
+                    TimeUnit.NANOSECONDS.toMillis(end - System.nanoTime()))));
       }
       checkRetry();
       LabCallContext.retrying();
       retries.set(retries.get() + 1);
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
-      throw new java.io.InterruptedIOException("Retry interrupted");
+      throw new InterruptedIOException("Retry interrupted");
     }
   }
 
